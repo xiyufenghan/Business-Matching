@@ -1,5 +1,5 @@
 """
-商达撮合管理 - FastAPI 后端 (SQLite 版)
+教育行业商达撮合平台 - FastAPI 后端 (SQLite 版)
 提供 products / talents / matches 的完整 CRUD API + 用户认证系统
 数据库：SQLite（零运维，文件存储）
 前端静态文件通过 StaticFiles 挂载
@@ -74,7 +74,7 @@ def _decode_token(token: str) -> Optional[dict]:
         return None
 
 
-app = FastAPI(title="商达撮合管理 API")
+app = FastAPI(title="教育行业商达撮合平台 API")
 
 # ========== 全局异常处理 ==========
 @app.exception_handler(Exception)
