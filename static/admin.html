@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>商达撮合管理 · BizMatch</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#f5f3ff',
+              100: '#ede9fe',
+              200: '#ddd6fe',
+              300: '#c4b5fd',
+              400: '#a78bfa',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              800: '#5b21b6',
+              900: '#4c1d95'
+            }
+          },
+          boxShadow: {
+            'soft': '0 4px 24px -6px rgba(124, 58, 237, 0.12)',
+            'card': '0 2px 8px -2px rgba(15, 23, 42, 0.08)'
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- ECharts -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+  <!-- SheetJS for Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <!-- 顶部导航 -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
+    <div class="max-w-[1600px] mx-auto px-6 h-16 flex items-center gap-8 flex-nowrap overflow-x-auto whitespace-nowrap">
+      <div class="flex items-center gap-3 shrink-0">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 grid place-items-center text-white shadow-soft">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+            <path d="M12 2l3 6 6 .9-4.5 4.3 1.1 6.3L12 16.8 6.4 19.5 7.5 13.2 3 8.9 9 8z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="font-bold text-slate-900 leading-tight">商达撮合管理</div>
+          <div class="text-[11px] text-slate-400 leading-tight tracking-wide">BIZ × TALENT MATCHING</div>
+        </div>
+      </div>
+
+      <nav id="mainNav" class="flex items-center gap-4 ml-6 shrink-0 flex-nowrap">
+        <a data-route="dashboard" class="nav-link">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3zM13 21h8V11h-8zM3 21h8v-6H3zM13 3v6h8V3z"/></svg>
+          数据看板
+        </a>
+        <a data-route="matching" class="nav-link">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17l10-10M7 7h4M17 17h-4"/><circle cx="7" cy="7" r="3"/><circle cx="17" cy="17" r="3"/></svg>
+          撮合管理
+        </a>
+        <a data-route="products" class="nav-link">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7L12 3 4 7v10l8 4 8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg>
+          商品货盘
+        </a>
+        <a data-route="talents" class="nav-link">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="4"/><path d="M17 11a3 3 0 100-6M3 21v-1a6 6 0 0112 0v1M17 14a6 6 0 014 5.65V21"/></svg>
+          达人管理
+        </a>
+        <!-- 智能匹配已移至管理后台 -->
+      </nav>
+
+      <div class="ml-auto flex items-center gap-4 shrink-0 flex-nowrap">
+        <div class="hidden md:flex items-center gap-2 px-3 h-9 rounded-lg bg-slate-100 text-slate-500 text-sm w-72">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="globalSearch" placeholder="搜索达人 / 商品 / 撮合单号…" class="bg-transparent outline-none flex-1 text-slate-700 placeholder:text-slate-400" />
+          <kbd class="text-[10px] px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-400">Ctrl K</kbd>
+        </div>
+        <a href="admin.html" target="_blank" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition" title="打开管理后台">
+          <svg viewBox="0 0 24 24" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+          管理后台
+        </a>
+        <button class="relative w-9 h-9 grid place-items-center rounded-lg hover:bg-slate-100 text-slate-500" title="通知">
+          <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>
+          <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500"></span>
+        </button>
+        <div id="userInfo" class="flex items-center gap-2 pl-3 border-l border-slate-200">
+          <img id="userAvatar" src="" alt="avatar" class="w-8 h-8 rounded-full bg-slate-200 object-cover" style="display:none"/>
+          <div class="text-sm leading-tight">
+            <div id="userName" class="font-medium text-slate-700">管理员</div>
+            <div id="userDept" class="text-xs text-slate-400">商达运营中心</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容 -->
+  <main id="appMain" class="max-w-[1600px] mx-auto px-6 py-6">
+    <!-- 视图将通过JS渲染 -->
+  </main>
+
+  <!-- 通用 Modal 容器 -->
+  <div id="modalRoot"></div>
+
+  <!-- Toast 容器 -->
+  <div id="toastRoot" class="fixed top-20 right-6 z-[100] flex flex-col gap-2"></div>
+
+  <!-- 页脚 -->
+  <footer class="mt-10 py-6 border-t border-slate-200 text-center text-sm text-slate-400">
+    <p>由 <a href="https://with.woa.com/" style="color: #8A2BE2;" target="_blank">With</a> 通过自然语言生成</p>
+  </footer>
+
+  <!-- 脚本 -->
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
