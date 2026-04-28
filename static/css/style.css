@@ -1,0 +1,1119 @@
+/* ============ 全局基础 ============ */
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", Roboto, sans-serif;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+/* ============ 导航链接 ============ */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 22px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s ease;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.nav-link:hover { background: #f1f5f9; color: #0f172a; }
+.nav-link.active {
+  background: linear-gradient(135deg, #ede9fe 0%, #e0e7ff 100%);
+  color: #6d28d9;
+}
+
+/* ============ 通用卡片 ============ */
+.card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15,23,42,.03);
+}
+
+/* ============ 按钮 ============ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 0 14px; height: 36px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: all .15s ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.btn-primary { background: #7c3aed; color: #fff; }
+.btn-primary:hover { background: #6d28d9; }
+.btn-ghost { background: #fff; color: #475569; border-color: #e2e8f0; }
+.btn-ghost:hover { background: #f8fafc; color: #0f172a; }
+.btn-danger { background: #fee2e2; color: #b91c1c; }
+.btn-danger:hover { background: #fecaca; }
+.btn-sm { height: 30px; font-size: 13px; padding: 0 10px; }
+
+/* ============ 输入框 ============ */
+.inp {
+  height: 36px; padding: 0 12px;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  font-size: 14px; outline: none; background: #fff;
+  transition: all .15s ease;
+  width: 100%;
+}
+.inp:focus { border-color: #a78bfa; box-shadow: 0 0 0 3px rgba(167,139,250,.15); }
+textarea.inp { height: auto; padding: 8px 12px; min-height: 72px; resize: vertical; }
+select.inp { appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+  padding-right: 32px;
+}
+
+.form-label { display:block; font-size:13px; color:#475569; margin-bottom:6px; font-weight:500; }
+.form-label .req { color:#ef4444; margin-left:2px; }
+
+/* ============ 表格 ============ */
+.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.tbl thead th {
+  background: #f8fafc; color: #64748b; font-weight: 500;
+  padding: 10px 12px; text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap; font-size: 13px;
+}
+.tbl tbody td {
+  padding: 12px; border-bottom: 1px solid #f1f5f9; color: #334155;
+  vertical-align: top;
+}
+/* 单行/数字/操作列恢复垂直居中，避免 badge 贴到顶部显得突兀 */
+.tbl tbody td.nowrap,
+.tbl tbody td.num-col,
+.tbl tbody td.actions-col {
+  vertical-align: middle;
+}
+.tbl tbody tr:hover { background: #faf9ff; }
+.tbl tbody tr.selected { background: #f5f3ff; }
+
+/* ============ 徽章 / 状态 ============ */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 500; line-height: 1;
+  padding: 4px 8px; border-radius: 6px;
+  background: #f1f5f9; color: #475569;
+}
+.badge-dot::before {
+  content:''; width:6px; height:6px; border-radius:50%; background: currentColor;
+}
+.badge-blue   { background:#dbeafe; color:#1d4ed8; }
+.badge-purple { background:#ede9fe; color:#6d28d9; }
+.badge-amber  { background:#fef3c7; color:#b45309; }
+.badge-green  { background:#dcfce7; color:#15803d; }
+.badge-rose   { background:#ffe4e6; color:#be123c; }
+.badge-slate  { background:#f1f5f9; color:#475569; }
+.badge-cyan   { background:#cffafe; color:#0e7490; }
+
+/* ============ Tab ============ */
+.tab {
+  padding: 8px 4px; font-size: 14px; color: #64748b; cursor: pointer;
+  border-bottom: 2px solid transparent; font-weight: 500;
+}
+.tab:hover { color: #334155; }
+.tab.active { color: #6d28d9; border-bottom-color: #7c3aed; }
+
+/* ============ 模态 ============ */
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(15,23,42,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 90; padding: 20px;
+  animation: fadeIn .2s ease;
+}
+.modal-card {
+  background: #fff; border-radius: 16px;
+  width: 100%; max-height: 90vh; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px -10px rgba(15,23,42,.3);
+  animation: slideUp .25s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ============ 漏斗步骤 ============ */
+.step {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 10px; cursor: pointer;
+  background: #f8fafc; border: 1px solid transparent;
+}
+.step.active { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+
+/* ============ 拖拽上传 ============ */
+.drop-zone {
+  border: 2px dashed #cbd5e1; border-radius: 12px;
+  padding: 32px; text-align: center; cursor: pointer;
+  transition: all .15s ease;
+  background: #f8fafc;
+}
+.drop-zone:hover, .drop-zone.dragover {
+  border-color: #8b5cf6; background: #f5f3ff;
+}
+
+/* ============ Toast ============ */
+.toast {
+  min-width: 260px; padding: 12px 16px; border-radius: 10px;
+  background: #fff; border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 32px -8px rgba(15,23,42,.18);
+  display: flex; align-items: center; gap: 10px;
+  font-size: 14px;
+  animation: slideIn .2s ease;
+}
+.toast.success { border-left: 3px solid #10b981; }
+.toast.error   { border-left: 3px solid #ef4444; }
+.toast.info    { border-left: 3px solid #3b82f6; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ============ 漏斗图特殊 ============ */
+.funnel-stage {
+  position: relative;
+  color: #fff;
+  font-weight: 500;
+  padding: 14px 18px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+/* 匹配得分条 */
+.score-bar { height: 6px; border-radius: 3px; background: #f1f5f9; overflow: hidden; }
+.score-bar > span { display:block; height:100%; background: linear-gradient(90deg,#8b5cf6,#ec4899); }
+
+/* 动画 */
+.fade-in { animation: fadeIn .25s ease; }
+
+/* 空状态 */
+.empty {
+  padding: 48px 16px; text-align: center; color: #94a3b8; font-size: 14px;
+}
+.empty svg { width: 56px; height: 56px; margin: 0 auto 12px; color: #cbd5e1; }
+
+/* 可编辑单元 */
+td.editable { cursor: pointer; }
+td.editable:hover { background: #f5f3ff; }
+td.editing { padding: 0 !important; }
+td.editing input, td.editing select {
+  width: 100%; height: 44px; border: 2px solid #8b5cf6; border-radius: 0;
+  padding: 0 10px; font-size: 14px; outline: none;
+}
+
+/* 商品货盘编辑态适配：缩小高度，取消折行限制 */
+.tbl.products-tbl td.editing {
+  -webkit-line-clamp: unset;
+  display: table-cell;
+  overflow: visible;
+  max-height: none;
+}
+.tbl.products-tbl td.editing input,
+.tbl.products-tbl td.editing select {
+  height: 36px;
+  font-size: 12.5px;
+  padding: 0 8px;
+}
+
+/* checkbox 样式简化 */
+input[type="checkbox"].chk {
+  width: 16px; height: 16px; accent-color: #7c3aed; cursor: pointer;
+}
+
+/* 卡片 hover */
+.hover-lift { transition: transform .15s ease, box-shadow .15s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -6px rgba(15,23,42,.08); }
+
+/* 进度环（用SVG）文字居中 */
+.ring-wrap { position: relative; width: 80px; height: 80px; }
+.ring-wrap .text { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; color:#334155; }
+
+/* 趋势数字颜色 */
+.trend-up { color: #15803d; }
+.trend-down { color: #be123c; }
+
+/* ============ 分页器 ============ */
+.pg-btn {
+  min-width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0 8px;
+  font-size: 13px; color: #475569;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;
+  cursor: pointer; transition: all .15s ease;
+}
+.pg-btn:hover:not(:disabled) { background: #f5f3ff; color: #6d28d9; border-color: #c4b5fd; }
+.pg-btn.pg-active {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: #fff; border-color: transparent;
+}
+.pg-btn:disabled { opacity: .4; cursor: not-allowed; }
+.pg-gap { padding: 0 4px; color: #94a3b8; font-size: 13px; }
+
+/* 导航条：桌面端不折行，中小屏下自动换行以适配手机宽度 */
+#mainNav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#mainNav::-webkit-scrollbar { display: none; }
+.nav-link { flex-shrink: 0; }
+
+/* 响应式：中等屏幕下保持完整显示但更紧凑 */
+@media (max-width: 1024px) {
+  #mainNav { gap: 6px; margin-left: 0; }
+  .nav-link { padding: 6px 12px; font-size: 13px; letter-spacing: 0.02em; }
+}
+
+/* 手机宽度：导航栏允许折行展示，顶栏整体改为多行布局 */
+@media (max-width: 768px) {
+  header .max-w-\[1600px\] {
+    height: auto !important;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    white-space: normal;
+    gap: 10px;
+  }
+  #mainNav {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;       /* 关键：折行展示 */
+    overflow-x: visible;
+    margin-left: 0;
+    gap: 6px;
+    justify-content: flex-start;
+    padding-top: 4px;
+    border-top: 1px solid #f1f5f9;
+  }
+  .nav-link {
+    padding: 6px 10px;
+    font-size: 12.5px;
+    letter-spacing: 0;
+    gap: 4px;
+  }
+  .nav-link svg { width: 14px; height: 14px; }
+  /* 手机宽度下，隐藏搜索框与通知按钮的占位，使右侧更紧凑 */
+  header .hidden.md\:flex { display: none !important; }
+}
+
+/* 超小屏幕（< 480px）进一步紧凑 */
+@media (max-width: 480px) {
+  #mainNav { justify-content: space-between; }
+  .nav-link { padding: 5px 8px; font-size: 12px; }
+  #userInfo .text-sm { display: none; }
+}
+
+/* ============ 全局手机自适应（<= 768px） ============ */
+@media (max-width: 768px) {
+  /* 顶栏/主内容容器 padding 收窄，避免横向溢出 */
+  header .max-w-\[1600px\] { padding-left: 12px !important; padding-right: 12px !important; }
+  main#appMain { padding-left: 12px !important; padding-right: 12px !important; padding-top: 14px !important; padding-bottom: 14px !important; }
+
+  /* 页面标题区字号缩小 */
+  h1.text-2xl { font-size: 20px !important; line-height: 1.3; }
+  .text-sm { font-size: 13px; }
+
+  /* 按钮组允许换行，按钮整体小号化 */
+  .flex.items-end.justify-between { align-items: flex-start; }
+  .flex.items-end.justify-between > div:last-child,
+  .flex.items-center.justify-between > div:last-child {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .btn { height: 34px; font-size: 13px; padding: 0 10px; }
+  .btn-sm { height: 28px; font-size: 12px; padding: 0 8px; }
+  .btn svg { width: 14px; height: 14px; }
+
+  /* 卡片内边距收窄 */
+  .card.p-5 { padding: 14px !important; }
+  .card.p-4 { padding: 12px !important; }
+
+  /* 表格：外层容器横向滚动兜底 */
+  .tbl { min-width: 640px; font-size: 13px; }
+  .tbl thead th { padding: 8px 10px; font-size: 12px; }
+  .tbl tbody td { padding: 10px; }
+  /* 如果表格父元素未设置 overflow，强制可横向滚动 */
+  .card > .tbl,
+  .card > table.tbl {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Modal 在手机上占满宽度 */
+  .modal-mask { padding: 10px; align-items: flex-end; }
+  .modal-card { max-width: 100% !important; max-height: 94vh; border-radius: 14px; }
+  .modal-card .px-6 { padding-left: 14px !important; padding-right: 14px !important; }
+  .modal-card .py-4 { padding-top: 12px !important; padding-bottom: 12px !important; }
+  .modal-card .py-5 { padding-top: 14px !important; padding-bottom: 14px !important; }
+
+  /* 看板视图列（撮合管理）：改为横向可滚动，列宽固定 */
+  .kanban-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .kanban-col { min-width: 260px; }
+
+  /* 输入框、选择框在小屏下不占太大宽度 */
+  .inp { height: 34px; font-size: 13px; }
+  select.inp { padding-right: 28px; }
+
+  /* 数据看板 Tab/工具条允许换行 */
+  .inline-flex.rounded-lg.bg-slate-100 { flex-wrap: wrap; }
+
+  /* 图表高度在手机上适当缩小 */
+  [id$="Chart"] { height: 240px !important; }
+
+  /* 筛选区的 min-w-[240px] 取消，让筛选项自适应换行 */
+  [class*="min-w-\[240px\]"] { min-width: 100% !important; }
+
+  /* 分页器紧凑 */
+  .pg-wrap { padding: 10px 8px !important; gap: 8px !important; justify-content: center !important; }
+  .pg-wrap > div { font-size: 12px; }
+  .pg-btn { min-width: 28px; height: 28px; font-size: 12px; }
+
+  /* 面包屑/描述文案自动换行 */
+  .whitespace-nowrap { white-space: normal !important; }
+
+  /* 智能匹配卡片网格：已使用 Tailwind md:grid-cols-2，手机保持单列，此处仅小调 */
+  .card.hover-lift.relative { padding: 12px !important; }
+
+  /* 商品卡片图片网格：小屏限制图片高度 */
+  .card img { max-height: 180px; object-fit: cover; }
+
+  /* Modal 内部的多列表单在手机上降为单列 */
+  .modal-card .grid.grid-cols-2,
+  .modal-card .grid.grid-cols-3,
+  .modal-card .col-span-2.grid.grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+  /* 模态框内 footer 按钮容器换行 */
+  .modal-card .border-t.border-slate-100.flex.justify-end { flex-wrap: wrap; }
+
+  /* 达人管理统计卡片：在 768px 下 3 列 */
+  .grid.grid-cols-2.md\:grid-cols-5 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  /* 筛选区在 768px 下每项占约 1/3 宽 */
+  .card.p-4 .flex.flex-wrap.items-center.gap-2 .inp { min-width: 0 !important; flex: 1 1 30% !important; width: auto !important; }
+  .card.p-4 .flex.flex-wrap.items-center.gap-2 > #kwInp { flex: 1 1 100% !important; width: 100% !important; }
+}
+
+/* ============ 超小屏（<= 480px）再进一步 ============ */
+@media (max-width: 480px) {
+  h1.text-2xl { font-size: 18px !important; }
+  .text-2xl { font-size: 20px !important; }
+  .btn { padding: 0 8px; }
+  .modal-card { border-radius: 12px; }
+  /* 页面标题与按钮组改为竖向堆叠 */
+  .flex.items-end.justify-between.mb-5 {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .flex.items-end.justify-between.mb-5 > div:last-child {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  /* 达人/商品列表的统计卡片：2 列布局 */
+  .grid.grid-cols-2.md\:grid-cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid.grid-cols-2.md\:grid-cols-5 > .card:first-child { grid-column: span 2; }
+  /* KPI 卡片 2 列 */
+  .grid.grid-cols-2.md\:grid-cols-3.lg\:grid-cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  /* 筛选区间距压缩 */
+  .card.p-4 .flex.flex-wrap.items-center.gap-2 { gap: 6px; }
+  .card.p-4 .flex.flex-wrap.items-center.gap-2 .inp { flex: 1 1 45% !important; min-width: 0 !important; width: auto !important; }
+  .card.p-4 .flex.flex-wrap.items-center.gap-2 > #kwInp { flex: 1 1 100% !important; width: 100% !important; }
+}
+
+/* ============ 序号列样式（单列，可点击编辑） ============ */
+.seq-cell {
+  white-space: nowrap;
+  text-align: center;
+}
+.seq-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all .15s;
+  user-select: none;
+}
+.seq-badge:hover {
+  background: #ede9fe;
+  color: #6d28d9;
+  border-color: #c4b5fd;
+}
+.seq-badge::after {
+  content: '✎';
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.seq-badge:hover::after {
+  opacity: .8;
+}
+.seq-weight-inp {
+  width: 56px;
+  height: 26px;
+  padding: 0 4px;
+  border: 1px solid #8b5cf6;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #334155;
+  text-align: center;
+  background: #fff;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============ 模糊搜索下拉 ============ */
+.search-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px -12px rgba(15, 23, 42, 0.18);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.search-suggest.hidden { display: none; }
+.search-suggest-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background .12s;
+}
+.search-suggest-item:last-child { border-bottom: none; }
+.search-suggest-item:hover,
+.search-suggest-item.active {
+  background: linear-gradient(to right, #f5f3ff, #ffffff);
+}
+.search-suggest-empty {
+  padding: 16px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* ============ 诊断卡片 ============ */
+.diagnosis-card {
+  position: relative;
+  overflow: hidden;
+}
+.diagnosis-card::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.12), transparent 70%);
+  pointer-events: none;
+}
+.diagnosis-card > * { position: relative; z-index: 1; }
+
+/* 移动端对新元素的响应 */
+@media (max-width: 768px) {
+  .seq-weight-inp { width: 48px; height: 24px; font-size: 11px; }
+  .seq-badge { min-width: 28px; height: 22px; font-size: 11px; padding: 0 6px; }
+  .seq-badge::after { display: none; }
+  .search-suggest { max-height: 260px; }
+}
+
+/* ============ 电脑屏幕自适应（桌面端分档） ============ */
+
+/* 中等桌面：1024 ~ 1280px，维持紧凑布局 */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  header .max-w-\[1600px\],
+  main#appMain { max-width: 100% !important; padding-left: 24px; padding-right: 24px; }
+  .tbl { font-size: 13px; }
+  .tbl thead th { padding: 9px 10px; }
+  .tbl tbody td { padding: 10px; }
+  h1.text-2xl { font-size: 22px; }
+}
+
+/* 标准桌面：1280 ~ 1536px，维持默认容器 1600px 上限 */
+@media (min-width: 1280px) and (max-width: 1535px) {
+  header .max-w-\[1600px\],
+  main#appMain { max-width: 1280px; padding-left: 28px; padding-right: 28px; }
+}
+
+/* 大桌面：1536 ~ 1920px */
+@media (min-width: 1536px) and (max-width: 1919px) {
+  header .max-w-\[1600px\],
+  main#appMain { max-width: 1520px; padding-left: 32px; padding-right: 32px; }
+  h1.text-2xl { font-size: 26px; }
+  .card.p-5 { padding: 22px; }
+  [id$="Chart"] { height: 360px !important; }
+}
+
+/* 超宽桌面：1920px+（4K/宽屏办公场景） */
+@media (min-width: 1920px) {
+  header .max-w-\[1600px\],
+  main#appMain { max-width: 1760px; padding-left: 40px; padding-right: 40px; }
+  h1.text-2xl { font-size: 28px; line-height: 1.25; }
+  .card.p-5 { padding: 24px; }
+  .card.p-4 { padding: 18px; }
+  .tbl { font-size: 14.5px; }
+  .tbl thead th { padding: 12px 14px; font-size: 13.5px; }
+  .tbl tbody td { padding: 14px; }
+  [id$="Chart"] { height: 400px !important; }
+  .btn { height: 38px; }
+  /* KPI 卡片在超宽屏时文案字号上调 */
+  .grid.grid-cols-2.md\:grid-cols-3.lg\:grid-cols-5 .text-2xl { font-size: 28px; }
+}
+
+/* 4K 超大桌面：2560px+ */
+@media (min-width: 2560px) {
+  header .max-w-\[1600px\],
+  main#appMain { max-width: 2200px; padding-left: 48px; padding-right: 48px; }
+  [id$="Chart"] { height: 460px !important; }
+}
+
+/* 桌面端通用：确保卡片网格在大屏时更均衡、间距更合理 */
+@media (min-width: 1280px) {
+  /* 让宽表在容器内自然撑满，不再强制最小宽度 */
+  main#appMain .card > .tbl,
+  main#appMain .card > table.tbl { min-width: 100%; }
+
+  /* 筛选区：桌面端允许搜索框与筛选栏并排，同一行对齐 */
+  .card.p-4 .flex.flex-wrap.items-center.gap-2 > .inp { flex-shrink: 0; }
+}
+
+/* 红色五角星徽标：撮合列表/看板/详情 用于标识"变化佣金率 > 商品佣金率" */
+.commission-star {
+  filter: drop-shadow(0 1px 1.5px rgba(239, 68, 68, 0.35));
+  animation: commission-star-pulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes commission-star-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.15); opacity: 0.85; }
+}
+
+/* ============ 商品货盘表格专用样式 ============
+ * 目标：
+ * 1) 字体适当缩小，列距更紧凑；
+ * 2) 文本自动 wrap，但最多折行两行，超出用省略号；
+ * 3) 桌面端不再强制横向滚动（≥1280px 铺满容器），中等屏保留横向滚动，手机端紧凑显示；
+ * 4) 图片、操作、价格、库存列保持不折行；链接单行省略号。
+ */
+.tbl.products-tbl {
+  font-size: 12.5px;
+  table-layout: fixed;
+  width: 100%;
+}
+.tbl.products-tbl thead th {
+  padding: 8px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+}
+.tbl.products-tbl tbody tr,
+.tbl.talents-tbl tbody tr {
+  /* 统一每行最小高度，避免因为单元格高度差异造成"错行"视觉 */
+  height: 58px;
+}
+/* 强制 td 最大高度（第36版本错行修复方法延续）：
+ * 即使某一列（目标人群 tag-list、规格多行、供应链多行、达人品类赛道多值等）内容会换行，
+ * 也严格限制在 58px 内，多余内容由 overflow:hidden 裁剪，完全杜绝"某一行被撑高"导致
+ * 与其他行错位的现象。
+ */
+.tbl.products-tbl tbody td,
+.tbl.talents-tbl tbody td {
+  max-height: 58px;
+  overflow: hidden;
+  vertical-align: top;
+}
+/* 编辑态下允许展开，避免编辑控件被裁剪 */
+.tbl.products-tbl tbody td.editing,
+.tbl.products-tbl tbody td.editable.editing,
+.tbl.talents-tbl tbody td.editing,
+.tbl.talents-tbl tbody td.editable.editing {
+  max-height: none;
+  overflow: visible;
+}
+/* 达人表格常见多值 / 多行单元格：统一套用 2 行省略 */
+.tbl.talents-tbl tbody td {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.tbl.talents-tbl tbody td > .clamp-2-inner,
+.tbl.talents-tbl tbody td .tag-list {
+  max-height: 2.9em;
+  overflow: hidden;
+}
+.tbl.talents-tbl tbody td.editing > .clamp-2-inner,
+.tbl.talents-tbl tbody td.editing .tag-list,
+.tbl.talents-tbl tbody td.editable.editing > .clamp-2-inner,
+.tbl.talents-tbl tbody td.editable.editing .tag-list {
+  max-height: none;
+  overflow: visible;
+}
+.tbl.products-tbl tbody td {
+  padding: 8px 8px;
+  /* 关键：所有列内容从顶部开始渲染，确保\"图片 / 链接 / 多行文字\"等混合内容在同一水平基线 */
+  vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+/* 纯数字/操作/图片/checkbox 这类单行列，保留顶端对齐与两行文字列首行对齐 */
+.tbl.products-tbl tbody td.nowrap,
+.tbl.products-tbl tbody td.num-col,
+.tbl.products-tbl tbody td.actions-col,
+.tbl.products-tbl tbody td.link-col {
+  vertical-align: top;
+}
+
+/* 默认所有可文字折行的 td 限制两行省略 */
+.tbl.products-tbl tbody td.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 2.9em;
+}
+/* 通用版：使 .clamp-2 在其他表格（如达人管理）也生效 */
+.tbl tbody td.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 3em;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+/* 关键修复（第36版本处理方法）：
+ * 当 clamp-2 的 td 内部使用 flex 容器（如 .tag-list 目标人群、品类赛道）时，
+ * -webkit-line-clamp 对 flex 子元素不生效，会导致该 td 被撑出 3~4 行，
+ * 进而让整行高度超过 58px，相邻行视觉错行。
+ * 这里对 td 内的 .tag-list.clamp-2-inner 显式限高 + overflow:hidden，
+ * 与行固定 58px 高度配合，杜绝错行。
+ */
+.tbl.products-tbl tbody td.clamp-2 .tag-list.clamp-2-inner,
+.tbl tbody td.clamp-2 .tag-list.clamp-2-inner {
+  max-height: 2.9em;
+  overflow: hidden;
+}
+.tbl.products-tbl tbody td.editable.editing .tag-list.clamp-2-inner,
+.tbl tbody td.editable.editing .tag-list.clamp-2-inner {
+  max-height: none;
+  overflow: visible;
+}
+/* 通用两行省略工具类：
+ * 场景：td 内部由多个 <div> 组成（视频号+公众号、更新频率短/直、近月销售额总+细分…）。
+ * 这些 td 由于堆叠多个块级子元素，高度常超过 2 行，导致整行视觉不对齐(错行)。
+ * 加 .cell-2line 后整个 td 最多显示两行并溢出省略，与其他列保持行高一致。
+ */
+.tbl tbody td.cell-2line {
+  max-height: 3.2em;
+  overflow: hidden;
+  line-height: 1.45;
+  position: relative;
+}
+.tbl tbody td.cell-2line > * {
+  line-height: 1.45;
+}
+.tbl tbody td.cell-2line.clamp-expanded {
+  max-height: none;
+  overflow: visible;
+}
+.clamp-2-inner {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 用于 td 内部独立块（如标题+编号双行时，用在内层 div） */
+.tbl.products-tbl .clamp-2-inner {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tbl.products-tbl .clamp-1 {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 数字/金额/操作列保持不折行 */
+.tbl.products-tbl td.nowrap,
+.tbl.products-tbl td.num-col,
+.tbl.products-tbl td.actions-col { white-space: nowrap; }
+
+/* 图书货盘各列宽度（≥1280px） */
+@media (min-width: 1280px) {
+  .tbl.products-tbl.book-tbl { min-width: 100%; }
+  .tbl.products-tbl.book-tbl col.col-chk      { width: 36px; }
+  .tbl.products-tbl.book-tbl col.col-seq      { width: 74px; }
+  .tbl.products-tbl.book-tbl col.col-img      { width: 56px; }
+  .tbl.products-tbl.book-tbl col.col-name     { width: 15%; }
+  .tbl.products-tbl.book-tbl col.col-audience { width: 82px; }
+  .tbl.products-tbl.book-tbl col.col-cat      { width: 90px; }
+  .tbl.products-tbl.book-tbl col.col-spec     { width: 9%; }
+  .tbl.products-tbl.book-tbl col.col-price    { width: 76px; }
+  .tbl.products-tbl.book-tbl col.col-comm     { width: 10%; }
+  .tbl.products-tbl.book-tbl col.col-adcomm   { width: 10%; }
+  .tbl.products-tbl.book-tbl col.col-logi     { width: 86px; }
+  .tbl.products-tbl.book-tbl col.col-stock    { width: 68px; }
+  .tbl.products-tbl.book-tbl col.col-supplier { width: 11%; }
+  .tbl.products-tbl.book-tbl col.col-link     { width: 10%; }
+  .tbl.products-tbl.book-tbl col.col-actions  { width: 112px; }
+}
+
+/* 课程货盘各列宽度（≥1280px） */
+@media (min-width: 1280px) {
+  .tbl.products-tbl.course-tbl col.col-chk     { width: 36px; }
+  .tbl.products-tbl.course-tbl col.col-seq     { width: 74px; }
+  .tbl.products-tbl.course-tbl col.col-img     { width: 70px; }
+  .tbl.products-tbl.course-tbl col.col-name    { width: 20%; }
+  .tbl.products-tbl.course-tbl col.col-price   { width: 90px; }
+  .tbl.products-tbl.course-tbl col.col-type    { width: 10%; }
+  .tbl.products-tbl.course-tbl col.col-stage   { width: 86px; }
+  .tbl.products-tbl.course-tbl col.col-subject { width: 86px; }
+  .tbl.products-tbl.course-tbl col.col-intro   { width: 24%; }
+  .tbl.products-tbl.course-tbl col.col-link    { width: 12%; }
+  .tbl.products-tbl.course-tbl col.col-actions { width: 112px; }
+}
+
+/* 图书首列（书名）内部文本：书名单行省略 + 编号单行省略，保证整 td 固定两行高，与其他 clamp-2 列对齐 */
+.tbl.products-tbl td .prod-name {
+  font-size: 12.8px;
+  font-weight: 500;
+  color: #1e293b;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tbl.products-tbl td .prod-id {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 2px;
+}
+
+/* 操作列按钮紧凑 */
+.tbl.products-tbl .actions-col button {
+  font-size: 12px;
+  margin-right: 6px;
+}
+.tbl.products-tbl .actions-col button:last-child { margin-right: 0; }
+
+/* 链接 td：保留一行，溢出省略 */
+.tbl.products-tbl td.link-col a {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* 中等桌面（1024 ~ 1279）：进一步缩小一点字号 */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .tbl.products-tbl { font-size: 12px; }
+  .tbl.products-tbl thead th { font-size: 11.5px; padding: 7px 6px; }
+  .tbl.products-tbl tbody td { padding: 7px 6px; }
+}
+
+/* 平板/小桌面（≤1023px）：允许横向滚动，但内部字号仍紧凑 */
+@media (max-width: 1023px) {
+  .tbl.products-tbl { font-size: 12px; min-width: 900px; }
+  .tbl.products-tbl thead th { padding: 7px 8px; font-size: 11.5px; }
+  .tbl.products-tbl tbody td { padding: 7px 8px; }
+}
+
+/* 手机（≤768px）：字号再小，图片列压缩 */
+@media (max-width: 768px) {
+  .tbl.products-tbl { font-size: 11.5px; min-width: 840px; }
+  .tbl.products-tbl thead th { font-size: 11px; padding: 6px 6px; }
+  .tbl.products-tbl tbody td { padding: 6px 6px; }
+  .tbl.products-tbl td .prod-name { font-size: 12px; }
+  .tbl.products-tbl td img { width: 34px !important; height: 34px !important; }
+  .tbl.products-tbl .actions-col button { font-size: 11.5px; margin-right: 4px; }
+}
+
+/* 超小屏（≤480px） */
+@media (max-width: 480px) {
+  .tbl.products-tbl { font-size: 11px; min-width: 780px; }
+  .tbl.products-tbl tbody td { padding: 5px 5px; }
+}
+
+/* 商品货盘页面顶部描述文案在小屏允许换行 */
+@media (max-width: 768px) {
+  .products-subtitle { white-space: normal !important; }
+}
+
+/* ============ 商品货盘表头允许折行（适配手机屏幕）============ */
+.tbl.products-tbl thead th {
+  white-space: normal;          /* 允许自动换行 */
+  word-break: break-word;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+/* 手机下表头更紧凑 */
+@media (max-width: 768px) {
+  .tbl.products-tbl thead th {
+    font-size: 11px;
+    padding: 6px 5px;
+    line-height: 1.3;
+  }
+}
+
+/* ============ 图书图片点击放大（zoomable）============ */
+.img-zoomable { cursor: zoom-in; transition: transform .12s ease; }
+.img-zoomable:hover { transform: scale(1.08); box-shadow: 0 2px 8px rgba(15,23,42,.2); }
+
+.img-lightbox {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(15, 23, 42, 0.82);
+  display: flex; align-items: center; justify-content: center;
+  padding: 32px;
+  animation: fadeIn .2s ease;
+  cursor: zoom-out;
+}
+.img-lightbox img {
+  max-width: 92vw; max-height: 88vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.6);
+  background: #fff;
+  object-fit: contain;
+  animation: lightboxIn .22s ease;
+}
+.img-lightbox .lightbox-close {
+  position: absolute; top: 20px; right: 20px;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background .15s;
+}
+.img-lightbox .lightbox-close:hover { background: rgba(255, 255, 255, 0.25); }
+@keyframes lightboxIn {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (max-width: 768px) {
+  .img-lightbox { padding: 16px; }
+  .img-lightbox img { max-width: 96vw; max-height: 80vh; }
+  .img-lightbox .lightbox-close {
+    top: 12px; right: 12px; width: 36px; height: 36px;
+  }
+}
+
+/* ============ 折叠内容展开（clamp 的 td 点击可展开）============
+ * 点击 .clamp-2 后加 .clamp-expanded 类，展开显示全部内容。
+ * 在手机（≤768px）下特别需要，但桌面端同样支持。
+ * 通用于 .tbl 下所有带 clamp-2 类的单元格（商品货盘、达人管理等共用）。
+ */
+.tbl tbody td.clamp-2.clamp-expanded {
+  display: table-cell;
+  -webkit-line-clamp: unset;
+  max-height: none;
+  overflow: visible;
+  white-space: normal;
+  background: #fafaff;
+}
+.tbl tbody td.clamp-2 {
+  position: relative;
+  cursor: pointer;
+}
+/* 给 clamp 单元格一个"展开提示" 小符号（仅手机显示） */
+@media (max-width: 768px) {
+  .tbl tbody td.clamp-2::after {
+    content: '⋯';
+    position: absolute;
+    right: 4px;
+    bottom: 2px;
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1;
+    background: linear-gradient(to right, transparent, #fff 40%);
+    padding: 0 2px 0 8px;
+    pointer-events: none;
+  }
+  .tbl tbody td.clamp-2.clamp-expanded::after {
+    content: '';
+  }
+}
+
+/* ============ 多值标签编辑器（目标人群等） ============ */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  line-height: 1.5;
+}
+.tag-list .badge {
+  margin: 0;
+}
+
+/* 列表行内的 tags 编辑器（进入 editing 后展开，通用于所有 .tbl 表格） */
+.tbl.products-tbl tbody td.editable.editing,
+.tbl tbody td.editable.editing {
+  padding: 6px;
+  background: #fafaff;
+  overflow: visible;
+  white-space: normal;
+  max-height: none;
+  -webkit-line-clamp: unset;
+  z-index: 2;
+  position: relative;
+}
+.tag-edit-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 240px;
+  max-width: 100%;
+}
+.tag-edit-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 26px;
+  padding: 4px;
+  border: 1px dashed #c7d2fe;
+  border-radius: 6px;
+  background: #fff;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ede9fe, #e0f2fe);
+  color: #5b21b6;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+  border: 1px solid #ddd6fe;
+}
+.tag-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(124, 58, 237, 0.12);
+  color: #7c3aed;
+  font-size: 12px;
+  line-height: 1;
+  border: none;
+  cursor: pointer;
+  transition: background .12s;
+}
+.tag-chip-x:hover {
+  background: #7c3aed;
+  color: #fff;
+}
+.tag-edit-input-row {
+  display: flex;
+  gap: 4px;
+}
+.tag-edit-input {
+  flex: 1;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  background: #fff;
+  transition: border-color .15s;
+}
+.tag-edit-input:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.12);
+}
+.tag-edit-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 2px 0;
+}
+.tag-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  user-select: none;
+}
+.tag-opt:hover {
+  background: #f1f5f9;
+}
+.tag-opt input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #7c3aed;
+  cursor: pointer;
+}
+.tag-edit-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.tag-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 5px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all .15s;
+}
+.tag-btn:hover {
+  background: #e2e8f0;
+}
+.tag-btn-ok {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  color: #fff;
+  border-color: transparent;
+}
+.tag-btn-ok:hover {
+  filter: brightness(1.05);
+}
+
+/* 手机端压缩 */
+@media (max-width: 768px) {
+  .tag-edit-wrap { min-width: 180px; }
+  .tag-edit-options { gap: 2px 6px; }
+  .tag-opt { font-size: 11px; padding: 2px 4px; }
+  .tag-chip { font-size: 11px; padding: 2px 4px 2px 6px; }
+}
