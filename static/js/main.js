@@ -31,7 +31,7 @@ function render() {
     a.classList.toggle('active', a.dataset.route === key);
   });
   const route = routes[key];
-  document.title = `${route.name} · 商达撮合管理`;
+  document.title = `${route.name} · 教育行业商达撮合平台`;
   route.render(main);
   window.scrollTo({ top: 0, behavior: 'instant' });
 }
