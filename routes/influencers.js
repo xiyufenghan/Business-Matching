@@ -5,6 +5,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { parseChineseNumber, normalizeText, normalizeYesNo } = require('../utils/chineseParser');
 
 // 配置文件上传
 const uploadDir = path.join(__dirname, '..', 'uploads');
@@ -29,32 +30,55 @@ const upload = multer({
   }
 });
 
-// 达人 Excel 字段映射
-const INFLUENCER_FIELD_MAP = {
-  '达人等级': 'level',
-  '视频号账号名称': 'video_account_name',
-  '视频号带货品类赛道': 'video_category_track',
-  '现视频号品类销售额（月）短视频（万）': 'monthly_short_video_sales',
-  '现视频号品类销售额（月）直播（万）': 'monthly_live_sales',
-  '视频号粉丝数量': 'fans_count',
-  '可接受的合作类型': 'cooperation_type',
-  '视频号图书品类带货意愿': 'book_willingness',
-  '视频号少儿课程品类带货意愿': 'course_willingness',
-  '最近3个月短视频更新频率': 'short_video_frequency',
-  '最近3个月直播频率': 'live_frequency',
-  '是否有MCN': 'has_mcn',
-  'MCN名称': 'mcn_name',
-  '地区': 'region',
-  '是否已入驻互选': 'has_joined_mutual_select',
-  '归属销售': 'sales_owner',
-  '公众号账号名称': 'official_account_name'
+// 达人 Excel 字段映射（每个数据库字段允许多种 Excel 表头别名）
+const INFLUENCER_FIELD_ALIASES = {
+  level: ['达人等级', '等级'],
+  video_account_name: ['视频号账号名称', '视频号', '账号名称', '达人名称'],
+  video_category_track: ['视频号带货品类赛道', '带货品类', '品类赛道'],
+  monthly_short_video_sales: ['现视频号品类销售额（月）短视频（万）', '现视频号品类销售额（月）\n短视频（万）', '短视频月销', '短视频销售额'],
+  monthly_live_sales: ['现视频号品类销售额（月）直播（万）', '现视频号品类销售额（月）\n直播（万）', '直播月销', '直播销售额'],
+  fans_count: ['视频号粉丝数量', '粉丝数', '粉丝数量'],
+  cooperation_type: ['可接受的合作类型', '合作类型'],
+  book_willingness: ['视频号图书品类带货意愿', '图书品类', '图书带货意愿'],
+  course_willingness: ['视频号少儿课程品类带货意愿', '课程品类', '少儿课程带货意愿'],
+  short_video_frequency: ['最近3个月、日常短视频更新频率', '最近3个月短视频更新频率', '短视频更新频率', '短视频频率'],
+  live_frequency: ['最近3个月、日常直播频率', '最近3个月直播频率', '直播频率'],
+  has_mcn: ['是否有MCN'],
+  mcn_name: ['MCN名称'],
+  region: ['地区'],
+  has_joined_mutual_select: ['是否已入驻互选', '是否入驻互选'],
+  sales_owner: ['归属销售'],
+  official_account_name: ['公众号账号名称', '公众号名称'],
 };
+
+// 把行对象 row 按 alias 列表映射到 db 字段
+function mapRowByAliases(row) {
+  const out = {};
+  // 把 row 的 key 也做归一化（去空格/换行）以提高容错
+  const normalized = {};
+  Object.keys(row).forEach(k => {
+    const nk = String(k).replace(/\s+/g, '').replace(/\n/g, '');
+    normalized[nk] = row[k];
+  });
+  for (const [field, aliases] of Object.entries(INFLUENCER_FIELD_ALIASES)) {
+    let val = '';
+    for (const alias of aliases) {
+      // 直接匹配
+      if (row[alias] !== undefined && row[alias] !== '') { val = row[alias]; break; }
+      // 归一化匹配（处理换行/空格）
+      const na = alias.replace(/\s+/g, '').replace(/\n/g, '');
+      if (normalized[na] !== undefined && normalized[na] !== '') { val = normalized[na]; break; }
+    }
+    out[field] = val;
+  }
+  return out;
+}
 
 const INFLUENCER_FIELDS_ORDER = [
   '达人等级', '视频号账号名称', '视频号带货品类赛道',
   '现视频号品类销售额（月）短视频（万）', '现视频号品类销售额（月）直播（万）',
   '视频号粉丝数量', '可接受的合作类型', '视频号图书品类带货意愿',
-  '视频号少儿课程品类带货意愿', '最近3个月短视频更新频率', '最近3个月直播频率',
+  '视频号少儿课程品类带货意愿', '最近3个月、日常短视频更新频率', '最近3个月、日常直播频率',
   '是否有MCN', 'MCN名称', '地区', '是否已入驻互选', '归属销售', '公众号账号名称'
 ];
 
@@ -122,41 +146,91 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
       return res.status(400).json({ success: false, error: 'Excel文件为空或格式不正确' });
     }
     
-    const results = { success: 0, failed: 0, errors: [] };
+    // 预加载销售人员名 → admin_id 映射，用于 sales_owner 文本→sales_owner_id 关联
+    const salesAdmins = req.db.prepare(`SELECT id, name FROM admins WHERE admin_role='销售'`).all();
+    const salesNameToId = {};
+    salesAdmins.forEach(s => { salesNameToId[s.name] = s.id; });
+
+    const results = { success: 0, failed: 0, updated: 0, inserted: 0, errors: [] };
     
+    // 按 video_account_name UPSERT：重复账号则更新，新账号则插入
+    const findStmt = req.db.prepare(`SELECT id FROM influencers WHERE video_account_name = ?`);
     const insertStmt = req.db.prepare(`
-      INSERT INTO influencers (id, level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, password)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO influencers (id, level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, sales_owner_id, official_account_name, password)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+    const updateStmt = req.db.prepare(`
+      UPDATE influencers SET 
+        level = ?, video_category_track = ?,
+        monthly_short_video_sales = ?, monthly_live_sales = ?, fans_count = ?,
+        cooperation_type = ?, book_willingness = ?, course_willingness = ?,
+        short_video_frequency = ?, live_frequency = ?,
+        has_mcn = ?, mcn_name = ?, region = ?,
+        has_joined_mutual_select = ?, sales_owner = ?, sales_owner_id = ?,
+        official_account_name = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
+
     const importTransaction = req.db.transaction((rows) => {
       rows.forEach((row, idx) => {
         try {
-          const mapped = {};
-          for (const [cnKey, enKey] of Object.entries(INFLUENCER_FIELD_MAP)) {
-            mapped[enKey] = row[cnKey] !== undefined ? String(row[cnKey]) : '';
-          }
-          
-          if (!mapped.video_account_name) {
+          const mapped = mapRowByAliases(row);
+          const accountName = normalizeText(mapped.video_account_name);
+          if (!accountName) {
             results.errors.push(`第${idx + 2}行：视频号账号名称为必填`);
             results.failed++;
             return;
           }
-          
-          const id = uuidv4();
-          insertStmt.run(
-            id, mapped.level || '', mapped.video_account_name,
-            mapped.video_category_track || '',
-            parseFloat(mapped.monthly_short_video_sales) || 0,
-            parseFloat(mapped.monthly_live_sales) || 0,
-            parseInt(mapped.fans_count) || 0,
-            mapped.cooperation_type || '', mapped.book_willingness || '',
-            mapped.course_willingness || '', mapped.short_video_frequency || '',
-            mapped.live_frequency || '', mapped.has_mcn || '否',
-            mapped.mcn_name || '', mapped.region || '',
-            mapped.has_joined_mutual_select || '否',
-            mapped.sales_owner || '', mapped.official_account_name || '', '123456'
-          );
+
+          const salesOwnerText = normalizeText(mapped.sales_owner);
+          const salesOwnerId = salesNameToId[salesOwnerText] || null;
+
+          const fields = {
+            level: normalizeText(mapped.level),
+            video_category_track: normalizeText(mapped.video_category_track),
+            monthly_short_video_sales: parseChineseNumber(mapped.monthly_short_video_sales) || 0,
+            monthly_live_sales: parseChineseNumber(mapped.monthly_live_sales) || 0,
+            fans_count: parseChineseNumber(mapped.fans_count) || 0,
+            cooperation_type: normalizeText(mapped.cooperation_type),
+            book_willingness: normalizeText(mapped.book_willingness),
+            course_willingness: normalizeText(mapped.course_willingness),
+            short_video_frequency: normalizeText(mapped.short_video_frequency),
+            live_frequency: normalizeText(mapped.live_frequency),
+            has_mcn: normalizeYesNo(mapped.has_mcn, '否'),
+            mcn_name: normalizeText(mapped.mcn_name),
+            region: normalizeText(mapped.region),
+            has_joined_mutual_select: normalizeYesNo(mapped.has_joined_mutual_select, '否'),
+            sales_owner: salesOwnerText,
+            sales_owner_id: salesOwnerId,
+            official_account_name: normalizeText(mapped.official_account_name),
+          };
+
+          const existing = findStmt.get(accountName);
+          if (existing) {
+            updateStmt.run(
+              fields.level, fields.video_category_track,
+              fields.monthly_short_video_sales, fields.monthly_live_sales, fields.fans_count,
+              fields.cooperation_type, fields.book_willingness, fields.course_willingness,
+              fields.short_video_frequency, fields.live_frequency,
+              fields.has_mcn, fields.mcn_name, fields.region,
+              fields.has_joined_mutual_select, fields.sales_owner, fields.sales_owner_id,
+              fields.official_account_name,
+              existing.id
+            );
+            results.updated++;
+          } else {
+            const id = uuidv4();
+            insertStmt.run(
+              id, fields.level, accountName, fields.video_category_track,
+              fields.monthly_short_video_sales, fields.monthly_live_sales, fields.fans_count,
+              fields.cooperation_type, fields.book_willingness, fields.course_willingness,
+              fields.short_video_frequency, fields.live_frequency,
+              fields.has_mcn, fields.mcn_name, fields.region,
+              fields.has_joined_mutual_select, fields.sales_owner, fields.sales_owner_id,
+              fields.official_account_name, '123456'
+            );
+            results.inserted++;
+          }
           results.success++;
         } catch (e) {
           results.errors.push(`第${idx + 2}行：${e.message}`);
@@ -171,7 +245,7 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
     res.json({
       success: true,
       data: results,
-      message: `导入完成：成功 ${results.success} 条，失败 ${results.failed} 条`
+      message: `导入完成：新增 ${results.inserted} 条，更新 ${results.updated} 条，失败 ${results.failed} 条`
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
@@ -182,17 +256,24 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
 // ========== 获取所有达人（支持搜索+分页） ==========
 router.get('/', (req, res) => {
   try {
-    const { keyword, category, page, pageSize, operator_id, sales_owner_id } = req.query;
-    let sql = `SELECT i.*, a.name as sales_owner_name, a.username as sales_owner_username 
+    const {
+      keyword, category, page, pageSize, operator_id, sales_owner_id,
+      level, fans_min, fans_max, sales_min, sales_max,
+      region_province, book_category, course_category,
+      has_mcn, mutual_select, cooperation_type, filter_sales_id,
+      sortField, sortOrder
+    } = req.query;
+    let sql = `SELECT i.*, a.name as sales_owner_name, a.username as sales_owner_username,
+                 (COALESCE(i.monthly_short_video_sales, 0) + COALESCE(i.monthly_live_sales, 0)) as total_sales
                FROM influencers i 
                LEFT JOIN admins a ON i.sales_owner_id = a.id AND a.admin_role = '销售'
                WHERE 1=1`;
     let countSql = 'SELECT COUNT(*) as total FROM influencers i WHERE 1=1';
     const params = [];
     const countParams = [];
-    
+
+    // 销售/运营权限过滤
     if (sales_owner_id) {
-      // 销售角色：只能看归属自己的 + 没有归属的
       const salesFilter = ` AND (i.sales_owner_id = ? OR i.sales_owner_id IS NULL OR i.sales_owner_id = '')`;
       sql += salesFilter; countSql += salesFilter;
       params.push(sales_owner_id); countParams.push(sales_owner_id);
@@ -200,22 +281,154 @@ router.get('/', (req, res) => {
       sql += ' AND i.operator_id = ?'; countSql += ' AND i.operator_id = ?';
       params.push(operator_id); countParams.push(operator_id);
     }
-    if (keyword) {
-      const kwClause = ' AND (i.video_account_name LIKE ? OR i.video_category_track LIKE ? OR i.region LIKE ? OR i.mcn_name LIKE ? OR i.sales_owner LIKE ? OR i.cooperation_type LIKE ? OR i.level LIKE ?)';
-      sql += kwClause; countSql += kwClause;
-      const kw = `%${keyword}%`;
-      params.push(kw, kw, kw, kw, kw, kw, kw);
-      countParams.push(kw, kw, kw, kw, kw, kw, kw);
+
+    // 等级（支持多选，逗号分隔）
+    if (level) {
+      const levels = String(level).split(',').filter(Boolean);
+      if (levels.length) {
+        const placeholders = levels.map(() => '?').join(',');
+        sql += ` AND i.level IN (${placeholders})`;
+        countSql += ` AND i.level IN (${placeholders})`;
+        params.push(...levels); countParams.push(...levels);
+      }
     }
+
+    // 粉丝数区间
+    if (fans_min !== undefined && fans_min !== '') {
+      const v = parseInt(fans_min); if (!isNaN(v)) {
+        sql += ' AND i.fans_count >= ?'; countSql += ' AND i.fans_count >= ?';
+        params.push(v); countParams.push(v);
+      }
+    }
+    if (fans_max !== undefined && fans_max !== '') {
+      const v = parseInt(fans_max); if (!isNaN(v)) {
+        sql += ' AND i.fans_count <= ?'; countSql += ' AND i.fans_count <= ?';
+        params.push(v); countParams.push(v);
+      }
+    }
+
+    // 月销总额（短视频+直播）区间
+    if (sales_min !== undefined && sales_min !== '') {
+      const v = parseInt(sales_min); if (!isNaN(v)) {
+        sql += ' AND (COALESCE(i.monthly_short_video_sales,0) + COALESCE(i.monthly_live_sales,0)) >= ?';
+        countSql += ' AND (COALESCE(i.monthly_short_video_sales,0) + COALESCE(i.monthly_live_sales,0)) >= ?';
+        params.push(v); countParams.push(v);
+      }
+    }
+    if (sales_max !== undefined && sales_max !== '') {
+      const v = parseInt(sales_max); if (!isNaN(v)) {
+        sql += ' AND (COALESCE(i.monthly_short_video_sales,0) + COALESCE(i.monthly_live_sales,0)) <= ?';
+        countSql += ' AND (COALESCE(i.monthly_short_video_sales,0) + COALESCE(i.monthly_live_sales,0)) <= ?';
+        params.push(v); countParams.push(v);
+      }
+    }
+
+    // 地区（按省份模糊匹配）— 同时兼容"省,市"格式 + "市"单独存储的脏数据
+    if (region_province) {
+      // 该省份对应的城市列表（脏数据可能存的是城市名）
+      const PROVINCE_TO_CITIES = {
+        '浙江': ['杭州','宁波','温州','金华','嘉兴','绍兴','台州','湖州','丽水','衢州','舟山'],
+        '湖北': ['武汉','宜昌','襄阳'],
+        '广东': ['深圳','广州','东莞','佛山','珠海','中山','汕头'],
+        '江苏': ['南京','苏州','无锡','常州','南通','徐州','扬州'],
+        '山东': ['济南','青岛','烟台','潍坊','临沂','淄博'],
+        '四川': ['成都','绵阳'],
+        '陕西': ['西安','宝鸡'],
+        '河南': ['郑州','洛阳','开封'],
+        '湖南': ['长沙','株洲','岳阳'],
+        '云南': ['昆明','大理'],
+        '广西': ['南宁','桂林','柳州'],
+        '河北': ['石家庄','保定','邯郸','唐山','秦皇岛'],
+        '辽宁': ['沈阳','大连'],
+        '吉林': ['长春'],
+        '黑龙江': ['哈尔滨'],
+        '山西': ['太原'],
+        '安徽': ['合肥','芜湖'],
+        '江西': ['南昌'],
+        '福建': ['福州','厦门','泉州'],
+        '海南': ['海口','三亚'],
+        '贵州': ['贵阳'],
+        '甘肃': ['兰州'],
+        '青海': ['西宁'],
+        '西藏': ['拉萨'],
+        '宁夏': ['银川'],
+        '新疆': ['乌鲁木齐'],
+        '内蒙古': ['呼和浩特'],
+      };
+      const conditions = [`i.region LIKE ?`];
+      const condParams = [`${region_province}%`];
+      const cities = PROVINCE_TO_CITIES[region_province] || [];
+      cities.forEach(c => {
+        conditions.push(`i.region LIKE ?`);
+        condParams.push(`${c}%`);
+      });
+      const clause = ' AND (' + conditions.join(' OR ') + ')';
+      sql += clause; countSql += clause;
+      params.push(...condParams); countParams.push(...condParams);
+    }
+
+    // 视频品类赛道
     if (category) {
       sql += ' AND i.video_category_track LIKE ?';
       countSql += ' AND i.video_category_track LIKE ?';
-      params.push(`%${category}%`);
-      countParams.push(`%${category}%`);
+      params.push(`%${category}%`); countParams.push(`%${category}%`);
     }
-    
-    sql += ' ORDER BY i.fans_count DESC';
-    
+    // 图书品类（book_willingness 字段实际存的是品类）
+    if (book_category) {
+      sql += ' AND i.book_willingness LIKE ?';
+      countSql += ' AND i.book_willingness LIKE ?';
+      params.push(`%${book_category}%`); countParams.push(`%${book_category}%`);
+    }
+    // 课程品类（course_willingness 字段实际存的是品类）
+    if (course_category) {
+      sql += ' AND i.course_willingness LIKE ?';
+      countSql += ' AND i.course_willingness LIKE ?';
+      params.push(`%${course_category}%`); countParams.push(`%${course_category}%`);
+    }
+    // 是否 MCN
+    if (has_mcn) {
+      sql += ' AND i.has_mcn = ?'; countSql += ' AND i.has_mcn = ?';
+      params.push(has_mcn); countParams.push(has_mcn);
+    }
+    // 是否互选
+    if (mutual_select) {
+      sql += ' AND i.has_joined_mutual_select = ?';
+      countSql += ' AND i.has_joined_mutual_select = ?';
+      params.push(mutual_select); countParams.push(mutual_select);
+    }
+    // 合作类型（模糊匹配）
+    if (cooperation_type) {
+      sql += ' AND i.cooperation_type LIKE ?';
+      countSql += ' AND i.cooperation_type LIKE ?';
+      params.push(`%${cooperation_type}%`); countParams.push(`%${cooperation_type}%`);
+    }
+    // 主动按归属销售筛选（超管使用）
+    if (filter_sales_id) {
+      sql += ' AND i.sales_owner_id = ?';
+      countSql += ' AND i.sales_owner_id = ?';
+      params.push(filter_sales_id); countParams.push(filter_sales_id);
+    }
+
+    // 关键词搜索（扩展销售姓名）
+    if (keyword) {
+      const kwClause = ' AND (i.video_account_name LIKE ? OR i.video_category_track LIKE ? OR i.region LIKE ? OR i.mcn_name LIKE ? OR i.sales_owner LIKE ? OR i.cooperation_type LIKE ? OR i.level LIKE ? OR i.book_willingness LIKE ? OR i.course_willingness LIKE ? OR a.name LIKE ?)';
+      sql += kwClause; countSql += kwClause.replace('a.name LIKE ?', 'i.sales_owner LIKE ?');
+      const kw = `%${keyword}%`;
+      params.push(kw, kw, kw, kw, kw, kw, kw, kw, kw, kw);
+      countParams.push(kw, kw, kw, kw, kw, kw, kw, kw, kw, kw);
+    }
+
+    // 排序（白名单）
+    const allowedSortFields = ['fans_count', 'total_sales', 'level', 'created_at', 'monthly_short_video_sales', 'monthly_live_sales'];
+    let orderField = allowedSortFields.includes(sortField) ? sortField : 'fans_count';
+    if (orderField === 'total_sales') {
+      orderField = '(COALESCE(i.monthly_short_video_sales,0) + COALESCE(i.monthly_live_sales,0))';
+    } else {
+      orderField = `i.${orderField}`;
+    }
+    const dir = sortOrder === 'asc' ? 'ASC' : 'DESC';
+    sql += ` ORDER BY ${orderField} ${dir}`;
+
     // 分页
     const currentPage = parseInt(page) || 1;
     const size = parseInt(pageSize) || 20;
@@ -230,6 +443,136 @@ router.get('/', (req, res) => {
       success: true, 
       data: influencers, 
       pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========== 达人广场筛选选项 ==========
+router.get('/filter-options', (req, res) => {
+  try {
+    // 等级
+    const levelRows = req.db.prepare(`SELECT level, COUNT(*) as count FROM influencers WHERE level IS NOT NULL AND level != '' GROUP BY level ORDER BY level`).all();
+    
+    // 视频品类（多值，拆分去重）
+    const trackRows = req.db.prepare(`SELECT DISTINCT video_category_track FROM influencers WHERE video_category_track IS NOT NULL AND video_category_track != ''`).all();
+    const videoCategories = [...new Set(
+      trackRows.flatMap(r => (r.video_category_track || '').split(/[,，、;；]/).map(s => s.trim()).filter(Boolean))
+    )].sort();
+    
+    // 图书品类
+    const bookRows = req.db.prepare(`SELECT DISTINCT book_willingness FROM influencers WHERE book_willingness IS NOT NULL AND book_willingness != ''`).all();
+    const bookCategories = [...new Set(
+      bookRows.flatMap(r => (r.book_willingness || '').split(/[,，、;；]/).map(s => s.trim()).filter(Boolean))
+    )].sort();
+    
+    // 课程品类
+    const courseRows = req.db.prepare(`SELECT DISTINCT course_willingness FROM influencers WHERE course_willingness IS NOT NULL AND course_willingness != ''`).all();
+    const courseCategories = [...new Set(
+      courseRows.flatMap(r => (r.course_willingness || '').split(/[,，、;；]/).map(s => s.trim()).filter(Boolean))
+    )].sort();
+    
+    // 省份（地区"省,市"）— 规范化：只保留合法省份，单独"X市"反查省份
+    const PROVINCES_WHITELIST = new Set([
+      '北京','天津','上海','重庆',
+      '河北','山西','辽宁','吉林','黑龙江','江苏','浙江','安徽','福建','江西','山东',
+      '河南','湖北','湖南','广东','海南','四川','贵州','云南','陕西','甘肃','青海',
+      '内蒙古','广西','西藏','宁夏','新疆',
+      '香港','澳门','台湾'
+    ]);
+    const CITY_TO_PROVINCE = {
+      '杭州':'浙江','宁波':'浙江','温州':'浙江','金华':'浙江','嘉兴':'浙江','绍兴':'浙江','台州':'浙江','湖州':'浙江','丽水':'浙江','衢州':'浙江','舟山':'浙江',
+      '武汉':'湖北','宜昌':'湖北','襄阳':'湖北',
+      '深圳':'广东','广州':'广东','东莞':'广东','佛山':'广东','珠海':'广东','中山':'广东','汕头':'广东',
+      '南京':'江苏','苏州':'江苏','无锡':'江苏','常州':'江苏','南通':'江苏','徐州':'江苏','扬州':'江苏',
+      '济南':'山东','青岛':'山东','烟台':'山东','潍坊':'山东','临沂':'山东','淄博':'山东',
+      '成都':'四川','绵阳':'四川',
+      '西安':'陕西','宝鸡':'陕西',
+      '郑州':'河南','洛阳':'河南','开封':'河南',
+      '长沙':'湖南','株洲':'湖南','岳阳':'湖南',
+      '昆明':'云南','大理':'云南',
+      '南宁':'广西','桂林':'广西','柳州':'广西',
+      '石家庄':'河北','保定':'河北','邯郸':'河北','唐山':'河北','秦皇岛':'河北',
+      '沈阳':'辽宁','大连':'辽宁',
+      '长春':'吉林',
+      '哈尔滨':'黑龙江',
+      '太原':'山西',
+      '合肥':'安徽','芜湖':'安徽',
+      '南昌':'江西',
+      '福州':'福建','厦门':'福建','泉州':'福建',
+      '海口':'海南','三亚':'海南',
+      '贵阳':'贵州',
+      '兰州':'甘肃',
+      '西宁':'青海',
+      '拉萨':'西藏',
+      '银川':'宁夏',
+      '乌鲁木齐':'新疆',
+      '呼和浩特':'内蒙古',
+      '香港':'香港','澳门':'澳门','台北':'台湾',
+    };
+    const regionRows = req.db.prepare(`SELECT DISTINCT region FROM influencers WHERE region IS NOT NULL AND region != ''`).all();
+    const provinceSet = new Set();
+    regionRows.forEach(r => {
+      const raw = (r.region || '').split(/[,，、]/)[0].trim().replace(/[省市自治区]+$/, '');
+      if (!raw) return;
+      if (PROVINCES_WHITELIST.has(raw)) {
+        provinceSet.add(raw);
+      } else if (CITY_TO_PROVINCE[raw]) {
+        provinceSet.add(CITY_TO_PROVINCE[raw]);
+      }
+    });
+    const provinces = [...provinceSet].sort();
+    
+    // 合作类型
+    const coopRows = req.db.prepare(`SELECT DISTINCT cooperation_type FROM influencers WHERE cooperation_type IS NOT NULL AND cooperation_type != ''`).all();
+    const cooperationTypes = [...new Set(
+      coopRows.flatMap(r => (r.cooperation_type || '').split(/[,，、;；]/).map(s => s.trim()).filter(Boolean))
+    )].sort();
+    
+    // 销售人员
+    const salesList = req.db.prepare(`SELECT id, name FROM admins WHERE admin_role = '销售' ORDER BY name`).all();
+    
+    res.json({
+      success: true,
+      data: {
+        levels: levelRows,
+        videoCategories,
+        bookCategories,
+        courseCategories,
+        provinces,
+        cooperationTypes,
+        salesList
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========== 达人广场顶部数据条 ==========
+router.get('/hero-stats', (req, res) => {
+  try {
+    const { operator_id, sales_owner_id } = req.query;
+    let where = '';
+    const params = [];
+    if (sales_owner_id) {
+      where = ` AND (sales_owner_id = ? OR sales_owner_id IS NULL OR sales_owner_id = '')`;
+      params.push(sales_owner_id);
+    } else if (operator_id) {
+      where = ` AND operator_id = ?`;
+      params.push(operator_id);
+    }
+    const total = req.db.prepare(`SELECT COUNT(*) as c FROM influencers WHERE 1=1${where}`).get(...params).c;
+    const levels = req.db.prepare(`SELECT level, COUNT(*) as c FROM influencers WHERE level IS NOT NULL AND level != ''${where} GROUP BY level ORDER BY level`).all(...params);
+    const mcnCount = req.db.prepare(`SELECT COUNT(*) as c FROM influencers WHERE has_mcn = '是'${where}`).get(...params).c;
+    const mutualCount = req.db.prepare(`SELECT COUNT(*) as c FROM influencers WHERE has_joined_mutual_select = '是'${where}`).get(...params).c;
+    const oneM = new Date(); oneM.setMonth(oneM.getMonth() - 1);
+    const newCount = req.db.prepare(`SELECT COUNT(*) as c FROM influencers WHERE created_at >= ?${where}`).get(oneM.toISOString().slice(0,19).replace('T',' '), ...params).c;
+    const highSales = req.db.prepare(`SELECT COUNT(*) as c FROM influencers WHERE (COALESCE(monthly_short_video_sales,0) + COALESCE(monthly_live_sales,0)) >= 100000${where}`).get(...params).c;
+    res.json({
+      success: true,
+      data: { total, levels, mcnCount, mutualCount, newCount, highSales }
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

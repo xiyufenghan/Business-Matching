@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 // 获取商家需求（支持筛选+搜索+分页）
 router.get('/', (req, res) => {
   try {
-    const { status, category, demand_type, merchant_id, keyword, page, pageSize, operator_id, sales_owner_id } = req.query;
+    const { status, category, demand_type, merchant_id, keyword, page, pageSize, operator_id, sales_owner_id, sortField, sortOrder, book_category, grade_level, pure_commission_min, pure_commission_max, ad_commission_min, ad_commission_max, filter_sales_id } = req.query;
     let sql = `
       SELECT d.*, m.name as merchant_name, m.company as merchant_company,
         m.sales_owner_id as merchant_sales_owner_id, sa.name as merchant_sales_owner_name,
@@ -20,7 +20,7 @@ router.get('/', (req, res) => {
       LEFT JOIN course_demands cd ON d.ref_demand_id = cd.id AND d.demand_type = 'course'
       WHERE 1=1
     `;
-    let countSql = `SELECT COUNT(*) as total FROM demands d LEFT JOIN merchants m ON d.merchant_id = m.id LEFT JOIN book_demands bd ON d.ref_demand_id = bd.id AND d.demand_type = 'book' LEFT JOIN course_demands cd ON d.ref_demand_id = cd.id AND d.demand_type = 'course' WHERE 1=1`;
+    let countSql = `SELECT COUNT(*) as total FROM demands d LEFT JOIN merchants m ON d.merchant_id = m.id LEFT JOIN admins sa ON m.sales_owner_id = sa.id AND sa.admin_role = '销售' LEFT JOIN book_demands bd ON d.ref_demand_id = bd.id AND d.demand_type = 'book' LEFT JOIN course_demands cd ON d.ref_demand_id = cd.id AND d.demand_type = 'course' WHERE 1=1`;
     const params = [];
     const countParams = [];
 
@@ -45,19 +45,89 @@ router.get('/', (req, res) => {
       sql += ' AND d.demand_type = ?'; countSql += ' AND d.demand_type = ?';
       params.push(demand_type); countParams.push(demand_type); 
     }
+    if (book_category) {
+      // 模糊匹配（图书分类支持多值逗号分隔存储）
+      const bcClause = ` AND (d.demand_type = 'book' AND bd.book_category LIKE ?)`;
+      sql += bcClause; countSql += bcClause;
+      params.push(`%${book_category}%`); countParams.push(`%${book_category}%`);
+    }
+    if (grade_level) {
+      const glClause = ` AND (d.demand_type = 'course' AND cd.grade_level LIKE ?)`;
+      sql += glClause; countSql += glClause;
+      params.push(`%${grade_level}%`); countParams.push(`%${grade_level}%`);
+    }
+    // 佣金范围筛选（仅图书有这两字段，按比率/百分数兼容）
+    const normalizeCommission = (v) => {
+      const n = parseFloat(v);
+      if (isNaN(n)) return null;
+      // 用户输入 25 表示 25%，存储既可能是 25 也可能是 0.25 → 都转成百分数比较
+      return n;
+    };
+    if (pure_commission_min !== undefined && pure_commission_min !== '') {
+      const v = normalizeCommission(pure_commission_min);
+      if (v !== null) {
+        const clause = ` AND (CASE WHEN bd.pure_commission > 1 THEN bd.pure_commission ELSE bd.pure_commission * 100 END) >= ?`;
+        sql += clause; countSql += clause;
+        params.push(v); countParams.push(v);
+      }
+    }
+    if (pure_commission_max !== undefined && pure_commission_max !== '') {
+      const v = normalizeCommission(pure_commission_max);
+      if (v !== null) {
+        const clause = ` AND (CASE WHEN bd.pure_commission > 1 THEN bd.pure_commission ELSE bd.pure_commission * 100 END) <= ?`;
+        sql += clause; countSql += clause;
+        params.push(v); countParams.push(v);
+      }
+    }
+    if (ad_commission_min !== undefined && ad_commission_min !== '') {
+      const v = normalizeCommission(ad_commission_min);
+      if (v !== null) {
+        const clause = ` AND (CASE WHEN bd.ad_commission > 1 THEN bd.ad_commission ELSE bd.ad_commission * 100 END) >= ?`;
+        sql += clause; countSql += clause;
+        params.push(v); countParams.push(v);
+      }
+    }
+    if (ad_commission_max !== undefined && ad_commission_max !== '') {
+      const v = normalizeCommission(ad_commission_max);
+      if (v !== null) {
+        const clause = ` AND (CASE WHEN bd.ad_commission > 1 THEN bd.ad_commission ELSE bd.ad_commission * 100 END) <= ?`;
+        sql += clause; countSql += clause;
+        params.push(v); countParams.push(v);
+      }
+    }
+    // 按归属销售筛选（admin 主动选择）
+    if (filter_sales_id) {
+      const fsClause = ` AND m.sales_owner_id = ?`;
+      sql += fsClause; countSql += fsClause;
+      params.push(filter_sales_id); countParams.push(filter_sales_id);
+    }
     if (merchant_id) { 
       sql += ' AND d.merchant_id = ?'; countSql += ' AND d.merchant_id = ?';
       params.push(merchant_id); countParams.push(merchant_id); 
     }
     if (keyword) {
       const kw = `%${keyword}%`;
-      const kwClause = ' AND (d.title LIKE ? OR d.category LIKE ? OR d.description LIKE ? OR m.company LIKE ? OR bd.book_name LIKE ? OR bd.book_merchant LIKE ? OR cd.course_name LIKE ?)';
+      // 关键词扩展：标题、类目、描述、商家名、图书名、图书商家、课程名、归属销售名
+      const kwClause = ' AND (d.title LIKE ? OR d.category LIKE ? OR d.description LIKE ? OR m.company LIKE ? OR bd.book_name LIKE ? OR bd.book_merchant LIKE ? OR cd.course_name LIKE ? OR sa.name LIKE ?)';
       sql += kwClause; countSql += kwClause;
-      params.push(kw, kw, kw, kw, kw, kw, kw);
-      countParams.push(kw, kw, kw, kw, kw, kw, kw);
+      params.push(kw, kw, kw, kw, kw, kw, kw, kw);
+      countParams.push(kw, kw, kw, kw, kw, kw, kw, kw);
     }
     
-    sql += ' ORDER BY d.created_at DESC';
+    // 排序（防SQL注入：白名单校验）
+    const allowedSortFields = ['created_at', 'title', 'price', 'status', 'sales'];
+    let orderField = allowedSortFields.includes(sortField) ? sortField : 'created_at';
+    if (orderField === 'price') {
+      orderField = "COALESCE(bd.selling_price, cd.unit_price, 0)";
+    } else if (orderField === 'sales') {
+      orderField = "sa.name";
+    } else if (orderField === 'title') {
+      orderField = "d.title";
+    } else {
+      orderField = `d.${orderField}`;
+    }
+    const direction = sortOrder === 'asc' ? 'ASC' : 'DESC';
+    sql += ` ORDER BY ${orderField} ${direction}`;
     
     // 分页
     const currentPage = parseInt(page) || 1;
@@ -79,12 +149,16 @@ router.get('/', (req, res) => {
   }
 });
 
-// 获取达人货盘需求列表（支持搜索+分页）
+// 获取达人货盘需求列表（支持搜索+分页+多维筛选）
 router.get('/influencer-demands', (req, res) => {
   try {
-    const { influencer_id, keyword, page, pageSize, operator_id, sales_owner_id } = req.query;
+    const {
+      influencer_id, keyword, page, pageSize, operator_id, sales_owner_id,
+      demand_category, book_category, subject_category, level, status,
+      fans_min, fans_max, price_min, price_max
+    } = req.query;
     let sql = `
-      SELECT id_tbl.*, inf.video_account_name as inf_video_account_name, inf.level, inf.fans_count as inf_fans_count, inf.video_category_track, inf.sales_owner_id
+      SELECT id_tbl.*, inf.video_account_name as inf_video_account_name, inf.level, inf.fans_count as inf_fans_count, inf.video_category_track, inf.region as inf_region, inf.sales_owner_id
       FROM influencer_demands id_tbl
       LEFT JOIN influencers inf ON id_tbl.influencer_id = inf.id
       WHERE 1=1
@@ -105,6 +179,55 @@ router.get('/influencer-demands', (req, res) => {
     if (influencer_id) { 
       sql += ' AND id_tbl.influencer_id = ?'; countSql += ' AND id_tbl.influencer_id = ?';
       params.push(influencer_id); countParams.push(influencer_id); 
+    }
+    // 需求类型（图书需求 / 课程需求）
+    if (demand_category) {
+      sql += ' AND id_tbl.demand_category = ?'; countSql += ' AND id_tbl.demand_category = ?';
+      params.push(demand_category); countParams.push(demand_category);
+    }
+    // 图书分类
+    if (book_category) {
+      sql += ' AND id_tbl.book_category = ?'; countSql += ' AND id_tbl.book_category = ?';
+      params.push(book_category); countParams.push(book_category);
+    }
+    // 学科分类
+    if (subject_category) {
+      sql += ' AND id_tbl.subject_category = ?'; countSql += ' AND id_tbl.subject_category = ?';
+      params.push(subject_category); countParams.push(subject_category);
+    }
+    // 达人等级
+    if (level) {
+      sql += ' AND inf.level = ?'; countSql += ' AND inf.level = ?';
+      params.push(level); countParams.push(level);
+    }
+    // 状态
+    if (status) {
+      sql += ' AND id_tbl.status = ?'; countSql += ' AND id_tbl.status = ?';
+      params.push(status); countParams.push(status);
+    }
+    // 粉丝量区间（基于达人主表 fans_count，回退到需求表）
+    if (fans_min) {
+      sql += ' AND COALESCE(inf.fans_count, id_tbl.fans_count, 0) >= ?';
+      countSql += ' AND COALESCE(inf.fans_count, id_tbl.fans_count, 0) >= ?';
+      params.push(parseInt(fans_min) || 0); countParams.push(parseInt(fans_min) || 0);
+    }
+    if (fans_max) {
+      sql += ' AND COALESCE(inf.fans_count, id_tbl.fans_count, 0) <= ?';
+      countSql += ' AND COALESCE(inf.fans_count, id_tbl.fans_count, 0) <= ?';
+      params.push(parseInt(fans_max) || 0); countParams.push(parseInt(fans_max) || 0);
+    }
+    // 客单价区间（图书优先取 book_price_max，课程取 course_price_max）
+    if (price_min) {
+      sql += ' AND (id_tbl.book_price_max >= ? OR id_tbl.course_price_max >= ?)';
+      countSql += ' AND (id_tbl.book_price_max >= ? OR id_tbl.course_price_max >= ?)';
+      const v = parseFloat(price_min) || 0;
+      params.push(v, v); countParams.push(v, v);
+    }
+    if (price_max) {
+      sql += ' AND ((id_tbl.book_price_min <= ? AND id_tbl.book_price_max > 0) OR (id_tbl.course_price_min <= ? AND id_tbl.course_price_max > 0))';
+      countSql += ' AND ((id_tbl.book_price_min <= ? AND id_tbl.book_price_max > 0) OR (id_tbl.course_price_min <= ? AND id_tbl.course_price_max > 0))';
+      const v = parseFloat(price_max) || 0;
+      params.push(v, v); countParams.push(v, v);
     }
     if (keyword) {
       const kw = `%${keyword}%`;
@@ -167,6 +290,26 @@ router.delete('/influencer-demands/:id', (req, res) => {
 });
 
 // 获取需求详情（含关联的图书/课程信息）
+router.get('/filter-options', (req, res) => {
+  try {
+    // 图书分类（来自 book_demands.book_category，可能多值逗号分隔）
+    const bookRows = req.db.prepare(`SELECT DISTINCT book_category FROM book_demands WHERE book_category IS NOT NULL AND book_category != ''`).all();
+    const bookCategories = [...new Set(
+      bookRows.flatMap(r => (r.book_category || '').split(/[,，;；]/).map(s => s.trim()).filter(Boolean))
+    )].sort();
+    // 课程学段
+    const gradeRows = req.db.prepare(`SELECT DISTINCT grade_level FROM course_demands WHERE grade_level IS NOT NULL AND grade_level != ''`).all();
+    const gradeLevels = [...new Set(
+      gradeRows.flatMap(r => (r.grade_level || '').split(/[,，;；]/).map(s => s.trim()).filter(Boolean))
+    )].sort();
+    // 销售人员列表（admin_role='销售' 的管理员）
+    const salesRows = req.db.prepare(`SELECT id, name FROM admins WHERE admin_role = '销售' ORDER BY name`).all();
+    res.json({ success: true, data: { book_categories: bookCategories, grade_levels: gradeLevels, sales_list: salesRows } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/:id', (req, res) => {
   try {
     const demand = req.db.prepare(`

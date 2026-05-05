@@ -16,3 +16,6 @@ decode.py
 *.db-journal
 *.db-shm
 *.db-wal
+
+# 业务数据源（不入仓库）
+*.xlsx

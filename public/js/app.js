@@ -220,58 +220,118 @@ async function checkNotifications() {
   }
 }
 
+// 折叠状态记忆（默认全部展开）
+let navCollapsed = JSON.parse(localStorage.getItem('navCollapsed') || '{}');
+
+function toggleNavGroup(groupId) {
+  navCollapsed[groupId] = !navCollapsed[groupId];
+  localStorage.setItem('navCollapsed', JSON.stringify(navCollapsed));
+  renderNavMenu();
+}
+
 function renderNavMenu() {
   const menu = document.getElementById('nav-menu');
-  let items = [];
+  let groups = [];
   
   if (currentUser.role === 'admin') {
     if (currentUser.is_super) {
-      items = [
-        { id: 'dashboard', icon: 'chart', label: '数据看板' },
-        { id: 'merchant-demands', icon: 'store', label: '商家需求大厅' },
-        { id: 'influencer-demands', icon: 'target', label: '达人需求大厅' },
-        { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
-        { id: 'publish', icon: 'edit', label: '发布需求' },
-        { id: 'matchmaking', icon: 'link', label: '合作管理' },
-        { id: 'merchant-manage', icon: 'building', label: '商家管理' },
-        { id: 'admin-manage', icon: 'shield', label: '管理员管理' },
+      groups = [
+        { id: 'workspace', label: '工作台', items: [
+          { id: 'dashboard', icon: 'chart', label: '数据看板' },
+        ]},
+        { id: 'resource', label: '资源中心', items: [
+          { id: 'influencer-plaza', icon: 'star', label: '达人池' },
+          { id: 'merchant-demands', icon: 'store', label: '商家货盘' },
+          { id: 'influencer-demands', icon: 'target', label: '达人需求' },
+        ]},
+        { id: 'business', label: '撮合作业', items: [
+          { id: 'publish', icon: 'edit', label: '发布需求' },
+          { id: 'matchmaking', icon: 'link', label: '合作管理', badge: notificationCount },
+        ]},
+        { id: 'system', label: '系统管理', items: [
+          { id: 'merchant-manage', icon: 'building', label: '商家管理' },
+          { id: 'admin-manage', icon: 'shield', label: '管理员管理' },
+        ]},
       ];
     } else {
-      items = [
-        { id: 'dashboard', icon: 'chart', label: '数据看板' },
-        { id: 'merchant-demands', icon: 'store', label: '商家需求大厅' },
-        { id: 'influencer-demands', icon: 'target', label: '达人需求大厅' },
-        { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
-        { id: 'publish', icon: 'edit', label: '发布需求' },
-        { id: 'matchmaking', icon: 'link', label: '合作管理' },
-        { id: 'merchant-manage', icon: 'building', label: '商家管理' },
+      groups = [
+        { id: 'workspace', label: '工作台', items: [
+          { id: 'dashboard', icon: 'chart', label: '数据看板' },
+        ]},
+        { id: 'resource', label: '资源中心', items: [
+          { id: 'influencer-plaza', icon: 'star', label: '达人池' },
+          { id: 'merchant-demands', icon: 'store', label: '商家货盘' },
+          { id: 'influencer-demands', icon: 'target', label: '达人需求' },
+        ]},
+        { id: 'business', label: '撮合作业', items: [
+          { id: 'publish', icon: 'edit', label: '发布需求' },
+          { id: 'matchmaking', icon: 'link', label: '合作管理', badge: notificationCount },
+        ]},
+        { id: 'system', label: '系统管理', items: [
+          { id: 'merchant-manage', icon: 'building', label: '商家管理' },
+        ]},
       ];
     }
   } else if (currentUser.role === 'merchant') {
-    items = [
-      { id: 'merchant-demands', icon: 'store', label: '我的需求' },
-      { id: 'influencer-demands', icon: 'target', label: '达人需求大厅' },
-      { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
-      { id: 'publish', icon: 'edit', label: '发布需求' },
-      { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
+    groups = [
+      { id: 'workspace', label: '我的工作台', items: [
+        { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
+      ]},
+      { id: 'resource', label: '找达人', items: [
+        { id: 'influencer-plaza', icon: 'star', label: '达人池' },
+      ]},
+      { id: 'business', label: '我的货盘', items: [
+        { id: 'merchant-demands', icon: 'store', label: '我的需求' },
+        { id: 'publish', icon: 'edit', label: '发布需求' },
+      ]},
+      { id: 'cooperation', label: '合作管理', items: [
+        { id: 'matchmaking', icon: 'link', label: '合作管理', badge: notificationCount },
+      ]},
     ];
   } else {
-    items = [
-      { id: 'merchant-demands', icon: 'store', label: '商家需求大厅' },
-      { id: 'influencer-demands', icon: 'target', label: '我的需求' },
-      { id: 'publish', icon: 'edit', label: '发布需求' },
-      { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
+    // 达人视角
+    groups = [
+      { id: 'workspace', label: '我的工作台', items: [
+        { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
+      ]},
+      { id: 'resource', label: '找货盘', items: [
+        { id: 'merchant-demands', icon: 'store', label: '商家货盘' },
+      ]},
+      { id: 'business', label: '我的需求', items: [
+        { id: 'influencer-demands', icon: 'target', label: '我的需求' },
+        { id: 'publish', icon: 'edit', label: '发布需求' },
+      ]},
     ];
   }
   
-  menu.innerHTML = items.map(item => `
-    <div class="nav-item ${navigationHistory[navigationHistory.length-1] === item.id ? 'active' : ''}" onclick="navigateTo('${item.id}')">
-      <span class="icon">${item.icon}</span>
-      <span>${item.label}</span>
-      ${item.badge> 0 ? '<span class="badge-dot">' + item.badge + '</span>' : ''}
-    </div>
-  `).join('');
-}
+  const activeId = navigationHistory[navigationHistory.length-1];
+  menu.innerHTML = groups.map(g => {
+    const isCollapsed = navCollapsed[g.id] === true;
+    // 单 item 的 group 不显示标题（如商家"找达人"只有 1 项）
+    const showHeader = g.items.length > 1 || g.id === 'workspace';
+    const itemsHtml = g.items.map(item => `
+      <div class="nav-item ${activeId === item.id ? 'active' : ''}" onclick="navigateTo('${item.id}')">
+        <span class="icon">${item.icon}</span>
+        <span>${item.label}</span>
+        ${item.badge > 0 ? '<span class="badge-dot">' + item.badge + '</span>' : ''}
+      </div>
+    `).join('');
+    
+    if (!showHeader) {
+      return `<div class="nav-group">${itemsHtml}</div>`;
+    }
+    return `
+      <div class="nav-group ${isCollapsed?'nav-group-collapsed':''}">
+        <div class="nav-group-header" onclick="toggleNavGroup('${g.id}')">
+          <span class="nav-group-label">${g.label}</span>
+          <svg class="nav-group-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+        <div class="nav-group-items">${itemsHtml}</div>
+      </div>
+    `;
+  }).join('');
 }
 
 function navigateTo(page, isBack = false) {
@@ -301,171 +361,853 @@ function navigateTo(page, isBack = false) {
 }
 
 // ============ 数据看板 ============
+let dashFilters = { range: 30, type: '', salesId: '' };
+let echartInstances = {};  // 缓存图表实例
+
+function disposeAllCharts() {
+  Object.values(echartInstances).forEach(c => { try { c.dispose(); } catch(e) {} });
+  echartInstances = {};
+}
+
+// 大数字格式化（万/亿）
+function formatBigNumber(n) {
+  if (n == null) return '0';
+  if (n >= 100000000) return (n / 100000000).toFixed(2) + '亿';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return n.toLocaleString();
+}
+
 async function renderDashboard() {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
+  disposeAllCharts();
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载看板数据中...</p></div>';
+
   const opFilter = getOperatorFilter();
-  const statsUrl = '/stats' + (opFilter ? '?' + opFilter.substring(1) : '');
-  const res = await fetchAPI(statsUrl);
-  if (!res.success) { container.innerHTML = '<p>加载失败</p>'; return; }
-  const d = res.data;
-  
+  const isSuperAdmin = currentUser.role === 'admin' && currentUser.is_super === true;
+  const isMerchant = currentUser.role === 'merchant';
+  const isInfluencer = currentUser.role === 'influencer';
+
+  const range = dashFilters.range || 30;
+  const baseQs = `?days=${range}` + (opFilter || '');
+
+  // 并行调用所有看板接口
+  let dashRes, funnelRes, trendRes, distRes, salesRes, topRes, timelineRes;
+  try {
+    [dashRes, funnelRes, trendRes, distRes, topRes, timelineRes] = await Promise.all([
+      fetchAPI('/stats/dashboard' + baseQs),
+      fetchAPI('/stats/funnel' + baseQs),
+      fetchAPI('/stats/trend' + baseQs),
+      fetchAPI('/stats/distribution' + (opFilter ? '?' + opFilter.substring(1) : '')),
+      fetchAPI('/stats/top-entities' + (opFilter ? '?' + opFilter.substring(1) : '')),
+      fetchAPI('/stats/timeline?limit=15' + (opFilter || '')),
+    ]);
+    if (isSuperAdmin) {
+      salesRes = await fetchAPI('/stats/sales-ranking');
+    }
+  } catch (e) {
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:#ef4444">看板数据加载失败：' + e.message + '</p>';
+    return;
+  }
+
+  if (!dashRes || !dashRes.success) {
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:#ef4444">数据接口异常</p>';
+    return;
+  }
+
+  const d = dashRes.data;
+  const funnel = funnelRes.success ? funnelRes.data : [];
+  const trend = trendRes.success ? trendRes.data : [];
+  const dist = distRes.success ? distRes.data : { typeStats:[], categoryStats:[], levelStats:[], fansBuckets:[] };
+  const top = topRes.success ? topRes.data : { topMerchants:[], topInfluencers:[] };
+  const timeline = timelineRes.success ? timelineRes.data : [];
+  const salesRank = (salesRes && salesRes.success) ? salesRes.data : [];
+
+  // 渲染 HTML 骨架
   container.innerHTML = `
     ${renderBackButton()}
-    <div class="page-header"><h2>数据看板</h2></div>
-    <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon">N</div><div class="stat-value">${d.totalInfluencers}</div><div class="stat-label">达人总数</div></div>
-      <div class="stat-card"><div class="stat-icon">D</div><div class="stat-value">${d.merchantDemandCount}</div><div class="stat-label">商家需求数</div></div>
-      <div class="stat-card"><div class="stat-icon"><div><div class="stat-value">${d.influencerDemandCount}</div><div class="stat-label">达人需求数</div></div>
-      <div class="stat-card"><div class="stat-icon"><div><div class="stat-value">${d.demandMerchantCount}</div><div class="stat-label">需求商家数</div></div>
-      <div class="stat-card"><div class="stat-icon">I</div><div class="stat-value">${d.demandInfluencerCount}</div><div class="stat-label">需求达人数</div></div>
-      <div class="stat-card"><div class="stat-icon">V</div><div class="stat-value">${d.totalOrders}</div><div class="stat-label">总接单数</div></div>
-      <div class="stat-card"><div class="stat-icon">%</div><div class="stat-value">${d.totalOrderRate}%</div><div class="stat-label">总接单率</div></div>
-      <div class="stat-card"><div class="stat-icon"><div><div class="stat-value">${d.totalDemands}</div><div class="stat-label">总需求数</div></div>
-    </div>
-    
-    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
-      <div class="stat-card"><div class="stat-label">商家接单率</div><div class="stat-value" style="color:var(--success)">${d.merchantOrderRate}%</div><div class="stat-desc">商家接单数 / 达人需求总数</div></div>
-      <div class="stat-card"><div class="stat-label">达人接单率</div><div class="stat-value" style="color:var(--warning)">${d.influencerOrderRate}%</div><div class="stat-desc">达人接单数 / 商家需求总数</div></div>
-      <div class="stat-card"><div class="stat-label">总接单率</div><div class="stat-value" style="color:var(--primary-600)">${d.totalOrderRate}%</div><div class="stat-desc">总接单数 / 总需求数</div></div>
-    </div>
-    
-    <div class="dashboard-charts">
-      <div class="card">
-        <div class="card-header"><h3> 达人等级分布</h3></div>
-        <div class="card-body">
-          ${d.influencerLevelStats.map(l => `
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-              <span class="level-badge" style="background:${getLevelColor(l.level)}">${l.level}</span>
-              <div style="flex:1;background:var(--primary-100);border-radius:6px;height:24px;overflow:hidden;">
-                <div style="background:${getLevelColor(l.level)};height:100%;width:${d.totalInfluencers> 0 ? (l.count/d.totalInfluencers*100) : 0}%;border-radius:6px;display:flex;align-items:center;padding-left:8px;">
-                  <span style="color:white;font-size:11px;font-weight:600">${l.count}人</span>
+    <div class="dashboard-page">
+      <!-- 顶部：标题 + 时间范围筛选 -->
+      <div class="dash-header">
+        <div>
+          <h2 style="font-size:22px;margin:0;color:#1e293b">数据看板</h2>
+          <p style="font-size:12px;color:#94a3b8;margin:4px 0 0">实时业务数据 · ${new Date().toLocaleString('zh-CN')}</p>
+        </div>
+        <div class="dash-toolbar">
+          <div class="range-selector">
+            ${[7, 30, 90].map(r => `
+              <button class="range-btn ${dashFilters.range===r?'active':''}" onclick="onDashRangeChange(${r})">${r}天</button>
+            `).join('')}
+          </div>
+          <button class="btn btn-sm btn-outline" onclick="renderDashboard()" title="刷新">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            刷新
+          </button>
+        </div>
+      </div>
+
+      <!-- Level 1: 北极星指标（4 张大卡） -->
+      <div class="kpi-row kpi-row-primary">
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+          <div class="kpi-content">
+            <div class="kpi-label">已确认合作</div>
+            <div class="kpi-value">${d.confirmedCooperations}</div>
+            <div class="kpi-sub">总撮合 ${d.totalCooperations} 次</div>
+          </div>
+        </div>
+        <div class="kpi-card kpi-green">
+          <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+          <div class="kpi-content">
+            <div class="kpi-label">潜在合作金额 <span class="kpi-tip" title="估算：已确认合作的需求售价之和">ⓘ</span></div>
+            <div class="kpi-value">¥${formatBigNumber(d.potentialGmv)}</div>
+            <div class="kpi-sub">基于已确认合作估算</div>
+          </div>
+        </div>
+        <div class="kpi-card kpi-orange">
+          <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+          <div class="kpi-content">
+            <div class="kpi-label">撮合达成率</div>
+            <div class="kpi-value">${d.matchRate}%</div>
+            <div class="kpi-sub">已确认 / 总撮合</div>
+          </div>
+        </div>
+        <div class="kpi-card kpi-purple">
+          <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
+          <div class="kpi-content">
+            <div class="kpi-label">活跃主体</div>
+            <div class="kpi-value">${d.activeMerchants + d.activeInfluencers}</div>
+            <div class="kpi-sub">商家 ${d.activeMerchants} · 达人 ${d.activeInfluencers}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Level 2: 过程指标（8 张小卡） -->
+      <div class="kpi-row kpi-row-secondary">
+        ${renderMiniKpi('入驻商家', d.merchantCount, '#3b82f6')}
+        ${renderMiniKpi('入驻达人', d.influencerCount, '#06b6d4')}
+        ${renderMiniKpi('销售人员', d.salesCount, '#10b981')}
+        ${renderMiniKpi('管理员', d.adminCount, '#64748b')}
+        ${renderMiniKpi('商家需求', d.totalDemands, '#8b5cf6')}
+        ${renderMiniKpi('达人需求', d.totalInfDemands, '#ec4899')}
+        ${renderMiniKpi('待处理合作', d.pendingCooperations, '#f59e0b')}
+        ${renderMiniKpi('本周新增需求', d.newDemandsThisWeek, '#ef4444')}
+      </div>
+
+      <!-- 漏斗 + 类型饼图 -->
+      <div class="dash-grid-2">
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">撮合转化漏斗 <span class="dash-chart-sub">最近 ${range} 天</span></div>
+          <div id="chart-funnel" style="height:340px"></div>
+        </div>
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">需求类型 / 类目分布</div>
+          <div id="chart-distribution" style="height:340px"></div>
+        </div>
+      </div>
+
+      <!-- 时间趋势 -->
+      <div class="dash-chart-card" style="margin-bottom:16px">
+        <div class="dash-chart-title">${range}天业务趋势 <span class="dash-chart-sub">每日新增需求 / 合作 / 接单</span></div>
+        <div id="chart-trend" style="height:300px"></div>
+      </div>
+
+      <!-- 达人结构画像 -->
+      <div class="dash-grid-2">
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">达人等级分布</div>
+          <div id="chart-level" style="height:280px"></div>
+        </div>
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">达人粉丝量段</div>
+          <div id="chart-fans" style="height:280px"></div>
+        </div>
+      </div>
+
+      <!-- 销售排行（仅超管） -->
+      ${isSuperAdmin && salesRank.length > 0 ? `
+      <div class="dash-chart-card" style="margin-bottom:16px">
+        <div class="dash-chart-title">销售业绩排行</div>
+        <div id="chart-sales-rank" style="height:${Math.max(140, salesRank.length * 50)}px"></div>
+      </div>
+      ` : ''}
+
+      <!-- Top10 + 时间线 -->
+      <div class="dash-grid-3">
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">商家 Top10 <span class="dash-chart-sub">按已确认合作</span></div>
+          <div class="rank-list">
+            ${top.topMerchants.length === 0 ? '<div class="empty-mini">暂无数据</div>' : top.topMerchants.map((m, i) => `
+              <div class="rank-item">
+                <span class="rank-no rank-no-${i<3?i+1:'rest'}">${i+1}</span>
+                <div class="rank-name" title="${m.company || m.name}">${m.company || m.name}</div>
+                <div class="rank-stat">
+                  <span class="rank-num">${m.confirmed_count}</span>
+                  <span class="rank-unit">/ ${m.demand_count}</span>
                 </div>
               </div>
-              <span style="font-size:12px;color:var(--gray-500)">${d.totalInfluencers> 0 ? (l.count/d.totalInfluencers*100).toFixed(1) : 0}%</span>
-            </div>
-          `).join('')}
+            `).join('')}
+          </div>
+        </div>
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">达人 Top10 <span class="dash-chart-sub">按已确认合作</span></div>
+          <div class="rank-list">
+            ${top.topInfluencers.length === 0 ? '<div class="empty-mini">暂无数据</div>' : top.topInfluencers.map((inf, i) => `
+              <div class="rank-item">
+                <span class="rank-no rank-no-${i<3?i+1:'rest'}">${i+1}</span>
+                <div class="rank-name" title="${inf.name||'未命名'}">
+                  ${inf.name || '未命名'}
+                  <span class="rank-level rank-level-${(inf.level||'').replace('级','')}">${inf.level || ''}</span>
+                </div>
+                <div class="rank-stat">
+                  <span class="rank-num">${inf.confirmed_count}</span>
+                  <span class="rank-unit">/ ${inf.coop_count}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="dash-chart-card">
+          <div class="dash-chart-title">最新动态 <span class="dash-chart-sub">最近 15 条</span></div>
+          <div class="timeline-list">
+            ${timeline.length === 0 ? '<div class="empty-mini">暂无动态</div>' : timeline.map(ev => renderTimelineItem(ev)).join('')}
+          </div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-header"><h3> 需求类目分布</h3></div>
-        <div class="card-body">
-          ${d.categoryStats.slice(0, 8).map(c => `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:6px 10px;background:var(--primary-light);border-radius:6px;">
-              <span style="font-size:13px;color:var(--gray-700)">${c.category || '未分类'}</span>
-              <span style="font-size:13px;font-weight:600;color:var(--primary-700)">${c.count}条</span>
-            </div>
-          `).join('')}
+    </div>
+  `;
+
+  // 初始化图表（在 DOM 渲染后）
+  setTimeout(() => {
+    initFunnelChart(funnel);
+    initDistributionChart(dist);
+    initTrendChart(trend);
+    initLevelChart(dist.levelStats);
+    initFansChart(dist.fansBuckets);
+    if (isSuperAdmin && salesRank.length > 0) initSalesRankChart(salesRank);
+  }, 50);
+
+  // 响应式
+  window.onresize = () => {
+    Object.values(echartInstances).forEach(c => { try { c.resize(); } catch(e) {} });
+  };
+}
+
+function onDashRangeChange(days) {
+  dashFilters.range = days;
+  renderDashboard();
+}
+
+function renderMiniKpi(label, value, color) {
+  return `
+    <div class="mini-kpi">
+      <div class="mini-kpi-bar" style="background:${color}"></div>
+      <div class="mini-kpi-value">${formatBigNumber(value || 0)}</div>
+      <div class="mini-kpi-label">${label}</div>
+    </div>
+  `;
+}
+
+function renderTimelineItem(ev) {
+  const time = ev.created_at ? formatRelativeTime(ev.created_at) : '';
+  if (ev.kind === 'demand') {
+    const typeLabel = ev.subtype === 'book' ? '图书' : '课程';
+    const typeColor = ev.subtype === 'book' ? '#3b82f6' : '#8b5cf6';
+    return `
+      <div class="tl-item">
+        <span class="tl-dot" style="background:${typeColor}"></span>
+        <div class="tl-content">
+          <div class="tl-text"><span class="tl-tag" style="background:${typeColor}15;color:${typeColor}">${typeLabel}</span> ${ev.text || '未命名'}</div>
+          <div class="tl-meta">${ev.merchant_name || '-'} · ${time}</div>
         </div>
       </div>
-    </div>`;
+    `;
+  } else {
+    const stMap = { confirmed: ['已确认', '#10b981'], pending: ['待处理', '#f59e0b'], rejected: ['已拒绝', '#ef4444'] };
+    const [stLabel, stColor] = stMap[ev.text] || [ev.text, '#64748b'];
+    return `
+      <div class="tl-item">
+        <span class="tl-dot" style="background:${stColor}"></span>
+        <div class="tl-content">
+          <div class="tl-text"><span class="tl-tag" style="background:${stColor}15;color:${stColor}">合作${stLabel}</span> ${ev.merchant_name||'-'} → ${ev.influencer_name||'-'}</div>
+          <div class="tl-meta">${ev.subtype === 'merchant' ? '商家发起' : '达人申请'} · ${time}</div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function formatRelativeTime(isoStr) {
+  if (!isoStr) return '';
+  const t = new Date(isoStr.replace(' ', 'T'));
+  const now = new Date();
+  const diffMs = now - t;
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return '刚刚';
+  if (diffMin < 60) return diffMin + '分钟前';
+  if (diffMin < 1440) return Math.floor(diffMin / 60) + '小时前';
+  if (diffMin < 43200) return Math.floor(diffMin / 1440) + '天前';
+  return t.toLocaleDateString('zh-CN');
+}
+
+// ============ ECharts 图表初始化 ============
+
+function initFunnelChart(data) {
+  const dom = document.getElementById('chart-funnel');
+  if (!dom || !data || !data.length) return;
+  const chart = echarts.init(dom);
+  echartInstances['funnel'] = chart;
+  chart.setOption({
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => `${p.name}<br/>数量: <b>${p.value}</b><br/>转化率: <b>${data[p.dataIndex].conversionFromTop}%</b>`
+    },
+    series: [{
+      type: 'funnel',
+      left: '10%', top: 20, bottom: 20, width: '80%',
+      min: 0, max: data[0]?.count || 1,
+      sort: 'descending',
+      gap: 4,
+      label: {
+        show: true, position: 'inside',
+        formatter: (p) => `${p.name}\n${p.value} (${data[p.dataIndex].conversionFromTop}%)`,
+        color: '#fff', fontWeight: 600, fontSize: 13
+      },
+      labelLine: { show: false },
+      itemStyle: { borderColor: '#fff', borderWidth: 2 },
+      emphasis: { label: { fontSize: 14 } },
+      data: data.map((f, i) => ({
+        value: f.count,
+        name: f.stage,
+        itemStyle: { color: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'][i] }
+      }))
+    }]
+  });
+}
+
+function initDistributionChart(dist) {
+  const dom = document.getElementById('chart-distribution');
+  if (!dom) return;
+  const chart = echarts.init(dom);
+  echartInstances['dist'] = chart;
+  
+  const typeData = (dist.typeStats || []).map(t => ({
+    name: t.type === 'book' ? '图书' : (t.type === 'course' ? '课程' : t.type),
+    value: t.count
+  }));
+  const catData = (dist.categoryStats || []).slice(0, 8).map(c => ({
+    name: c.category, value: c.count
+  }));
+  
+  chart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} ({d}%)' },
+    legend: { bottom: 0, type: 'scroll' },
+    series: [
+      {
+        name: '类型', type: 'pie',
+        radius: ['0%', '30%'], center: ['50%', '45%'],
+        label: { position: 'inner', formatter: '{b}\n{d}%', fontSize: 11, color: '#fff' },
+        data: typeData,
+        color: ['#3b82f6', '#8b5cf6']
+      },
+      {
+        name: '类目', type: 'pie',
+        radius: ['45%', '70%'], center: ['50%', '45%'],
+        labelLine: { length: 8, length2: 8 },
+        label: { fontSize: 11, formatter: '{b} {d}%' },
+        data: catData,
+        color: ['#60a5fa','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#64748b']
+      }
+    ]
+  });
+}
+
+function initTrendChart(trend) {
+  const dom = document.getElementById('chart-trend');
+  if (!dom || !trend || !trend.length) return;
+  const chart = echarts.init(dom);
+  echartInstances['trend'] = chart;
+  
+  const dates = trend.map(t => t.date.slice(5));  // MM-DD
+  chart.setOption({
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross' } },
+    legend: { data: ['新增需求', '新增合作', '新增接单'], top: 0 },
+    grid: { left: 40, right: 20, top: 40, bottom: 40 },
+    xAxis: {
+      type: 'category', data: dates, boundaryGap: false,
+      axisLabel: { fontSize: 11, color: '#94a3b8' },
+      axisLine: { lineStyle: { color: '#e2e8f0' } }
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { fontSize: 11, color: '#94a3b8' },
+      splitLine: { lineStyle: { color: '#f1f5f9' } }
+    },
+    series: [
+      {
+        name: '新增需求', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: '#3b82f6' }, lineStyle: { width: 2.5 },
+        areaStyle: { color: { type: 'linear', x:0,y:0,x2:0,y2:1, colorStops: [{offset:0,color:'rgba(59,130,246,0.3)'},{offset:1,color:'rgba(59,130,246,0)'}] } },
+        data: trend.map(t => t.demands)
+      },
+      {
+        name: '新增合作', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: '#10b981' }, lineStyle: { width: 2.5 },
+        data: trend.map(t => t.cooperations)
+      },
+      {
+        name: '新增接单', type: 'line', smooth: true, symbol: 'circle', symbolSize: 6,
+        itemStyle: { color: '#f59e0b' }, lineStyle: { width: 2.5 },
+        data: trend.map(t => t.orders)
+      }
+    ]
+  });
+}
+
+function initLevelChart(levelStats) {
+  const dom = document.getElementById('chart-level');
+  if (!dom) return;
+  const chart = echarts.init(dom);
+  echartInstances['level'] = chart;
+  const data = (levelStats || []).map(l => ({ name: l.level, value: l.count }));
+  if (data.length === 0) {
+    chart.setOption({ title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: '#94a3b8', fontSize: 13 } } });
+    return;
+  }
+  const colors = { 'S': '#ef4444', 'A级': '#f59e0b', 'A': '#f59e0b', 'B级': '#3b82f6', 'B': '#3b82f6', 'C级': '#10b981', 'C': '#10b981', 'D级': '#94a3b8', 'D': '#94a3b8' };
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 40, right: 20, top: 20, bottom: 30 },
+    xAxis: { type: 'category', data: data.map(d => d.name), axisLabel: { fontSize: 11 } },
+    yAxis: { type: 'value', axisLabel: { fontSize: 11 } },
+    series: [{
+      type: 'bar', data: data.map(d => ({ value: d.value, itemStyle: { color: colors[d.name] || '#64748b', borderRadius: [4,4,0,0] } })),
+      label: { show: true, position: 'top', fontSize: 11 },
+      barWidth: '48%'
+    }]
+  });
+}
+
+function initFansChart(fansBuckets) {
+  const dom = document.getElementById('chart-fans');
+  if (!dom) return;
+  const chart = echarts.init(dom);
+  echartInstances['fans'] = chart;
+  const data = fansBuckets || [];
+  if (data.length === 0) {
+    chart.setOption({ title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: '#94a3b8', fontSize: 13 } } });
+    return;
+  }
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 80, right: 30, top: 20, bottom: 30 },
+    xAxis: { type: 'value', axisLabel: { fontSize: 11 } },
+    yAxis: { type: 'category', data: data.map(b => b.bucket), axisLabel: { fontSize: 11 } },
+    series: [{
+      type: 'bar',
+      data: data.map(b => b.count),
+      label: { show: true, position: 'right', fontSize: 11 },
+      barWidth: '50%',
+      itemStyle: {
+        color: { type: 'linear', x:0,y:0,x2:1,y2:0, colorStops: [{offset:0,color:'#60a5fa'},{offset:1,color:'#2563eb'}] },
+        borderRadius: [0,6,6,0]
+      }
+    }]
+  });
+}
+
+function initSalesRankChart(rank) {
+  const dom = document.getElementById('chart-sales-rank');
+  if (!dom || !rank.length) return;
+  const chart = echarts.init(dom);
+  echartInstances['salesRank'] = chart;
+  const sorted = [...rank].sort((a, b) => a.confirmed_count - b.confirmed_count); // 倒序让大的在上
+  chart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const r = sorted[params[0].dataIndex];
+        return `${r.name}<br/>商家数: ${r.merchant_count}<br/>需求数: ${r.demand_count}<br/>已确认合作: <b>${r.confirmed_count}</b><br/>合作总数: ${r.total_coop_count}<br/>成交率: ${r.dealRate}%`;
+      }
+    },
+    legend: { data: ['已确认合作', '需求数', '商家数'], top: 0 },
+    grid: { left: 80, right: 40, top: 40, bottom: 30 },
+    xAxis: { type: 'value', axisLabel: { fontSize: 11 } },
+    yAxis: { type: 'category', data: sorted.map(r => r.name), axisLabel: { fontSize: 11 } },
+    series: [
+      { name: '已确认合作', type: 'bar', data: sorted.map(r => r.confirmed_count), itemStyle: { color: '#10b981', borderRadius: [0,4,4,0] }, label: { show: true, position: 'right', fontSize: 11 } },
+      { name: '需求数', type: 'bar', data: sorted.map(r => r.demand_count), itemStyle: { color: '#3b82f6', borderRadius: [0,4,4,0] } },
+      { name: '商家数', type: 'bar', data: sorted.map(r => r.merchant_count), itemStyle: { color: '#f59e0b', borderRadius: [0,4,4,0] } },
+    ]
+  });
 }
 
 // ============ 商家需求大厅 ============
-async function renderMerchantDemands(page = 1, pageSize = 20, keyword = '') {
+let mdFilters = { type: '', category: '', status: '', keyword: '', book_category: '', grade_level: '', pure_commission_min: '', pure_commission_max: '', ad_commission_min: '', ad_commission_max: '', filter_sales_id: '' };
+
+async function renderMerchantDemands(page = 1, pageSize = 20) {
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
+  const isInfluencer = currentUser.role === 'influencer';
+  const isMerchant = currentUser.role === 'merchant';
+  // 仅超级管理员可见"归属销售"列与筛选项（普通销售管理员只看到自己负责的需求，无需再筛销售）
+  const showSales = currentUser.role === 'admin' && currentUser.is_super === true;
+  const title = isMerchant ? '我的需求' : '商家货盘';
+  
   let url = `/demands?page=${page}&pageSize=${pageSize}`;
-  if (currentUser.role === 'merchant') url += `&merchant_id=${currentUser.id}`;
-  if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
+  if (isMerchant) url += `&merchant_id=${currentUser.id}`;
+  if (mdFilters.type) url += `&demand_type=${encodeURIComponent(mdFilters.type)}`;
+  if (mdFilters.status) url += `&status=${encodeURIComponent(mdFilters.status)}`;
+  if (mdFilters.book_category) url += `&book_category=${encodeURIComponent(mdFilters.book_category)}`;
+  if (mdFilters.grade_level) url += `&grade_level=${encodeURIComponent(mdFilters.grade_level)}`;
+  if (mdFilters.pure_commission_min) url += `&pure_commission_min=${encodeURIComponent(mdFilters.pure_commission_min)}`;
+  if (mdFilters.pure_commission_max) url += `&pure_commission_max=${encodeURIComponent(mdFilters.pure_commission_max)}`;
+  if (mdFilters.ad_commission_min) url += `&ad_commission_min=${encodeURIComponent(mdFilters.ad_commission_min)}`;
+  if (mdFilters.ad_commission_max) url += `&ad_commission_max=${encodeURIComponent(mdFilters.ad_commission_max)}`;
+  if (mdFilters.filter_sales_id) url += `&filter_sales_id=${encodeURIComponent(mdFilters.filter_sales_id)}`;
+  if (mdFilters.keyword) url += `&keyword=${encodeURIComponent(mdFilters.keyword)}`;
+  if (mdViewMode === 'list') { url += `&sortField=${mdSortField}&sortOrder=${mdSortOrder}`; }
   url += getOperatorFilter();
   
   const res = await fetchAPI(url);
   if (!res.success) { container.innerHTML = '<p>加载失败</p>'; return; }
   
-  const isInfluencer = currentUser.role === 'influencer';
-  const isMerchant = currentUser.role === 'merchant';
-  const title = isMerchant ? '我的需求' : '商家需求大厅';
+  // 获取筛选下拉项（图书分类、学段、销售列表）
+  let bookCategories = [];
+  let gradeLevels = [];
+  let salesList = [];
+  try {
+    const optsRes = await fetchAPI('/demands/filter-options');
+    if (optsRes && optsRes.success && optsRes.data) {
+      bookCategories = optsRes.data.book_categories || [];
+      gradeLevels = optsRes.data.grade_levels || [];
+      salesList = optsRes.data.sales_list || [];
+    }
+  } catch(e) { /* 兜底 */ }
   
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
       <h2>${title}</h2>
-      <div class="page-header-actions">
-        ${currentUser.role !== 'influencer' ? '<button class="btn btn-sm btn-danger" onclick="clearAllMerchantDemands()">一键清空</button>' : ''}
+      <div class="page-header-actions" style="display:flex;gap:8px;align-items:center;">
+        <span id="demand-count-badge" style="font-size:12px;color:#94a3b8;background:#f1f5f9;padding:4px 10px;border-radius:12px;">共 ${res.pagination.total} 条</span>
       </div>
     </div>
-    <div class="search-filter-bar">
-      <input type="text" id="merchant-demand-search" placeholder="搜索需求（名称/类目/商家）..." value="${keyword}" onkeypress="if(event.key==='Enter')searchMerchantDemands()">
-      <button class="btn btn-primary btn-sm" onclick="searchMerchantDemands()">搜索</button>
+    
+    <!-- 筛选面板：基于发布需求页字段，类型联动显示分类/学段 -->
+    <div class="filter-panel" id="md-filter-panel" style="display:${(!isInfluencer && mdFilterPanelOpen) ? 'block' : 'none'}">
+      <div class="filter-row">
+        <div class="filter-item">
+          <label>需求类型</label>
+          <select id="md-filter-type" onchange="onMdFilterChange('type', this.value); applyMdFilter()">
+            <option value="">全部</option>
+            <option value="book" ${mdFilters.type==='book'?'selected':''}>图书需求</option>
+            <option value="course" ${mdFilters.type==='course'?'selected':''}>课程需求</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>发布状态</label>
+          <select id="md-filter-status" onchange="onMdFilterChange('status', this.value); applyMdFilter()">
+            <option value="">全部</option>
+            <option value="published" ${mdFilters.status==='published'?'selected':''}>已发布</option>
+            <option value="accepted" ${mdFilters.status==='accepted'?'selected':''}>已接单</option>
+            <option value="closed" ${mdFilters.status==='closed'?'selected':''}>已关闭</option>
+          </select>
+        </div>
+        ${(mdFilters.type === 'book' || mdFilters.type === '') ? `
+        <div class="filter-item">
+          <label>图书分类</label>
+          <select id="md-filter-book-cat" onchange="onMdFilterChange('book_category', this.value); applyMdFilter()">
+            <option value="">全部</option>
+            ${bookCategories.map(c => `<option value="${c}" ${mdFilters.book_category===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>` : ''}
+        ${(mdFilters.type === 'course' || mdFilters.type === '') ? `
+        <div class="filter-item">
+          <label>课程学段</label>
+          <select id="md-filter-grade" onchange="onMdFilterChange('grade_level', this.value); applyMdFilter()">
+            <option value="">全部</option>
+            ${gradeLevels.map(g => `<option value="${g}" ${mdFilters.grade_level===g?'selected':''}>${g}</option>`).join('')}
+          </select>
+        </div>` : ''}
+        ${showSales ? `
+        <div class="filter-item">
+          <label>归属销售</label>
+          <select id="md-filter-sales" onchange="onMdFilterChange('filter_sales_id', this.value); applyMdFilter()">
+            <option value="">全部</option>
+            ${salesList.map(s => `<option value="${s.id}" ${mdFilters.filter_sales_id===s.id?'selected':''}>${s.name}</option>`).join('')}
+          </select>
+        </div>` : ''}
+      </div>
+      <!-- 第二行：佣金范围筛选（仅图书需求） -->
+      ${(mdFilters.type === 'book' || mdFilters.type === '') ? `
+      <div class="filter-row" style="margin-top:10px;">
+        <div class="filter-item" style="flex:0 0 auto;">
+          <label>纯佣金 (%)</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="md-filter-pure-min" placeholder="最低" value="${mdFilters.pure_commission_min || ''}" style="width:80px"
+              onchange="onMdFilterChange('pure_commission_min', this.value)">
+            <span style="color:#94a3b8">-</span>
+            <input type="number" id="md-filter-pure-max" placeholder="最高" value="${mdFilters.pure_commission_max || ''}" style="width:80px"
+              onchange="onMdFilterChange('pure_commission_max', this.value)">
+          </div>
+        </div>
+        <div class="filter-item" style="flex:0 0 auto;">
+          <label>投流佣金 (%)</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="md-filter-ad-min" placeholder="最低" value="${mdFilters.ad_commission_min || ''}" style="width:80px"
+              onchange="onMdFilterChange('ad_commission_min', this.value)">
+            <span style="color:#94a3b8">-</span>
+            <input type="number" id="md-filter-ad-max" placeholder="最高" value="${mdFilters.ad_commission_max || ''}" style="width:80px"
+              onchange="onMdFilterChange('ad_commission_max', this.value)">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" style="align-self:flex-end;margin-bottom:0;" onclick="applyMdFilter()">应用佣金筛选</button>
+      </div>` : ''}
+      <!-- 第三行：搜索 + 重置 -->
+      <div class="filter-row" style="margin-top:10px;">
+        <div class="filter-item" style="flex:1">
+          <input type="text" id="md-filter-keyword" placeholder="搜索图书名/课程名/商家名${showSales ? '/归属销售' : ''}..." value="${mdFilters.keyword || ''}"
+            onkeypress="if(event.key==='Enter'){ onMdFilterChange('keyword', this.value); applyMdFilter(); }">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="onMdFilterChange('keyword', document.getElementById('md-filter-keyword').value); applyMdFilter()">搜索</button>
+        ${(mdFilters.type||mdFilters.status||mdFilters.book_category||mdFilters.grade_level||mdFilters.keyword||mdFilters.pure_commission_min||mdFilters.pure_commission_max||mdFilters.ad_commission_min||mdFilters.ad_commission_max||mdFilters.filter_sales_id) ? '<button class="btn btn-sm btn-outline" onclick="resetMdFilter()">重置</button>' : ''}
+      </div>
     </div>
-    <div class="demand-grid" id="merchant-demand-list">
-      ${res.data.length === 0 ? '<div class="empty-state"><div class="icon">-</div><p>暂无需求</p></div>' : 
-        res.data.map(d => renderMerchantDemandCard(d, isInfluencer)).join('')}
+
+    <!-- 工具栏：视图切换 + 筛选/清空 -->
+    <div class="md-toolbar">
+      <div class="md-toolbar-left">
+        ${!isInfluencer ? `<button class="btn btn-sm ${mdFilterPanelOpen?'btn-primary':'btn-outline'}" onclick="toggleMdFilter()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          筛选${getActiveFilterCount() > 0 ? ' ('+getActiveFilterCount()+')' : ''}
+        </button>` : ''}
+        ${currentUser.role !== 'influencer' ? '<button class="btn btn-sm btn-danger-outline" onclick="clearAllMerchantDemands()">清空</button>' : ''}
+      </div>
+      <div class="md-toolbar-right">
+        <button class="btn btn-sm ${mdViewMode==='list'?'btn-primary':'btn-outline'}" onclick="switchMdView('list')" title="列表视图">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg> 列表
+        </button>
+        <button class="btn btn-sm ${mdViewMode==='card'?'btn-primary':'btn-outline'}" onclick="switchMdView('card')" title="卡片视图">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> 卡片
+        </button>
+      </div>
+    </div>
+    <div class="${mdViewMode==='card' ? 'demand-grid' : 'demand-list'}" id="merchant-demand-list">
+      ${res.data.length === 0 
+        ? '<div class="empty-state"><div class="icon">-</div><p>暂无匹配的需求</p><button class="btn btn-sm btn-primary mt-16" onclick="resetMdFilter()" style="margin-top:12px">清除筛选条件</button></div>'
+        : mdViewMode === 'card'
+          ? res.data.map(d => renderMerchantDemandCard(d, isInfluencer)).join('')
+          : renderMdTableHeader(isInfluencer, showSales) + res.data.map(d => renderMerchantDemandRow(d, isInfluencer, showSales)).join('')
+      }
     </div>
     ${renderPagination(res.pagination, 'pageMerchantDemands')}`;
 }
 
+let mdViewMode = 'list'; // 默认列表模式
+let mdSortField = 'created_at'; // 默认按创建时间排序
+let mdSortOrder = 'desc';      // 降序
+
+function switchMdView(mode) {
+  mdViewMode = mode;
+  renderMerchantDemands();
+}
+
+function switchMdSort(field) {
+  if (mdSortField === field) {
+    mdSortOrder = mdSortOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    mdSortField = field;
+    mdSortOrder = 'asc';
+  }
+  renderMerchantDemands();
+}
+
+function getMdSortIcon(field) {
+  if (mdSortField !== field) return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M7 15l5 5 5-5M7 9l5-5 5 5"/></svg>';
+  const icon = mdSortOrder === 'asc'
+    ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#2563eb" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>'
+    : '<svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#2563eb" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+  return icon;
+}
+
+function renderMdTableHeader(isInfluencer, showSales) {
+  // align: left | center | right
+  const sortTh = (label, field, align = 'left') => {
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    const icon = `<span class="sort-icon">${getMdSortIcon(field)}</span>`;
+    return `<div class="demand-th ${cls}" onclick="switchMdSort('${field}')">${label}${icon}</div>`;
+  };
+  const plainTh = (label, align = 'left') => {
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    return `<div class="demand-th no-hover ${cls}">${label}</div>`;
+  };
+
+  const hasSales = showSales;
+  const headerClass = hasSales ? 'demand-row-header has-sales' : 'demand-row-header';
+  return `
+    <div class="${headerClass}">
+      ${plainTh('', 'center')}
+      ${sortTh('类型', 'type', 'center')}
+      ${plainTh('需求信息', 'left')}
+      ${sortTh('售价', 'price', 'right')}
+      ${plainTh('库存', 'right')}
+      ${sortTh('纯佣金', 'commission', 'right')}
+      ${plainTh('投流佣金', 'right')}
+      ${hasSales ? sortTh('归属销售', 'sales', 'center') : ''}
+      ${sortTh('状态', 'status', 'center')}
+      ${sortTh('创建时间', 'created_at', 'right')}
+      ${plainTh('操作', 'right')}
+    </div>`;
+}
+
+function renderMerchantDemandRow(d, isInfluencer, showSales) {
+  const isBook = d.demand_type === 'book';
+  const typeLabel = isBook ? '图书' : '课程';
+  const typeColor = isBook ? '#3b82f6' : '#8b5cf6';
+  const priceVal = isBook ? `¥${d.selling_price || 0}` : `¥${d.unit_price || 0}`;
+  const pureComm = isBook ? formatPercent(d.pure_commission || 0) : '-';
+  const adComm = isBook ? formatPercent(d.ad_commission || 0) : '-';
+  const stockVal = isBook ? (d.stock != null ? formatNumber(d.stock) : '-') : '-';
+  const merchantName = d.merchant_company || d.merchant_name || '-';
+  // 副信息：商家 · 分类 · 目标人群/学段
+  let subParts = [merchantName];
+  if (isBook) {
+    if (d.book_category) subParts.push(d.book_category);
+    if (d.book_target_audience) subParts.push(d.book_target_audience);
+    if (d.specification) subParts.push(d.specification);
+  } else {
+    if (d.grade_level) subParts.push(d.grade_level);
+    if (d.subject) subParts.push(d.subject);
+  }
+  const titleText = d.title || (isBook ? d.book_name : d.course_name) || '未命名';
+  const rowClass = showSales ? 'demand-row has-sales' : 'demand-row';
+  const salesCol = showSales ? `<span class="demand-row-sales" title="归属销售">${d.merchant_sales_owner_name||'<span style="color:#cbd5e1">-</span>'}</span>` : '';
+  return `
+    <div class="${rowClass}" data-id="${d.id}">
+      <input type="checkbox" class="demand-checkbox" value="${d.id}">
+      <span class="type-badge-sm" style="background:${typeColor}15;color:${typeColor}">${typeLabel}</span>
+      <div class="demand-row-main">
+        <div class="demand-row-title">${titleText}</div>
+        <div class="demand-row-sub">${subParts.join(' · ')}</div>
+      </div>
+      <span class="demand-row-price">${priceVal}</span>
+      <span class="demand-row-stock">${stockVal}</span>
+      <span class="demand-row-commission">${pureComm}</span>
+      <span class="demand-row-ad-commission">${adComm}</span>
+      ${salesCol}
+      <span class="demand-row-status">${getStatusBadge(d.status)}</span>
+      <span class="demand-row-date">${formatDate(d.created_at)}</span>
+      <div class="demand-row-actions">
+        ${isInfluencer ? `<button class="btn btn-xs btn-primary" onclick="applyCooperation('${d.id}','${d.merchant_id}')">申请合作</button>` : ''}
+        ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-xs btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">编辑</button>` : ''}
+        ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-xs btn-danger-outline" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
+      </div>
+    </div>`;
+}
+
+let mdFilterPanelOpen = false;
+function toggleMdFilter() {
+  mdFilterPanelOpen = !mdFilterPanelOpen;
+  renderMerchantDemands();
+}
+
+function getActiveFilterCount() {
+  const keys = ['type','status','book_category','grade_level','keyword','pure_commission_min','pure_commission_max','ad_commission_min','ad_commission_max','filter_sales_id'];
+  return keys.filter(k => mdFilters[k] !== '' && mdFilters[k] != null).length;
+}
+
+function onMdFilterChange(key, value) {
+  mdFilters[key] = value;
+}
+
+function applyMdFilter() {
+  renderMerchantDemands(1, 20);
+}
+
+function resetMdFilter() {
+  mdFilters = { type: '', category: '', status: '', keyword: '', book_category: '', grade_level: '', pure_commission_min: '', pure_commission_max: '', ad_commission_min: '', ad_commission_max: '', filter_sales_id: '' };
+  renderMerchantDemands(1, 20);
+}
+
+function searchMerchantDemands() {
+  mdFilters.keyword = document.getElementById('merchant-demand-search')?.value?.trim() || '';
+  renderMerchantDemands(1, 20);
+}
+
 function renderMerchantDemandCard(d, isInfluencer) {
   const typeLabel = d.demand_type === 'book' ? '图书' : '课程';
-  // 仅管理员可见归属销售字段（商家、达人登录均不外显）
-  const showSales = currentUser.role === 'admin';
-  const salesField = showSales ? `
-        <div class="detail-field"><div class="detail-label">归属销售</div><div class="detail-value">${
-          d.merchant_sales_owner_name
-            ? `<span style="color:#16a34a;font-weight:600">${d.merchant_sales_owner_name}</span> <span class="badge" style="background:#dcfce7;color:#16a34a;font-size:10px;padding:1px 6px;border-radius:8px">销售</span>`
-            : '<span style="color:#999">未分配</span>'
-        }</div></div>` : '';
-  let detailHtml = '';
-  
-  if (d.demand_type === 'book' && d.book_name) {
-    detailHtml = `
-      <div class="demand-detail-grid">
-        ${d.book_image ? `<div class="detail-field"><div class="detail-label">图书图片</div><div class="detail-value"><img src="${d.book_image}" class="thumb-img" onclick="openImagePreview('${d.book_image}')"></div></div>` : ''}
-        <div class="detail-field"><div class="detail-label">图书商家</div><div class="detail-value">${d.book_merchant || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">图书名称</div><div class="detail-value">${d.book_name || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">目标人群</div><div class="detail-value">${d.book_target_audience || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">图书分类</div><div class="detail-value">${d.book_category || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">规格</div><div class="detail-value">${d.specification || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">售价</div><div class="detail-value price-text">¥${d.selling_price || 0}</div></div>
-        <div class="detail-field"><div class="detail-label">纯佣金</div><div class="detail-value">${formatPercent(d.pure_commission)}</div></div>
-        <div class="detail-field"><div class="detail-label">投流佣金</div><div class="detail-value">${formatPercent(d.ad_commission)}</div></div>
-        <div class="detail-field"><div class="detail-label">物流</div><div class="detail-value">${d.logistics || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">库存</div><div class="detail-value">${d.stock || 0}</div></div>
-        ${salesField}
-      </div>`;
-  } else if (d.demand_type === 'course' && d.course_name) {
-    detailHtml = `
-      <div class="demand-detail-grid">
-        ${d.course_image ? `<div class="detail-field"><div class="detail-label">课程图片</div><div class="detail-value"><img src="${d.course_image}" class="thumb-img" onclick="openImagePreview('${d.course_image}')"></div></div>` : ''}
-        <div class="detail-field"><div class="detail-label">课程名称</div><div class="detail-value">${d.course_name || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">课程价格</div><div class="detail-value price-text">¥${d.unit_price || 0}</div></div>
-        <div class="detail-field"><div class="detail-label">学段</div><div class="detail-value">${d.grade_level || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">学科</div><div class="detail-value">${d.subject || '-'}</div></div>
-        ${salesField}
-        <div class="detail-field full-width"><div class="detail-label">课程介绍</div><div class="detail-value">${d.course_introduction || '-'}</div></div>
-      </div>`;
-  }
+  const typeColor = d.demand_type === 'book' ? '#3b82f6' : '#8b5cf6';
+  // 仅超级管理员可见归属销售字段（商家、达人、销售管理员均不外显）
+  const showSales = currentUser.role === 'admin' && currentUser.is_super === true;
   
   return `
-    <div class="demand-card">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <div class="demand-card-v2">
+      <div class="demand-header">
         <input type="checkbox" class="demand-checkbox" value="${d.id}">
-        <span class="badge tag-type">${typeLabel}</span>
+        <span class="type-badge" style="background:${typeColor}15;color:${typeColor}">${typeLabel}</span>
         <span class="demand-title">${d.title || d.book_name || d.course_name || '未命名'}</span>
         ${getStatusBadge(d.status)}
       </div>
-      ${detailHtml}
+
+      <!-- 核心信息区 -->
+      <div class="demand-body">
+        <div class="demand-info-grid">
+          <div class="info-item">
+            <span class="info-label">发布商家</span>
+            <span class="info-value">${d.merchant_company || d.merchant_name || '-'}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">需求类目</span>
+            <span class="info-value">${d.category || '-'}</span>
+          </div>
+        </div>
+        
+        ${d.demand_type === 'book' && d.book_name ? `
+        <div class="demand-info-grid">
+          <div class="info-item"><span class="info-label">图书名称</span><span class="info-value">${d.book_name}</span></div>
+          <div class="info-item"><span class="info-label">目标人群</span><span class="info-value">${d.book_target_audience || '-'}</span></div>
+          ${showSales ? `<div class="info-item"><span class="info-label">归属销售</span><span class="info-value" style="color:#16a34a;font-weight:600">${d.merchant_sales_owner_name||'未分配'}</span></div>` : ''}
+        </div>
+        <div class="demand-info-grid">
+          <div class="info-item highlight"><span class="info-label">售价</span><span class="info-value price-text">¥${d.selling_price || 0}</span></div>
+          <div class="info-item"><span class="info-label">纯佣金</span><span class="info-value">${formatPercent(d.pure_commission)}</span></div>
+          <div class="info-item"><span class="info-label">投流佣金</span><span class="info-value">${formatPercent(d.ad_commission)}</span></div>
+          <div class="info-item"><span class="info-label">库存</span><span class="info-value">${d.stock || 0}</span></div>
+          <div class="info-item"><span class="info-label">规格</span><span class="info-value">${d.specification || '-'}</span></div>
+          <div class="info-item"><span class="info-label">物流</span><span class="info-value">${d.logistics || '-'}</span></div>
+        </div>` : ''}
+
+        ${d.demand_type === 'course' && d.course_name ? `
+        <div class="demand-info-grid">
+          <div class="info-item"><span class="info-label">课程名称</span><span class="info-value">${d.course_name}</span></div>
+          <div class="info-item"><span class="info-label">学段</span><span class="info-value">${d.grade_level || '-'}</span></div>
+          <div class="info-item"><span class="info-label">学科</span><span class="info-value">${d.subject || '-'}</span></div>
+          ${showSales ? `<div class="info-item"><span class="info-label">归属销售</span><span class="info-value" style="color:#16a34a;font-weight:600">${d.merchant_sales_owner_name||'未分配'}</span></div>` : ''}
+        </div>
+        <div class="demand-info-grid">
+          <div class="info-item highlight"><span class="info-label">单价</span><span class="info-value price-text">¥${d.unit_price || 0}</span></div>
+        </div>` : ''}
+        
+        ${d.description ? `<div class="demand-desc">${d.description.length > 120 ? d.description.slice(0, 120) + '...' : d.description}</div>` : ''}
+        ${(d.fans_requirement || d.requirements) ? `
+        <div class="demand-requirements">
+          ${d.fans_requirement ? `<span>粉丝要求: ${d.fans_requirement}</span>` : ''}
+          ${d.requirements ? `<span>需求: ${d.requirements}</span>` : ''}
+        </div>` : ''}
+      </div>
+
       <div class="demand-footer">
-        <span class="merchant-info">${d.merchant_company || ''} · ${formatDate(d.created_at)}</span>
-        <div style="display:flex;gap:6px;">
-          ${isInfluencer ? `<button class="btn btn-sm btn-apply" onclick="applyCooperation('${d.id}','${d.merchant_id}')">我要带货</button>` : ''}
+        <span class="demand-meta">${d.merchant_company || ''} · ${formatDate(d.created_at)}</span>
+        <div class="demand-actions">
+          ${isInfluencer ? `<button class="btn btn-sm btn-primary" onclick="applyCooperation('${d.id}','${d.merchant_id}')">申请合作</button>` : ''}
           ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-sm btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">编辑</button>` : ''}
-          ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-sm btn-danger" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
+          ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-sm btn-danger-outline" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
         </div>
       </div>
     </div>`;
 }
 
-function searchMerchantDemands() {
-  const keyword = document.getElementById('merchant-demand-search').value;
-  renderMerchantDemands(1, 20, keyword);
-}
-function pageMerchantDemands(page, pageSize) {
-  const keyword = document.getElementById('merchant-demand-search')?.value || '';
-  renderMerchantDemands(page, pageSize || 20, keyword);
-}
 async function deleteMerchantDemand(id) {
   if (!confirm('确定删除此需求？')) return;
   await fetchAPI(`/demands/${id}`, { method: 'DELETE' });
@@ -587,23 +1329,44 @@ async function applyCooperation(demandId, merchantId) {
   else { showToast(res.error || '申请失败', 'error'); }
 }
 
-// ============ 达人需求大厅 ============
-async function renderInfluencerDemands(page = 1, pageSize = 20, keyword = '') {
+// ============ 达人需求大厅 V2 ============
+let idFilters = {
+  demand_category: '', book_category: '', subject_category: '',
+  level: '', status: '', fans_min: '', fans_max: '',
+  price_min: '', price_max: '', keyword: ''
+};
+let idFilterPanelOpen = false;
+
+const ID_BOOK_CATEGORIES = ['少儿科普', '绘本', '教辅', '文学', '家庭教育', '童书', '人文社科', '其他'];
+const ID_SUBJECT_CATEGORIES = ['语文', '数学', '英语', '科学', '艺术', '编程', '通用'];
+const ID_LEVELS = ['S级', 'A级', 'B级', 'C级', 'D级'];
+
+async function renderInfluencerDemands(page = 1, pageSize = 20) {
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
-  
+
   let url = `/demands/influencer-demands?page=${page}&pageSize=${pageSize}`;
   if (currentUser.role === 'influencer') url += `&influencer_id=${currentUser.id}`;
-  if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
+  if (idFilters.demand_category) url += `&demand_category=${encodeURIComponent(idFilters.demand_category)}`;
+  if (idFilters.book_category) url += `&book_category=${encodeURIComponent(idFilters.book_category)}`;
+  if (idFilters.subject_category) url += `&subject_category=${encodeURIComponent(idFilters.subject_category)}`;
+  if (idFilters.level) url += `&level=${encodeURIComponent(idFilters.level)}`;
+  if (idFilters.status) url += `&status=${encodeURIComponent(idFilters.status)}`;
+  if (idFilters.fans_min) url += `&fans_min=${encodeURIComponent(idFilters.fans_min)}`;
+  if (idFilters.fans_max) url += `&fans_max=${encodeURIComponent(idFilters.fans_max)}`;
+  if (idFilters.price_min) url += `&price_min=${encodeURIComponent(idFilters.price_min)}`;
+  if (idFilters.price_max) url += `&price_max=${encodeURIComponent(idFilters.price_max)}`;
+  if (idFilters.keyword) url += `&keyword=${encodeURIComponent(idFilters.keyword)}`;
   url += getOperatorFilter();
-  
+
   const res = await fetchAPI(url);
   if (!res.success) { container.innerHTML = '<p>加载失败</p>'; return; }
-  
+
   const isMerchant = currentUser.role === 'merchant';
   const isInfluencer = currentUser.role === 'influencer';
-  const title = isInfluencer ? '我的达人需求' : '达人需求大厅';
-  
+  const title = isInfluencer ? '我的达人需求' : '达人需求';
+  const activeCount = getIdActiveFilterCount();
+
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
@@ -612,48 +1375,183 @@ async function renderInfluencerDemands(page = 1, pageSize = 20, keyword = '') {
         ${currentUser.role !== 'merchant' ? '<button class="btn btn-sm btn-danger" onclick="clearAllInfluencerDemands()">一键清空</button>' : ''}
       </div>
     </div>
-    <div class="search-filter-bar">
-      <input type="text" id="inf-demand-search" placeholder="搜索达人需求..." value="${keyword}" onkeypress="if(event.key==='Enter')searchInfluencerDemands()">
-      <button class="btn btn-primary btn-sm" onclick="searchInfluencerDemands()">搜索</button>
+
+    <!-- 工具栏 -->
+    <div class="md-toolbar">
+      <div class="md-toolbar-left">
+        <button class="btn btn-sm ${idFilterPanelOpen?'btn-primary':'btn-outline'}" onclick="toggleIdFilter()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          筛选${activeCount > 0 ? ' ('+activeCount+')' : ''}
+        </button>
+        ${activeCount>0?'<button class="btn btn-sm btn-outline" onclick="resetIdFilter()">清空筛选</button>':''}
+      </div>
+      <div class="md-toolbar-right">
+        <span style="color:#94a3b8;font-size:13px;">共 ${res.pagination?.total || 0} 条</span>
+      </div>
     </div>
+
+    <!-- 筛选面板 -->
+    <div class="filter-panel" id="id-filter-panel" style="display:${idFilterPanelOpen?'block':'none'}">
+      <div class="filter-row">
+        <div class="filter-item">
+          <label>需求类型</label>
+          <select onchange="onIdFilterChange('demand_category', this.value); applyIdFilter()">
+            <option value="">全部</option>
+            <option value="图书需求" ${idFilters.demand_category==='图书需求'?'selected':''}>图书需求</option>
+            <option value="课程需求" ${idFilters.demand_category==='课程需求'?'selected':''}>课程需求</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>状态</label>
+          <select onchange="onIdFilterChange('status', this.value); applyIdFilter()">
+            <option value="">全部</option>
+            <option value="published" ${idFilters.status==='published'?'selected':''}>已发布</option>
+            <option value="closed" ${idFilters.status==='closed'?'selected':''}>已关闭</option>
+          </select>
+        </div>
+        ${(idFilters.demand_category === '图书需求' || idFilters.demand_category === '') ? `
+        <div class="filter-item">
+          <label>图书分类</label>
+          <select onchange="onIdFilterChange('book_category', this.value); applyIdFilter()">
+            <option value="">全部</option>
+            ${ID_BOOK_CATEGORIES.map(c => `<option value="${c}" ${idFilters.book_category===c?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>` : ''}
+        <div class="filter-item">
+          <label>学科</label>
+          <select onchange="onIdFilterChange('subject_category', this.value); applyIdFilter()">
+            <option value="">全部</option>
+            ${ID_SUBJECT_CATEGORIES.map(s => `<option value="${s}" ${idFilters.subject_category===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>达人等级</label>
+          <select onchange="onIdFilterChange('level', this.value); applyIdFilter()">
+            <option value="">全部</option>
+            ${ID_LEVELS.map(l => `<option value="${l}" ${idFilters.level===l?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+
+      <!-- 第二行：粉丝量 + 客单价 -->
+      <div class="filter-row" style="margin-top:10px;">
+        <div class="filter-item" style="flex:0 0 auto;">
+          <label>粉丝量</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" placeholder="最低" value="${idFilters.fans_min || ''}" style="width:90px"
+              onchange="onIdFilterChange('fans_min', this.value); applyIdFilter()">
+            <span style="color:#94a3b8">-</span>
+            <input type="number" placeholder="最高" value="${idFilters.fans_max || ''}" style="width:90px"
+              onchange="onIdFilterChange('fans_max', this.value); applyIdFilter()">
+          </div>
+        </div>
+        <div class="filter-item" style="flex:0 0 auto;">
+          <label>可接受客单价 (¥)</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" placeholder="最低" value="${idFilters.price_min || ''}" style="width:80px"
+              onchange="onIdFilterChange('price_min', this.value); applyIdFilter()">
+            <span style="color:#94a3b8">-</span>
+            <input type="number" placeholder="最高" value="${idFilters.price_max || ''}" style="width:80px"
+              onchange="onIdFilterChange('price_max', this.value); applyIdFilter()">
+          </div>
+        </div>
+      </div>
+
+      <!-- 第三行：搜索 -->
+      <div class="filter-row" style="margin-top:10px;">
+        <div class="filter-item" style="flex:1">
+          <input type="text" id="id-filter-keyword" placeholder="搜索达人账号 / 图书名 / 描述..." value="${idFilters.keyword || ''}"
+            onkeypress="if(event.key==='Enter'){ onIdFilterChange('keyword', this.value); applyIdFilter(); }">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="onIdFilterChange('keyword', document.getElementById('id-filter-keyword').value); applyIdFilter()">搜索</button>
+        ${activeCount>0 ? '<button class="btn btn-sm btn-outline" onclick="resetIdFilter()">重置</button>' : ''}
+      </div>
+    </div>
+
     <div class="demand-grid" id="inf-demand-list">
-      ${res.data.length === 0 ? '<div class="empty-state"><div class="icon">-</div><p>暂无达人需求</p></div>' :
-        res.data.map(d => renderInfluencerDemandCard(d, isMerchant)).join('')}
+      ${res.data.length === 0
+        ? '<div class="empty-state"><div class="icon">-</div><p>暂无达人需求</p></div>'
+        : res.data.map(d => renderInfluencerDemandCardV2(d, isMerchant)).join('')}
     </div>
     ${renderPagination(res.pagination, 'pageInfluencerDemands')}`;
 }
 
-function renderInfluencerDemandCard(d, isMerchant) {
+function renderInfluencerDemandCardV2(d, isMerchant) {
+  const isBook = d.demand_category === '图书需求';
+  const typeColor = isBook ? '#3b82f6' : '#8b5cf6';
+  const typeLabel = d.demand_category || '需求';
+  const accountName = d.video_account_name || d.inf_video_account_name || '未知达人';
+  const fansCount = d.fans_count || d.inf_fans_count || 0;
+  const statusBadge = (typeof getStatusBadge === 'function') ? getStatusBadge(d.status) : '';
+  const levelBadge = d.level
+    ? `<span class="level-badge" style="background:${getLevelColor(d.level)}">${d.level}</span>`
+    : '';
+
+  const priceRangeBook = (d.book_price_max > 0)
+    ? `¥${d.book_price_min || 0} - ${d.book_price_max}`
+    : '-';
+  const priceRangeCourse = (d.course_price_max > 0)
+    ? `¥${d.course_price_min || 0} - ${d.course_price_max}`
+    : '-';
+
   return `
-    <div class="demand-card">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <div class="demand-card-v2">
+      <div class="demand-header">
         <input type="checkbox" class="inf-demand-checkbox" value="${d.id}">
-        ${d.level ? `<span class="level-badge" style="background:${getLevelColor(d.level)}">${d.level}</span>` : ''}
-        <span class="demand-title">${d.video_account_name || d.inf_video_account_name || '未知达人'}</span>
+        <span class="type-badge" style="background:${typeColor}15;color:${typeColor}">${typeLabel}</span>
+        ${levelBadge}
+        <span class="demand-title">${accountName}</span>
+        ${statusBadge}
       </div>
-      <div class="demand-detail-grid">
-        <div class="detail-field"><div class="detail-label">需求类型</div><div class="detail-value">${d.demand_category || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">粉丝数</div><div class="detail-value">${formatNumber(d.fans_count || d.inf_fans_count)}</div></div>
-        ${d.book_name ? `<div class="detail-field"><div class="detail-label">图书名称</div><div class="detail-value">${d.book_name}</div></div>` : ''}
-        ${d.book_category ? `<div class="detail-field"><div class="detail-label">图书分类</div><div class="detail-value">${d.book_category}</div></div>` : ''}
-        ${d.book_price_max> 0 ? `<div class="detail-field"><div class="detail-label">图书售价范围</div><div class="detail-value">¥${d.book_price_min}-${d.book_price_max}</div></div>` : ''}
-        ${d.course_price_max> 0 ? `<div class="detail-field"><div class="detail-label">课程价格范围</div><div class="detail-value">¥${d.course_price_min}-${d.course_price_max}</div></div>` : ''}
-        ${d.subject_category ? `<div class="detail-field"><div class="detail-label">学科分类</div><div class="detail-value">${d.subject_category}</div></div>` : ''}
-        ${d.description ? `<div class="detail-field full-width"><div class="detail-label">需求描述</div><div class="detail-value">${d.description}</div></div>` : ''}
+
+      <div class="demand-body">
+        <div class="demand-info-grid">
+          <div class="info-item"><span class="info-label">粉丝量</span><span class="info-value">${formatNumber(fansCount)}</span></div>
+          ${d.subject_category ? `<div class="info-item"><span class="info-label">擅长学科</span><span class="info-value">${d.subject_category}</span></div>` : ''}
+          ${d.video_category_track ? `<div class="info-item"><span class="info-label">内容赛道</span><span class="info-value" title="${d.video_category_track}">${(d.video_category_track || '').slice(0, 16)}${(d.video_category_track || '').length > 16 ? '…' : ''}</span></div>` : ''}
+          ${d.inf_region ? `<div class="info-item"><span class="info-label">所在地</span><span class="info-value">${(d.inf_region || '').split(',')[0] || '-'}</span></div>` : ''}
+        </div>
+
+        ${isBook ? `
+        <div class="demand-info-grid">
+          ${d.book_name ? `<div class="info-item"><span class="info-label">期望图书</span><span class="info-value">${d.book_name}</span></div>` : ''}
+          ${d.book_category ? `<div class="info-item"><span class="info-label">图书分类</span><span class="info-value">${d.book_category}</span></div>` : ''}
+          <div class="info-item highlight"><span class="info-label">可接受售价</span><span class="info-value price-text">${priceRangeBook}</span></div>
+        </div>` : `
+        <div class="demand-info-grid">
+          <div class="info-item highlight"><span class="info-label">可接受课程价</span><span class="info-value price-text">${priceRangeCourse}</span></div>
+        </div>`}
+
+        ${d.description ? `<div class="demand-desc">${d.description.length > 120 ? d.description.slice(0, 120) + '…' : d.description}</div>` : ''}
       </div>
+
       <div class="demand-footer">
-        <span class="merchant-info"> ${formatDate(d.created_at)}</span>
-        <div style="display:flex;gap:6px;">
-          ${isMerchant ? `<button class="btn btn-sm btn-invite" onclick="inviteInfluencer('${d.influencer_id}','${d.id}')">~ 邀请合作</button>` : ''}
-          ${currentUser.role === 'admin' || currentUser.role === 'influencer' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencerDemand('${d.id}')">编辑</button>` : ''}
-          ${currentUser.role === 'admin' || currentUser.role === 'influencer' ? `<button class="btn btn-sm btn-danger" onclick="deleteInfluencerDemand('${d.id}')">删除</button>` : ''}
+        <span class="demand-meta">${formatDate(d.created_at)}</span>
+        <div class="demand-actions">
+          ${isMerchant ? `<button class="btn btn-sm btn-primary" onclick="inviteInfluencer('${d.influencer_id}','${d.id}')">邀请合作</button>` : ''}
+          ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-sm btn-outline" onclick="editInfluencerDemand('${d.id}')">编辑</button>` : ''}
+          ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-sm btn-danger-outline" onclick="deleteInfluencerDemand('${d.id}')">删除</button>` : ''}
         </div>
       </div>
     </div>`;
 }
 
-function searchInfluencerDemands() { renderInfluencerDemands(1, 20, document.getElementById('inf-demand-search').value); }
-function pageInfluencerDemands(page, pageSize) { renderInfluencerDemands(page, pageSize || 20, document.getElementById('inf-demand-search')?.value || ''); }
+function toggleIdFilter() { idFilterPanelOpen = !idFilterPanelOpen; renderInfluencerDemands(); }
+function onIdFilterChange(key, value) { idFilters[key] = value; }
+function applyIdFilter() { renderInfluencerDemands(1, 20); }
+function resetIdFilter() {
+  idFilters = { demand_category:'', book_category:'', subject_category:'', level:'', status:'', fans_min:'', fans_max:'', price_min:'', price_max:'', keyword:'' };
+  renderInfluencerDemands(1, 20);
+}
+function getIdActiveFilterCount() {
+  return Object.values(idFilters).filter(v => v !== '' && v != null).length;
+}
+
+function searchInfluencerDemands() {
+  idFilters.keyword = document.getElementById('id-filter-keyword')?.value?.trim() || '';
+  renderInfluencerDemands(1, 20);
+}
+function pageInfluencerDemands(page, pageSize) { renderInfluencerDemands(page, pageSize || 20); }
 async function deleteInfluencerDemand(id) { if (!confirm('确定删除？')) return; await fetchAPI(`/demands/influencer-demands/${id}`, { method: 'DELETE' }); showToast('删除成功'); renderInfluencerDemands(); }
 async function clearAllInfluencerDemands() {
   if (!confirm('确定清空所有达人需求？')) return;
@@ -730,106 +1628,507 @@ async function inviteInfluencer(influencerId, demandId) {
 }
 
 // ============ 达人广场 ============
-async function renderInfluencerPlaza(page = 1, pageSize = 20, keyword = '') {
+let infFilters = {
+  keyword: '',
+  level: [],            // 多选数组
+  fans_min: '',
+  fans_max: '',
+  region_province: '',
+  video_category: '',
+  book_category: '',
+  course_category: '',
+  has_mcn: '',
+  mutual_select: '',
+  cooperation_type: '',
+  filter_sales_id: ''
+};
+let infViewMode = 'card';   // card | list
+let infSortField = 'fans_count';
+let infSortOrder = 'desc';
+let infFilterPanelOpen = false;
+
+// 粉丝段预设
+const FANS_BUCKETS = [
+  { label: '全部', min: '', max: '' },
+  { label: '1万以下', min: '0', max: '9999' },
+  { label: '1-10万', min: '10000', max: '99999' },
+  { label: '10-50万', min: '100000', max: '499999' },
+  { label: '50-100万', min: '500000', max: '999999' },
+  { label: '100万+', min: '1000000', max: '' },
+];
+
+function getInfActiveFilterCount() {
+  let c = 0;
+  if (infFilters.level && infFilters.level.length) c++;
+  if (infFilters.fans_min || infFilters.fans_max) c++;
+  ['region_province','video_category','book_category','course_category',
+   'has_mcn','mutual_select','cooperation_type','filter_sales_id','keyword'].forEach(k => {
+    if (infFilters[k]) c++;
+  });
+  return c;
+}
+
+async function renderInfluencerPlaza(page = 1, pageSize = 20) {
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
-  const [levelRes, infRes, salesRes] = await Promise.all([
-    fetchAPI('/stats/influencer-levels'),
-    fetchAPI(`/influencers?page=${page}&pageSize=${pageSize}${keyword ? '&keyword=' + encodeURIComponent(keyword) : ''}`),
-    fetchAPI('/admins/sales-list')
-  ]);
-  // 构建销售名称/账号 集合，用于卡片兜底匹配
-  window.__salesNameSet = new Set((salesRes.success ? salesRes.data : []).flatMap(s => [s.name, s.username].filter(Boolean)));
-  
-  const levelData = levelRes.success ? levelRes.data : { levelStats: [], total: 0 };
   const isMerchant = currentUser.role === 'merchant';
-  
+  const isInfluencer = currentUser.role === 'influencer';
+  const isAdmin = currentUser.role === 'admin';
+  const isSuperAdmin = isAdmin && currentUser.is_super === true;
+
+  // 拼接 URL 参数
+  const opFilter = getOperatorFilter();
+  const params = new URLSearchParams();
+  params.append('page', page);
+  params.append('pageSize', pageSize);
+  if (infFilters.keyword) params.append('keyword', infFilters.keyword);
+  if (infFilters.level && infFilters.level.length) params.append('level', infFilters.level.join(','));
+  if (infFilters.fans_min) params.append('fans_min', infFilters.fans_min);
+  if (infFilters.fans_max) params.append('fans_max', infFilters.fans_max);
+  if (infFilters.region_province) params.append('region_province', infFilters.region_province);
+  if (infFilters.video_category) params.append('category', infFilters.video_category);
+  if (infFilters.book_category) params.append('book_category', infFilters.book_category);
+  if (infFilters.course_category) params.append('course_category', infFilters.course_category);
+  if (infFilters.has_mcn) params.append('has_mcn', infFilters.has_mcn);
+  if (infFilters.mutual_select) params.append('mutual_select', infFilters.mutual_select);
+  if (infFilters.cooperation_type) params.append('cooperation_type', infFilters.cooperation_type);
+  if (infFilters.filter_sales_id) params.append('filter_sales_id', infFilters.filter_sales_id);
+  params.append('sortField', infSortField);
+  params.append('sortOrder', infSortOrder);
+  let qs = '?' + params.toString();
+  if (opFilter) qs += opFilter;
+
+  const [heroRes, infRes, optsRes] = await Promise.all([
+    fetchAPI('/influencers/hero-stats' + (opFilter ? '?' + opFilter.substring(1) : '')),
+    fetchAPI('/influencers' + qs),
+    fetchAPI('/influencers/filter-options'),
+  ]);
+
+  if (!infRes.success) {
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:#ef4444">加载失败：' + (infRes.error || '') + '</p>';
+    return;
+  }
+
+  const hero = heroRes.success ? heroRes.data : { total: 0, levels: [], mcnCount: 0, mutualCount: 0, newCount: 0, highSales: 0 };
+  const opts = optsRes.success ? optsRes.data : { levels: [], videoCategories: [], bookCategories: [], courseCategories: [], provinces: [], cooperationTypes: [], salesList: [] };
+
+  // 用于卡片销售徽章兜底匹配
+  window.__salesNameSet = new Set((opts.salesList || []).map(s => s.name).filter(Boolean));
+
   container.innerHTML = `
     ${renderBackButton()}
-    <div class="page-header"><h2>达人广场</h2></div>
-    <div class="level-stats-bar">
-      <div class="level-stat-item"><span class="level-stat-label">总计</span><span class="level-stat-value">${levelData.total}</span></div>
-      ${levelData.levelStats.map(l => `
-        <div class="level-stat-item">
-          <span class="level-badge" style="background:${getLevelColor(l.level)}">${l.level}</span>
-          <span class="level-stat-value">${l.count}</span>
+    <div class="inf-plaza-page">
+      <!-- 顶部 Hero 数据条 -->
+      <div class="inf-hero">
+        <div class="inf-hero-title">
+          <h2>达人池</h2>
+          <p>视频号优质达人资源库</p>
         </div>
-      `).join('')}
-    </div>
-    <div class="search-filter-bar">
-      <input type="text" id="inf-plaza-search" placeholder="搜索达人（名称/分类/地区）..." value="${keyword}" onkeypress="if(event.key==='Enter')searchInfluencerPlaza()">
-      <button class="btn btn-primary btn-sm" onclick="searchInfluencerPlaza()">搜索</button>
-      ${currentUser.role === 'admin' ? `
-        <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">添加达人</button>
-        <button class="btn btn-sm btn-warning" onclick="showInfluencerExcelUpload()">批量上传</button>
-        <button class="btn btn-sm btn-danger" onclick="clearAllInfluencers()">一键清空</button>
-      ` : ''}
-    </div>
-    <div id="influencer-upload-area" style="display:none;margin-bottom:16px">
-      <div class="card"><div class="card-header"><h3>批量上传达人</h3></div><div class="card-body">
-        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">下载导入模板</a>
+        <div class="inf-hero-stats">
+          <div class="inf-stat-card inf-stat-primary">
+            <div class="inf-stat-value">${formatBigNumber(hero.total)}</div>
+            <div class="inf-stat-label">达人总数</div>
+          </div>
+          ${hero.levels.map(l => `
+            <div class="inf-stat-card">
+              <div class="inf-stat-value">
+                <span class="level-badge-mini ${getLevelClass(l.level)}">${l.level}</span>
+                ${l.c}
+              </div>
+              <div class="inf-stat-label">${l.level}达人</div>
+            </div>
+          `).join('')}
+          <div class="inf-stat-card">
+            <div class="inf-stat-value" style="color:#16a34a">${hero.mutualCount}</div>
+            <div class="inf-stat-label">已入互选</div>
+          </div>
+          <div class="inf-stat-card">
+            <div class="inf-stat-value" style="color:#f59e0b">${hero.mcnCount}</div>
+            <div class="inf-stat-label">MCN达人</div>
+          </div>
+          <div class="inf-stat-card">
+            <div class="inf-stat-value" style="color:#dc2626">${hero.highSales}</div>
+            <div class="inf-stat-label">高月销(10万+)</div>
+          </div>
         </div>
-        <div class="upload-area" onclick="document.getElementById('influencer-excel-input').click()">
-          <div class="upload-icon"></div>
-          <div class="upload-text">点击上传达人Excel文件</div>
-          <div class="upload-hint">支持.xlsx格式，请按模板格式填写达人信息</div>
+      </div>
+
+      <!-- 筛选面板 -->
+      <div class="filter-panel" id="inf-filter-panel" style="display:${infFilterPanelOpen ? 'block' : 'none'}">
+        <div class="filter-row">
+          <div class="filter-item" style="flex:1.5">
+            <label>等级（多选）</label>
+            <div class="chip-group">
+              ${opts.levels.map(l => `
+                <span class="chip ${(infFilters.level||[]).includes(l.level) ? 'chip-active' : ''}" 
+                      onclick="toggleInfLevel('${l.level}')">${l.level} (${l.count})</span>
+              `).join('')}
+            </div>
+          </div>
         </div>
-        <input type="file" id="influencer-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleInfluencerExcelUpload(event)">
-        <div id="influencer-import-result" style="margin-top:12px"></div>
-      </div></div>
-    </div>
-    <div class="demand-grid">
-      ${(!infRes.success || infRes.data.length === 0) ? '<div class="empty-state"><div class="icon">N</div><p>暂无达人</p></div>' :
-        infRes.data.map(inf => renderInfluencerCard(inf, isMerchant)).join('')}
-    </div>
-    ${infRes.success ? renderPagination(infRes.pagination, 'pageInfluencerPlaza') : ''}`;
+        <div class="filter-row" style="margin-top:10px;">
+          <div class="filter-item">
+            <label>粉丝量段</label>
+            <select onchange="onInfFansBucketChange(this.value)">
+              ${FANS_BUCKETS.map((b, i) => {
+                const selected = (infFilters.fans_min === b.min && infFilters.fans_max === b.max) ? 'selected' : '';
+                return `<option value="${i}" ${selected}>${b.label}</option>`;
+              }).join('')}
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>地区（省份）</label>
+            <select onchange="onInfFilterChange('region_province', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              ${opts.provinces.map(p => `<option value="${p}" ${infFilters.region_province===p?'selected':''}>${p}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>视频品类</label>
+            <select onchange="onInfFilterChange('video_category', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              ${opts.videoCategories.map(c => `<option value="${c}" ${infFilters.video_category===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>图书品类</label>
+            <select onchange="onInfFilterChange('book_category', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              ${opts.bookCategories.map(c => `<option value="${c}" ${infFilters.book_category===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>课程品类</label>
+            <select onchange="onInfFilterChange('course_category', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              ${opts.courseCategories.map(c => `<option value="${c}" ${infFilters.course_category===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="filter-row" style="margin-top:10px;">
+          <div class="filter-item">
+            <label>合作类型</label>
+            <select onchange="onInfFilterChange('cooperation_type', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              ${opts.cooperationTypes.map(c => `<option value="${c}" ${infFilters.cooperation_type===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>是否MCN</label>
+            <select onchange="onInfFilterChange('has_mcn', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              <option value="是" ${infFilters.has_mcn==='是'?'selected':''}>是</option>
+              <option value="否" ${infFilters.has_mcn==='否'?'selected':''}>否</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <label>是否互选</label>
+            <select onchange="onInfFilterChange('mutual_select', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              <option value="是" ${infFilters.mutual_select==='是'?'selected':''}>是</option>
+              <option value="否" ${infFilters.mutual_select==='否'?'selected':''}>否</option>
+            </select>
+          </div>
+          ${isSuperAdmin ? `
+          <div class="filter-item">
+            <label>归属销售</label>
+            <select onchange="onInfFilterChange('filter_sales_id', this.value); applyInfFilter()">
+              <option value="">全部</option>
+              ${opts.salesList.map(s => `<option value="${s.id}" ${infFilters.filter_sales_id===s.id?'selected':''}>${s.name}</option>`).join('')}
+            </select>
+          </div>` : ''}
+        </div>
+        <div class="filter-row" style="margin-top:10px;">
+          <div class="filter-item" style="flex:1">
+            <input type="text" id="inf-filter-keyword" placeholder="搜索达人名 / 品类 / 地区 / MCN / 销售..." value="${infFilters.keyword || ''}"
+              onkeypress="if(event.key==='Enter'){ onInfFilterChange('keyword', this.value); applyInfFilter(); }">
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="onInfFilterChange('keyword', document.getElementById('inf-filter-keyword').value); applyInfFilter()">搜索</button>
+          ${getInfActiveFilterCount() > 0 ? '<button class="btn btn-sm btn-outline" onclick="resetInfFilter()">重置</button>' : ''}
+        </div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="md-toolbar">
+        <div class="md-toolbar-left">
+          <button class="btn btn-sm ${infFilterPanelOpen?'btn-primary':'btn-outline'}" onclick="toggleInfFilter()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            筛选${getInfActiveFilterCount() > 0 ? ' ('+getInfActiveFilterCount()+')' : ''}
+          </button>
+          <span style="font-size:12px;color:#94a3b8;margin-left:8px;">共 <strong style="color:#2563eb">${infRes.pagination.total}</strong> 位达人</span>
+          <select class="sort-select" onchange="onInfSortChange(this.value)" title="排序">
+            <option value="fans_count:desc" ${infSortField==='fans_count'&&infSortOrder==='desc'?'selected':''}>粉丝量↓</option>
+            <option value="fans_count:asc" ${infSortField==='fans_count'&&infSortOrder==='asc'?'selected':''}>粉丝量↑</option>
+            <option value="total_sales:desc" ${infSortField==='total_sales'&&infSortOrder==='desc'?'selected':''}>月销总额↓</option>
+            <option value="total_sales:asc" ${infSortField==='total_sales'&&infSortOrder==='asc'?'selected':''}>月销总额↑</option>
+            <option value="level:asc" ${infSortField==='level'&&infSortOrder==='asc'?'selected':''}>等级 A→D</option>
+            <option value="created_at:desc" ${infSortField==='created_at'&&infSortOrder==='desc'?'selected':''}>最新加入</option>
+          </select>
+          ${isAdmin ? `
+            <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">添加达人</button>
+            <button class="btn btn-sm btn-outline" onclick="showInfluencerExcelUpload()">批量上传</button>
+            <button class="btn btn-sm btn-danger-outline" onclick="clearAllInfluencers()">清空</button>
+          ` : ''}
+        </div>
+        <div class="md-toolbar-right">
+          <button class="btn btn-sm ${infViewMode==='card'?'btn-primary':'btn-outline'}" onclick="switchInfView('card')" title="卡片视图">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> 卡片
+          </button>
+          <button class="btn btn-sm ${infViewMode==='list'?'btn-primary':'btn-outline'}" onclick="switchInfView('list')" title="列表视图">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg> 列表
+          </button>
+        </div>
+      </div>
+
+      <!-- Excel 上传区（隐藏） -->
+      <div id="influencer-upload-area" style="display:none;margin-bottom:16px">
+        <div class="card"><div class="card-header"><h3>批量上传达人</h3></div><div class="card-body">
+          <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+            <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">下载导入模板</a>
+            <span style="font-size:12px;color:#94a3b8;align-self:center">支持"X万"格式（如 50万），同名达人自动更新</span>
+          </div>
+          <div class="upload-area" onclick="document.getElementById('influencer-excel-input').click()">
+            <div class="upload-icon">+</div>
+            <div class="upload-text">点击上传达人Excel文件</div>
+            <div class="upload-hint">支持.xlsx格式</div>
+          </div>
+          <input type="file" id="influencer-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleInfluencerExcelUpload(event)">
+          <div id="influencer-import-result" style="margin-top:12px"></div>
+        </div></div>
+      </div>
+
+      <!-- 达人列表 -->
+      <div class="${infViewMode==='card' ? 'inf-grid' : 'inf-list'}" id="influencer-list">
+        ${infRes.data.length === 0 
+          ? '<div class="empty-state"><div class="icon">-</div><p>暂无符合条件的达人</p>' + (getInfActiveFilterCount() > 0 ? '<button class="btn btn-sm btn-primary" style="margin-top:12px" onclick="resetInfFilter()">清除筛选条件</button>' : '') + '</div>'
+          : infViewMode === 'card'
+            ? infRes.data.map(inf => renderInfCardV2(inf, isMerchant, isSuperAdmin)).join('')
+            : renderInfListHeader(isSuperAdmin) + infRes.data.map(inf => renderInfRow(inf, isMerchant, isSuperAdmin)).join('')
+        }
+      </div>
+      ${renderPagination(infRes.pagination, 'pageInfluencerPlaza')}
+    </div>`;
 }
 
-function renderInfluencerCard(inf, isMerchant) {
-  // 仅管理员可见归属销售字段（商家、达人登录均不外显）
-  const showSales = currentUser.role === 'admin';
-  // 销售徽章显示规则：优先用id关联返回的姓名；若无，则用文本sales_owner匹配销售管理员集合做兜底
+function getLevelClass(level) {
+  const map = { 'S级': 'lv-S', 'A级': 'lv-A', 'B级': 'lv-B', 'C级': 'lv-C', 'D级': 'lv-D', 'S':'lv-S','A':'lv-A','B':'lv-B','C':'lv-C','D':'lv-D' };
+  return map[level] || 'lv-D';
+}
+
+function formatSalesAmount(n) {
+  if (!n || n <= 0) return '-';
+  if (n >= 10000) return '¥' + (n / 10000).toFixed(n % 10000 === 0 ? 0 : 1) + '万';
+  return '¥' + n;
+}
+
+// 卡片视图（V2 - 巨量星图风格）
+function renderInfCardV2(inf, isMerchant, isSuperAdmin) {
+  const totalSales = (inf.monthly_short_video_sales || 0) + (inf.monthly_live_sales || 0);
+  const region = (inf.region || '').replace(/,/, '·').replace(/，/, '·');
+  const showSales = isSuperAdmin;
+  // 销售徽章兜底（id关联优先；否则文本匹配）
   const salesNameSet = window.__salesNameSet || new Set();
-  const textMatchedAsSales = inf.sales_owner && salesNameSet.has(String(inf.sales_owner).trim());
-  const displayName = inf.sales_owner_name || (textMatchedAsSales ? inf.sales_owner : '');
-  const salesField = showSales ? `
-        <div class="detail-field"><div class="detail-label">归属销售</div><div class="detail-value">${
-          displayName
-            ? `<span style="color:#16a34a;font-weight:600">${displayName}</span> <span class="badge" style="background:#dcfce7;color:#16a34a;font-size:10px;padding:1px 6px;border-radius:8px">销售</span>`
-            : (inf.sales_owner ? `<span>${inf.sales_owner}</span>` : '<span style="color:#999">未分配</span>')
-        }</div></div>` : '';
+  const textMatched = inf.sales_owner && salesNameSet.has(String(inf.sales_owner).trim());
+  const displayName = inf.sales_owner_name || (textMatched ? inf.sales_owner : '');
   return `
-    <div class="demand-card">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    <div class="inf-card-v2" data-id="${inf.id}">
+      <div class="inf-card-head">
         <input type="checkbox" class="inf-checkbox" value="${inf.id}">
-        <span class="level-badge" style="background:${getLevelColor(inf.level)}">${inf.level || '-'}</span>
-        <span class="demand-title">${inf.video_account_name}</span>
+        <span class="level-badge-mini ${getLevelClass(inf.level)}">${inf.level || '-'}</span>
+        <div class="inf-card-name" title="${inf.video_account_name}">${inf.video_account_name}</div>
+        ${inf.has_joined_mutual_select === '是' ? '<span class="inf-mutual-tag">互选</span>' : ''}
       </div>
-      <div class="demand-detail-grid">
-        <div class="detail-field"><div class="detail-label">带货品类</div><div class="detail-value">${inf.video_category_track || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">粉丝数</div><div class="detail-value">${formatNumber(inf.fans_count)}</div></div>
-        <div class="detail-field"><div class="detail-label">短视频销售额(月)</div><div class="detail-value">${inf.monthly_short_video_sales || 0}万</div></div>
-        <div class="detail-field"><div class="detail-label">直播销售额(月)</div><div class="detail-value">${inf.monthly_live_sales || 0}万</div></div>
-        <div class="detail-field"><div class="detail-label">图书意愿</div><div class="detail-value"><span class="willingness ${inf.book_willingness}">${inf.book_willingness || '-'}</span></div></div>
-        <div class="detail-field"><div class="detail-label">课程意愿</div><div class="detail-value"><span class="willingness ${inf.course_willingness}">${inf.course_willingness || '-'}</span></div></div>
-        <div class="detail-field"><div class="detail-label">合作类型</div><div class="detail-value">${inf.cooperation_type || '-'}</div></div>
-        <div class="detail-field"><div class="detail-label">地区</div><div class="detail-value">${inf.region || '-'}</div></div>
-        ${salesField}
+      <div class="inf-card-meta">
+        ${inf.video_category_track ? `<span class="inf-tag inf-tag-cat">${(inf.video_category_track||'').split(/[,，、]/)[0]}</span>` : ''}
+        ${region ? `<span class="inf-tag inf-tag-region">📍 ${region}</span>` : ''}
+        ${inf.has_mcn === '是' ? `<span class="inf-tag inf-tag-mcn">MCN: ${inf.mcn_name||'-'}</span>` : ''}
       </div>
-      <div class="demand-footer">
-        <span class="merchant-info">${inf.has_mcn === '是' ? `MCN: ${inf.mcn_name}` : '独立达人'} · ${inf.region || ''}</span>
-        <div style="display:flex;gap:6px;">
-          ${isMerchant ? `<button class="btn btn-sm btn-invite" onclick="inviteInfluencer('${inf.id}','')">~ 邀请合作</button>` : ''}
-          ${currentUser.role === 'admin' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>` : ''}
+      <div class="inf-card-stats">
+        <div class="inf-stat">
+          <div class="inf-stat-num" style="color:#2563eb">${formatBigNumber(inf.fans_count)}</div>
+          <div class="inf-stat-key">粉丝量</div>
         </div>
+        <div class="inf-stat">
+          <div class="inf-stat-num" style="color:#dc2626">${formatSalesAmount(totalSales)}</div>
+          <div class="inf-stat-key">月销总额</div>
+        </div>
+        <div class="inf-stat">
+          <div class="inf-stat-num" style="color:#10b981;font-size:13px">${inf.short_video_frequency || '-'}</div>
+          <div class="inf-stat-key">短视频</div>
+        </div>
+        <div class="inf-stat">
+          <div class="inf-stat-num" style="color:#f59e0b;font-size:13px">${inf.live_frequency || '-'}</div>
+          <div class="inf-stat-key">直播</div>
+        </div>
+      </div>
+      ${(inf.book_willingness || inf.course_willingness) ? `
+      <div class="inf-card-tracks">
+        ${inf.book_willingness ? `<div class="inf-track-line"><span class="inf-track-label">📚 图书</span><span class="inf-track-val">${inf.book_willingness}</span></div>` : ''}
+        ${inf.course_willingness ? `<div class="inf-track-line"><span class="inf-track-label">🎓 课程</span><span class="inf-track-val">${inf.course_willingness}</span></div>` : ''}
+      </div>` : ''}
+      ${showSales ? `<div class="inf-card-sales">归属销售: ${displayName ? `<span style="color:#16a34a;font-weight:600">${displayName}</span>` : '<span style="color:#cbd5e1">未分配</span>'}</div>` : ''}
+      <div class="inf-card-foot">
+        ${isMerchant ? `<button class="btn btn-sm btn-primary" onclick="inviteInfluencer('${inf.id}','')">邀请合作</button>` : ''}
+        <button class="btn btn-sm btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
+        ${currentUser.role === 'admin' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>` : ''}
       </div>
     </div>`;
 }
 
-function searchInfluencerPlaza() { renderInfluencerPlaza(1, 20, document.getElementById('inf-plaza-search').value); }
-function pageInfluencerPlaza(page, pageSize) { renderInfluencerPlaza(page, pageSize || 20, document.getElementById('inf-plaza-search')?.value || ''); }
+// 列表视图表头
+function renderInfListHeader(isSuperAdmin) {
+  const sortable = (label, field, align = 'left') => {
+    const active = infSortField === field;
+    const arrow = active ? (infSortOrder === 'asc' ? '↑' : '↓') : '↕';
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    return `<div class="inf-th sortable ${cls}" onclick="onInfSortClick('${field}')">${label} <span class="sort-arrow ${active?'active':''}">${arrow}</span></div>`;
+  };
+  const plain = (label, align = 'left') => {
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    return `<div class="inf-th ${cls}">${label}</div>`;
+  };
+  return `
+    <div class="inf-row inf-row-header ${isSuperAdmin?'has-sales':''}">
+      ${plain('', 'center')}
+      ${sortable('等级', 'level', 'center')}
+      ${plain('达人账号')}
+      ${plain('视频品类')}
+      ${sortable('粉丝量', 'fans_count', 'right')}
+      ${sortable('月销总额', 'total_sales', 'right')}
+      ${plain('更新频率', 'right')}
+      ${plain('地区')}
+      ${plain('MCN')}
+      ${isSuperAdmin ? plain('归属销售', 'center') : ''}
+      ${plain('操作', 'right')}
+    </div>`;
+}
+
+// 列表视图行
+function renderInfRow(inf, isMerchant, isSuperAdmin) {
+  const totalSales = (inf.monthly_short_video_sales || 0) + (inf.monthly_live_sales || 0);
+  const region = (inf.region || '').replace(/,/, '·').replace(/，/, '·');
+  const salesNameSet = window.__salesNameSet || new Set();
+  const textMatched = inf.sales_owner && salesNameSet.has(String(inf.sales_owner).trim());
+  const displayName = inf.sales_owner_name || (textMatched ? inf.sales_owner : '');
+  const mainCategory = (inf.video_category_track || '').split(/[,，、]/)[0] || '-';
+  return `
+    <div class="inf-row ${isSuperAdmin?'has-sales':''}" data-id="${inf.id}">
+      <input type="checkbox" class="inf-checkbox">
+      <span class="level-badge-mini ${getLevelClass(inf.level)}">${inf.level || '-'}</span>
+      <div class="inf-row-name">
+        <span class="inf-row-account">${inf.video_account_name}</span>
+        ${inf.has_joined_mutual_select === '是' ? '<span class="inf-mutual-tag-sm">互选</span>' : ''}
+      </div>
+      <div class="inf-row-cat" title="${inf.video_category_track||''}">${mainCategory}</div>
+      <div class="inf-row-num" style="color:#2563eb;font-weight:600">${formatBigNumber(inf.fans_count)}</div>
+      <div class="inf-row-num" style="color:#dc2626;font-weight:600">${formatSalesAmount(totalSales)}</div>
+      <div class="inf-row-freq">
+        <div style="font-size:11px">${inf.short_video_frequency || '-'}</div>
+        <div style="font-size:11px;color:#94a3b8">${inf.live_frequency || '-'}</div>
+      </div>
+      <div class="inf-row-region">${region || '-'}</div>
+      <div class="inf-row-mcn">${inf.has_mcn === '是' ? (inf.mcn_name || 'MCN') : '-'}</div>
+      ${isSuperAdmin ? `<div class="inf-row-sales">${displayName ? `<span style="color:#16a34a;font-weight:600">${displayName}</span>` : '<span style="color:#cbd5e1">-</span>'}</div>` : ''}
+      <div class="inf-row-actions">
+        ${isMerchant ? `<button class="btn btn-xs btn-primary" onclick="inviteInfluencer('${inf.id}','')">邀请</button>` : ''}
+        <button class="btn btn-xs btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
+        ${currentUser.role === 'admin' ? `<button class="btn btn-xs btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>` : ''}
+      </div>
+    </div>`;
+}
+
+// ============ 达人广场交互函数 ============
+function toggleInfFilter() {
+  infFilterPanelOpen = !infFilterPanelOpen;
+  renderInfluencerPlaza();
+}
+function onInfFilterChange(key, value) { infFilters[key] = value; }
+function applyInfFilter() { renderInfluencerPlaza(1, 20); }
+function resetInfFilter() {
+  infFilters = { keyword: '', level: [], fans_min: '', fans_max: '', region_province: '', video_category: '', book_category: '', course_category: '', has_mcn: '', mutual_select: '', cooperation_type: '', filter_sales_id: '' };
+  renderInfluencerPlaza(1, 20);
+}
+function toggleInfLevel(level) {
+  if (!Array.isArray(infFilters.level)) infFilters.level = [];
+  const i = infFilters.level.indexOf(level);
+  if (i >= 0) infFilters.level.splice(i, 1);
+  else infFilters.level.push(level);
+  applyInfFilter();
+}
+function onInfFansBucketChange(idx) {
+  const b = FANS_BUCKETS[parseInt(idx)] || FANS_BUCKETS[0];
+  infFilters.fans_min = b.min;
+  infFilters.fans_max = b.max;
+  applyInfFilter();
+}
+function switchInfView(mode) {
+  infViewMode = mode;
+  renderInfluencerPlaza();
+}
+function onInfSortChange(value) {
+  const [f, o] = value.split(':');
+  infSortField = f;
+  infSortOrder = o;
+  renderInfluencerPlaza(1, 20);
+}
+function onInfSortClick(field) {
+  if (infSortField === field) {
+    infSortOrder = infSortOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    infSortField = field;
+    infSortOrder = 'desc';
+  }
+  renderInfluencerPlaza(1, 20);
+}
+
+// 达人详情弹窗
+async function showInfDetailModal(id) {
+  const res = await fetchAPI('/influencers/' + id);
+  if (!res.success) { showToast('获取详情失败', 'error'); return; }
+  const inf = res.data;
+  const totalSales = (inf.monthly_short_video_sales || 0) + (inf.monthly_live_sales || 0);
+  const region = (inf.region || '').replace(/,/, '·').replace(/，/, '·');
+  const isSuperAdmin = currentUser.role === 'admin' && currentUser.is_super === true;
+  const body = `
+    <div class="inf-detail">
+      <div class="inf-detail-head">
+        <span class="level-badge-mini ${getLevelClass(inf.level)}" style="font-size:13px;padding:4px 10px;">${inf.level || '-'}</span>
+        <div>
+          <div style="font-size:18px;font-weight:600;color:#1e293b">${inf.video_account_name}</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">${region || '-'} ${inf.has_mcn === '是' ? '· MCN: ' + (inf.mcn_name || '-') : '· 独立达人'}</div>
+        </div>
+        ${inf.has_joined_mutual_select === '是' ? '<span class="inf-mutual-tag" style="margin-left:auto">已入互选</span>' : ''}
+      </div>
+      <div class="inf-detail-stats">
+        <div class="inf-detail-stat"><div class="dl">粉丝量</div><div class="dv" style="color:#2563eb">${formatBigNumber(inf.fans_count)}</div></div>
+        <div class="inf-detail-stat"><div class="dl">月销总额</div><div class="dv" style="color:#dc2626">${formatSalesAmount(totalSales)}</div></div>
+        <div class="inf-detail-stat"><div class="dl">短视频月销</div><div class="dv">${formatSalesAmount(inf.monthly_short_video_sales)}</div></div>
+        <div class="inf-detail-stat"><div class="dl">直播月销</div><div class="dv">${formatSalesAmount(inf.monthly_live_sales)}</div></div>
+      </div>
+      <div class="inf-detail-grid">
+        <div><span class="dl">视频品类赛道</span><div class="dv">${inf.video_category_track || '-'}</div></div>
+        <div><span class="dl">图书品类</span><div class="dv">${inf.book_willingness || '-'}</div></div>
+        <div><span class="dl">课程品类</span><div class="dv">${inf.course_willingness || '-'}</div></div>
+        <div><span class="dl">合作类型</span><div class="dv" style="font-size:12px;">${inf.cooperation_type || '-'}</div></div>
+        <div><span class="dl">短视频频率</span><div class="dv">${inf.short_video_frequency || '-'}</div></div>
+        <div><span class="dl">直播频率</span><div class="dv">${inf.live_frequency || '-'}</div></div>
+        ${isSuperAdmin ? `<div><span class="dl">归属销售</span><div class="dv">${inf.sales_owner_name || inf.sales_owner || '<span style="color:#cbd5e1">未分配</span>'}</div></div>` : ''}
+        ${inf.official_account_name ? `<div><span class="dl">公众号</span><div class="dv">${inf.official_account_name}</div></div>` : ''}
+      </div>
+    </div>`;
+  const footer = `
+    <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+    ${currentUser.role === 'merchant' ? `<button class="btn btn-primary" onclick="closeModal();inviteInfluencer('${inf.id}','')">邀请合作</button>` : ''}
+  `;
+  openModal('达人详情', body, footer);
+}
+
+function searchInfluencerPlaza() {
+  infFilters.keyword = document.getElementById('inf-filter-keyword')?.value || '';
+  renderInfluencerPlaza(1, 20);
+}
+function pageInfluencerPlaza(page, pageSize) { renderInfluencerPlaza(page, pageSize || 20); }
 async function clearAllInfluencers() {
   if (!confirm('确定清空所有达人数据？')) return;
   await fetchAPI('/influencers/all/clear', { method: 'DELETE' });
@@ -2575,7 +3874,5 @@ async function deleteAdmin(id, name) {
 
 // ============ 初始化 ============
 document.addEventListener('DOMContentLoaded', () => {
-  onLoginRoleChange();
-  // 响应窗口resize
   window.addEventListener('resize', () => { if (!isMobile()) closeSidebar(); });
 });
