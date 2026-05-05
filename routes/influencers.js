@@ -550,6 +550,67 @@ router.get('/filter-options', (req, res) => {
   }
 });
 
+// ========== 达人名单导出 (CSV) ==========
+router.get('/export', (req, res) => {
+  try {
+    const { keyword, level, operator_id, sales_owner_id, has_mcn } = req.query;
+    let sql = `SELECT inf.*, sa.name as sales_owner_name FROM influencers inf
+               LEFT JOIN admins sa ON inf.sales_owner_id = sa.id AND sa.admin_role = '销售'
+               WHERE 1=1`;
+    const params = [];
+    if (sales_owner_id) {
+      sql += " AND (inf.sales_owner_id = ? OR inf.sales_owner_id IS NULL OR inf.sales_owner_id = '')";
+      params.push(sales_owner_id);
+    } else if (operator_id) {
+      sql += ' AND inf.operator_id = ?';
+      params.push(operator_id);
+    }
+    if (level) { sql += ' AND inf.level = ?'; params.push(level); }
+    if (has_mcn) { sql += ' AND inf.has_mcn = ?'; params.push(has_mcn); }
+    if (keyword) {
+      const kw = '%' + keyword + '%';
+      sql += ' AND (inf.video_account_name LIKE ? OR inf.region LIKE ? OR inf.video_category_track LIKE ?)';
+      params.push(kw, kw, kw);
+    }
+    sql += ' ORDER BY CAST(inf.fans_count AS INTEGER) DESC';
+    const rows = req.db.prepare(sql).all(...params);
+
+    // CSV 头
+    const headers = [
+      '达人ID', '等级', '视频号账号', '视频号官方账号', '内容赛道', '所在地',
+      '粉丝量', '月度短视频销售额', '月度直播销售额',
+      '合作类型', '图书带货意向', '课程带货意向',
+      '短视频频次', '直播频次', '是否MCN', 'MCN名称', '互选状态',
+      '归属销售', '创建时间'
+    ];
+    const escape = (v) => {
+      if (v == null) return '';
+      const s = String(v).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+    const lines = [headers.join(',')];
+    rows.forEach(r => {
+      lines.push([
+        r.id, r.level, r.video_account_name, r.official_account_name,
+        r.video_category_track, r.region,
+        r.fans_count, r.monthly_short_video_sales, r.monthly_live_sales,
+        r.cooperation_type, r.book_willingness, r.course_willingness,
+        r.short_video_frequency, r.live_frequency, r.has_mcn, r.mcn_name,
+        r.has_joined_mutual_select,
+        r.sales_owner_name || r.sales_owner || '', r.created_at
+      ].map(escape).join(','));
+    });
+    const csv = '\uFEFF' + lines.join('\n'); // BOM 避免中文乱码
+
+    const filename = `influencers_${new Date().toISOString().slice(0,10)}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ========== 达人广场顶部数据条 ==========
 router.get('/hero-stats', (req, res) => {
   try {

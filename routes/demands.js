@@ -12,7 +12,8 @@ router.get('/', (req, res) => {
         bd.book_image, bd.book_merchant, bd.book_name, bd.target_audience as book_target_audience, 
         bd.book_category, bd.product_image, bd.book_introduction, bd.wechat_shop_link, 
         bd.specification, bd.selling_price, bd.pure_commission, bd.ad_commission, bd.logistics, bd.stock,
-        cd.course_image, cd.course_name, cd.unit_price, cd.grade_level, cd.subject, cd.course_introduction, cd.course_link
+        cd.course_image, cd.course_name, cd.unit_price, cd.grade_level, cd.subject, cd.course_introduction, cd.course_link,
+        cd.pure_commission as course_pure_commission, cd.ad_commission as course_ad_commission
       FROM demands d
       LEFT JOIN merchants m ON d.merchant_id = m.id
       LEFT JOIN admins sa ON m.sales_owner_id = sa.id AND sa.admin_role = '销售'
@@ -413,15 +414,15 @@ router.post('/book', (req, res) => {
 // 单条课程需求发布
 router.post('/course', (req, res) => {
   try {
-    const { merchant_id, course_image, course_name, unit_price, grade_level, subject, course_introduction, course_link, operator_id } = req.body;
+    const { merchant_id, course_image, course_name, unit_price, grade_level, subject, pure_commission, ad_commission, course_introduction, course_link, operator_id } = req.body;
     if (!merchant_id || !course_name) {
       return res.status(400).json({ success: false, error: '商家ID、课程名称为必填项' });
     }
     const courseId = uuidv4();
     req.db.prepare(`
-      INSERT INTO course_demands (id, merchant_id, course_image, course_name, unit_price, grade_level, subject, course_introduction, course_link, operator_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(courseId, merchant_id, course_image || '', course_name, parseFloat(unit_price) || 0, grade_level || '', subject || '', course_introduction || '', course_link || '', operator_id || null);
+      INSERT INTO course_demands (id, merchant_id, course_image, course_name, unit_price, grade_level, subject, pure_commission, ad_commission, course_introduction, course_link, operator_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(courseId, merchant_id, course_image || '', course_name, parseFloat(unit_price) || 0, grade_level || '', subject || '', parseFloat(pure_commission) || 0, parseFloat(ad_commission) || 0, course_introduction || '', course_link || '', operator_id || null);
     
     const demandId = uuidv4();
     const category = subject ? subject.split(',')[0] + '课程' : '课程';
@@ -613,8 +614,8 @@ router.put('/course/:id', (req, res) => {
     const id = req.params.id;
     const existing = req.db.prepare('SELECT * FROM course_demands WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ success: false, error: '课程需求不存在' });
-    const fields = ['course_image','course_name','unit_price','grade_level','subject','course_introduction','course_link','status'];
-    const numericFields = new Set(['unit_price']);
+    const fields = ['course_image','course_name','unit_price','grade_level','subject','pure_commission','ad_commission','course_introduction','course_link','status'];
+    const numericFields = new Set(['unit_price','pure_commission','ad_commission']);
     const updates = [], params = [];
     for (const f of fields) {
       if (req.body[f] !== undefined) {

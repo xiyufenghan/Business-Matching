@@ -48,10 +48,10 @@ app.post('/api/login', (req, res) => {
     }});
   }
 
-  // 2. 匹配商家（按 name 或 company 匹配）
-  let merchant = db.prepare('SELECT * FROM merchants WHERE (name = ? OR company = ?) AND password = ?').get(username, username, password);
+  // 2. 匹配商家（按 name 或 company 匹配，排除已删除）
+  let merchant = db.prepare("SELECT * FROM merchants WHERE (name = ? OR company = ?) AND password = ? AND status != 'deleted'").get(username, username, password);
   if (!merchant) {
-    merchant = db.prepare('SELECT * FROM merchants WHERE name = ? OR company = ?').get(username, username);
+    merchant = db.prepare("SELECT * FROM merchants WHERE (name = ? OR company = ?) AND status != 'deleted'").get(username, username);
   }
   if (merchant && merchant.password === password) {
     return res.json({ success: true, data: { id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry }});
@@ -74,6 +74,7 @@ app.use('/api/stats', require('./routes/stats'));
 app.use('/api/excel', require('./routes/excel-import'));
 app.use('/api/cooperation', require('./routes/cooperation'));
 app.use('/api/admins', require('./routes/admins'));
+app.use('/api/recruitments', require('./routes/recruitments'));
 
 // 首页
 app.get('/', (req, res) => {

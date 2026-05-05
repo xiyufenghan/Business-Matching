@@ -127,7 +127,7 @@ router.get('/dashboard', (req, res) => {
     const { start, days } = parseRange(req.query);
 
     // 用户规模
-    const merchantCount = req.db.prepare(`SELECT COUNT(*) as c FROM merchants m WHERE 1=1${scope.merchWhere}`).get(...scope.merchParams).c;
+    const merchantCount = req.db.prepare(`SELECT COUNT(*) as c FROM merchants m WHERE m.status != 'deleted'${scope.merchWhere}`).get(...scope.merchParams).c;
     const influencerCount = req.db.prepare(`SELECT COUNT(*) as c FROM influencers inf WHERE 1=1${scope.infWhere}`).get(...scope.infParams).c;
     const adminCount = req.db.prepare(`SELECT COUNT(*) as c FROM admins`).get().c;
     const salesCount = req.db.prepare(`SELECT COUNT(*) as c FROM admins WHERE admin_role='销售'`).get().c;
@@ -365,7 +365,7 @@ router.get('/top-entities', (req, res) => {
         (SELECT COUNT(*) FROM demands WHERE merchant_id = m.id) as demand_count,
         (SELECT COUNT(*) FROM cooperation WHERE merchant_id = m.id AND status='confirmed') as confirmed_count
       FROM merchants m
-      WHERE 1=1${scope.merchWhere}
+      WHERE m.status != 'deleted'${scope.merchWhere}
       ORDER BY confirmed_count DESC, demand_count DESC LIMIT 10
     `).all(...scope.merchParams);
 

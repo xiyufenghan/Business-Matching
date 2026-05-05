@@ -19,10 +19,20 @@ function initDatabase() {
       description TEXT,
       sales_owner_id TEXT,
       password TEXT DEFAULT '123456',
+      status TEXT DEFAULT 'active',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 兼容已有库：补齐 merchants 的 status 字段
+  try {
+    const cols = db.prepare('PRAGMA table_info(merchants)').all().map(c => c.name);
+    if (!cols.includes('status')) {
+      db.exec("ALTER TABLE merchants ADD COLUMN status TEXT DEFAULT 'active'");
+      db.prepare("UPDATE merchants SET status = 'active' WHERE status IS NULL").run();
+    }
+  } catch (e) { /* ignore */ }
 
   // 达人表
   db.exec(`
@@ -88,6 +98,8 @@ function initDatabase() {
       unit_price REAL DEFAULT 0,
       grade_level TEXT,
       subject TEXT,
+      pure_commission REAL DEFAULT 0,
+      ad_commission REAL DEFAULT 0,
       course_introduction TEXT,
       course_link TEXT,
       status TEXT DEFAULT 'published',
@@ -96,6 +108,17 @@ function initDatabase() {
       FOREIGN KEY (merchant_id) REFERENCES merchants(id)
     )
   `);
+
+  // 兼容已有库：补齐 course_demands 的佣金字段
+  try {
+    const cdCols = db.prepare('PRAGMA table_info(course_demands)').all().map(c => c.name);
+    if (!cdCols.includes('pure_commission')) {
+      db.exec('ALTER TABLE course_demands ADD COLUMN pure_commission REAL DEFAULT 0');
+    }
+    if (!cdCols.includes('ad_commission')) {
+      db.exec('ALTER TABLE course_demands ADD COLUMN ad_commission REAL DEFAULT 0');
+    }
+  } catch (e) { /* ignore */ }
 
   // 通用需求表
   db.exec(`
@@ -140,6 +163,34 @@ function initDatabase() {
       status TEXT DEFAULT 'published',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 商家招募需求表（商家需求：找什么样的达人）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS merchant_recruitments (
+      id TEXT PRIMARY KEY,
+      merchant_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      recruitment_type TEXT DEFAULT '图书推广',
+      linked_demand_id TEXT,
+      target_levels TEXT,
+      target_fans_min INTEGER DEFAULT 0,
+      target_fans_max INTEGER DEFAULT 0,
+      target_categories TEXT,
+      target_provinces TEXT,
+      target_audience TEXT,
+      cooperation_mode TEXT,
+      commission_offer TEXT,
+      budget_min REAL DEFAULT 0,
+      budget_max REAL DEFAULT 0,
+      description TEXT,
+      deadline DATETIME,
+      status TEXT DEFAULT 'recruiting',
+      operator_id TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (merchant_id) REFERENCES merchants(id)
     )
   `);
 

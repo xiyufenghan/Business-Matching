@@ -240,8 +240,9 @@ function renderNavMenu() {
           { id: 'dashboard', icon: 'chart', label: '数据看板' },
         ]},
         { id: 'resource', label: '资源中心', items: [
-          { id: 'influencer-plaza', icon: 'star', label: '达人池' },
+          { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
           { id: 'merchant-demands', icon: 'store', label: '商家货盘' },
+          { id: 'merchant-recruitments', icon: 'megaphone', label: '商家需求' },
           { id: 'influencer-demands', icon: 'target', label: '达人需求' },
         ]},
         { id: 'business', label: '撮合作业', items: [
@@ -250,6 +251,7 @@ function renderNavMenu() {
         ]},
         { id: 'system', label: '系统管理', items: [
           { id: 'merchant-manage', icon: 'building', label: '商家管理' },
+          { id: 'influencer-manage', icon: 'star', label: '达人管理' },
           { id: 'admin-manage', icon: 'shield', label: '管理员管理' },
         ]},
       ];
@@ -259,8 +261,9 @@ function renderNavMenu() {
           { id: 'dashboard', icon: 'chart', label: '数据看板' },
         ]},
         { id: 'resource', label: '资源中心', items: [
-          { id: 'influencer-plaza', icon: 'star', label: '达人池' },
+          { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
           { id: 'merchant-demands', icon: 'store', label: '商家货盘' },
+          { id: 'merchant-recruitments', icon: 'megaphone', label: '商家需求' },
           { id: 'influencer-demands', icon: 'target', label: '达人需求' },
         ]},
         { id: 'business', label: '撮合作业', items: [
@@ -278,10 +281,12 @@ function renderNavMenu() {
         { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
       ]},
       { id: 'resource', label: '找达人', items: [
-        { id: 'influencer-plaza', icon: 'star', label: '达人池' },
+        { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
+        { id: 'influencer-demands', icon: 'target', label: '达人需求' },
       ]},
       { id: 'business', label: '我的货盘', items: [
         { id: 'merchant-demands', icon: 'store', label: '我的需求' },
+        { id: 'merchant-recruitments', icon: 'megaphone', label: '我的招募' },
         { id: 'publish', icon: 'edit', label: '发布需求' },
       ]},
       { id: 'cooperation', label: '合作管理', items: [
@@ -294,8 +299,9 @@ function renderNavMenu() {
       { id: 'workspace', label: '我的工作台', items: [
         { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
       ]},
-      { id: 'resource', label: '找货盘', items: [
+      { id: 'resource', label: '找商家', items: [
         { id: 'merchant-demands', icon: 'store', label: '商家货盘' },
+        { id: 'merchant-recruitments', icon: 'megaphone', label: '商家需求' },
       ]},
       { id: 'business', label: '我的需求', items: [
         { id: 'influencer-demands', icon: 'target', label: '我的需求' },
@@ -350,11 +356,13 @@ function navigateTo(page, isBack = false) {
     case 'dashboard': renderDashboard(); break;
     case 'merchant-demands': renderMerchantDemands(); break;
     case 'influencer-demands': renderInfluencerDemands(); break;
+    case 'merchant-recruitments': renderMerchantRecruitments(); break;
     case 'influencer-plaza': renderInfluencerPlaza(); break;
     case 'publish': renderPublish(); break;
     case 'matchmaking': renderMatchmaking(); break;
     case 'profile': renderProfile(); break;
     case 'merchant-manage': renderMerchantManage(); break;
+    case 'influencer-manage': renderInfluencerManage(); break;
     case 'admin-manage': renderAdminManage(); break;
     default: renderDashboard();
   }
@@ -1066,8 +1074,12 @@ function renderMerchantDemandRow(d, isInfluencer, showSales) {
   const typeLabel = isBook ? '图书' : '课程';
   const typeColor = isBook ? '#3b82f6' : '#8b5cf6';
   const priceVal = isBook ? `¥${d.selling_price || 0}` : `¥${d.unit_price || 0}`;
-  const pureComm = isBook ? formatPercent(d.pure_commission || 0) : '-';
-  const adComm = isBook ? formatPercent(d.ad_commission || 0) : '-';
+  const pureComm = isBook
+    ? formatPercent(d.pure_commission || 0)
+    : (d.course_pure_commission != null ? formatPercent(d.course_pure_commission) : '-');
+  const adComm = isBook
+    ? formatPercent(d.ad_commission || 0)
+    : (d.course_ad_commission != null ? formatPercent(d.course_ad_commission) : '-');
   const stockVal = isBook ? (d.stock != null ? formatNumber(d.stock) : '-') : '-';
   const merchantName = d.merchant_company || d.merchant_name || '-';
   // 副信息：商家 · 分类 · 目标人群/学段
@@ -1187,6 +1199,8 @@ function renderMerchantDemandCard(d, isInfluencer) {
         </div>
         <div class="demand-info-grid">
           <div class="info-item highlight"><span class="info-label">单价</span><span class="info-value price-text">¥${d.unit_price || 0}</span></div>
+          <div class="info-item"><span class="info-label">纯佣金</span><span class="info-value">${d.course_pure_commission != null ? formatPercent(d.course_pure_commission) : '-'}</span></div>
+          <div class="info-item"><span class="info-label">投流佣金</span><span class="info-value">${d.course_ad_commission != null ? formatPercent(d.course_ad_commission) : '-'}</span></div>
         </div>` : ''}
         
         ${d.description ? `<div class="demand-desc">${d.description.length > 120 ? d.description.slice(0, 120) + '...' : d.description}</div>` : ''}
@@ -1262,6 +1276,8 @@ async function editMerchantDemand(refId, demandType) {
         <div class="form-group"><label>课程价格(元)</label><input type="number" step="0.01" id="edm-unit-price" value="${row.unit_price || 0}"></div>
         <div class="form-group"><label>学段</label><input id="edm-grade-level" value="${escapeHtml(row.grade_level || '')}"></div>
         <div class="form-group"><label>学科</label><input id="edm-subject" value="${escapeHtml(row.subject || '')}"></div>
+        <div class="form-group"><label>纯佣金(%)</label><input type="number" step="0.01" id="edm-course-pure-commission" value="${row.pure_commission || row.course_pure_commission || 0}"></div>
+        <div class="form-group"><label>投流佣金(%)</label><input type="number" step="0.01" id="edm-course-ad-commission" value="${row.ad_commission || row.course_ad_commission || 0}"></div>
         <div class="form-group"><label>课程图片URL</label><input id="edm-course-image" value="${escapeHtml(row.course_image || '')}"></div>
         <div class="form-group"><label>课程链接</label><input id="edm-course-link" value="${escapeHtml(row.course_link || '')}"></div>
         <div class="form-group" style="grid-column:1/-1"><label>课程介绍</label><textarea id="edm-course-intro" rows="3">${escapeHtml(row.course_introduction || '')}</textarea></div>
@@ -1300,6 +1316,8 @@ async function saveMerchantDemandEdit(refId, demandType) {
       unit_price: document.getElementById('edm-unit-price').value,
       grade_level: document.getElementById('edm-grade-level').value.trim(),
       subject: document.getElementById('edm-subject').value.trim(),
+      pure_commission: document.getElementById('edm-course-pure-commission')?.value || 0,
+      ad_commission: document.getElementById('edm-course-ad-commission')?.value || 0,
       course_image: document.getElementById('edm-course-image').value.trim(),
       course_link: document.getElementById('edm-course-link').value.trim(),
       course_introduction: document.getElementById('edm-course-intro').value.trim()
@@ -1336,6 +1354,9 @@ let idFilters = {
   price_min: '', price_max: '', keyword: ''
 };
 let idFilterPanelOpen = false;
+let idViewMode = 'list';        // 默认列表
+let idSortField = 'created_at'; // 默认按创建时间倒序
+let idSortOrder = 'desc';
 
 const ID_BOOK_CATEGORIES = ['少儿科普', '绘本', '教辅', '文学', '家庭教育', '童书', '人文社科', '其他'];
 const ID_SUBJECT_CATEGORIES = ['语文', '数学', '英语', '科学', '艺术', '编程', '通用'];
@@ -1362,6 +1383,12 @@ async function renderInfluencerDemands(page = 1, pageSize = 20) {
   const res = await fetchAPI(url);
   if (!res.success) { container.innerHTML = '<p>加载失败</p>'; return; }
 
+  // 列表视图本地排序（接口未做 ORDER BY 这套字段）
+  let rows = res.data;
+  if (idViewMode === 'list') {
+    rows = sortInfluencerDemandRows(rows, idSortField, idSortOrder);
+  }
+
   const isMerchant = currentUser.role === 'merchant';
   const isInfluencer = currentUser.role === 'influencer';
   const title = isInfluencer ? '我的达人需求' : '达人需求';
@@ -1384,9 +1411,15 @@ async function renderInfluencerDemands(page = 1, pageSize = 20) {
           筛选${activeCount > 0 ? ' ('+activeCount+')' : ''}
         </button>
         ${activeCount>0?'<button class="btn btn-sm btn-outline" onclick="resetIdFilter()">清空筛选</button>':''}
+        <span style="color:#94a3b8;font-size:13px;margin-left:8px;">共 ${res.pagination?.total || 0} 条</span>
       </div>
       <div class="md-toolbar-right">
-        <span style="color:#94a3b8;font-size:13px;">共 ${res.pagination?.total || 0} 条</span>
+        <button class="btn btn-sm ${idViewMode==='list'?'btn-primary':'btn-outline'}" onclick="switchIdView('list')" title="列表视图">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg> 列表
+        </button>
+        <button class="btn btn-sm ${idViewMode==='card'?'btn-primary':'btn-outline'}" onclick="switchIdView('card')" title="卡片视图">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> 卡片
+        </button>
       </div>
     </div>
 
@@ -1468,10 +1501,12 @@ async function renderInfluencerDemands(page = 1, pageSize = 20) {
       </div>
     </div>
 
-    <div class="demand-grid" id="inf-demand-list">
-      ${res.data.length === 0
-        ? '<div class="empty-state"><div class="icon">-</div><p>暂无达人需求</p></div>'
-        : res.data.map(d => renderInfluencerDemandCardV2(d, isMerchant)).join('')}
+    <div class="${idViewMode==='card' ? 'demand-grid' : 'id-list'}" id="inf-demand-list">
+      ${rows.length === 0
+        ? '<div class="empty-state"><div class="icon">-</div><p>暂无达人需求</p>'+(activeCount>0?'<button class="btn btn-sm btn-primary" onclick="resetIdFilter()" style="margin-top:12px">清除筛选条件</button>':'')+'</div>'
+        : idViewMode === 'card'
+          ? rows.map(d => renderInfluencerDemandCardV2(d, isMerchant)).join('')
+          : renderIdTableHeader() + rows.map(d => renderInfluencerDemandRow(d, isMerchant)).join('')}
     </div>
     ${renderPagination(res.pagination, 'pageInfluencerDemands')}`;
 }
@@ -1536,6 +1571,126 @@ function renderInfluencerDemandCardV2(d, isMerchant) {
     </div>`;
 }
 
+// ============ 达人需求 列表视图 ============
+function renderIdTableHeader() {
+  const sortTh = (label, field, align = 'left') => {
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    const icon = `<span class="sort-icon">${getIdSortIcon(field)}</span>`;
+    return `<div class="demand-th ${cls}" onclick="switchIdSort('${field}')">${label}${icon}</div>`;
+  };
+  const plainTh = (label, align = 'left') => {
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    return `<div class="demand-th no-hover ${cls}">${label}</div>`;
+  };
+  return `
+    <div class="id-row-header">
+      ${plainTh('', 'center')}
+      ${sortTh('类型', 'type', 'center')}
+      ${plainTh('达人账号', 'left')}
+      ${sortTh('粉丝量', 'fans', 'right')}
+      ${sortTh('等级', 'level', 'center')}
+      ${plainTh('期望/价格', 'left')}
+      ${sortTh('状态', 'status', 'center')}
+      ${sortTh('创建时间', 'created_at', 'right')}
+      ${plainTh('操作', 'right')}
+    </div>`;
+}
+
+function renderInfluencerDemandRow(d, isMerchant) {
+  const isBook = d.demand_category === '图书需求';
+  const typeLabel = isBook ? '图书' : '课程';
+  const typeColor = isBook ? '#3b82f6' : '#8b5cf6';
+  const accountName = d.video_account_name || d.inf_video_account_name || '未知达人';
+  const fansCount = d.fans_count || d.inf_fans_count || 0;
+  const subParts = [];
+  if (d.subject_category) subParts.push(d.subject_category);
+  if (d.video_category_track) subParts.push((d.video_category_track || '').slice(0, 12));
+  if (d.inf_region) subParts.push((d.inf_region || '').split(',')[0]);
+
+  // 期望与价格摘要
+  let demandBrief = '';
+  if (isBook) {
+    const parts = [];
+    if (d.book_name) parts.push(d.book_name);
+    if (d.book_category) parts.push(`【${d.book_category}】`);
+    const priceRange = d.book_price_max > 0 ? `¥${d.book_price_min||0}-${d.book_price_max}` : '';
+    if (priceRange) parts.push(priceRange);
+    demandBrief = parts.join(' ') || '-';
+  } else {
+    const priceRange = d.course_price_max > 0 ? `¥${d.course_price_min||0}-${d.course_price_max}` : '';
+    demandBrief = priceRange || '-';
+  }
+
+  const levelTag = d.level
+    ? `<span class="level-badge" style="background:${getLevelColor(d.level)}">${d.level}</span>`
+    : '<span style="color:#cbd5e1">-</span>';
+
+  return `
+    <div class="id-row" data-id="${d.id}">
+      <input type="checkbox" class="inf-demand-checkbox" value="${d.id}">
+      <span class="type-badge-sm" style="background:${typeColor}15;color:${typeColor}">${typeLabel}</span>
+      <div class="id-row-main">
+        <div class="id-row-title">${accountName}</div>
+        <div class="id-row-sub">${subParts.join(' · ') || '-'}</div>
+      </div>
+      <span class="id-row-fans">${formatNumber(fansCount)}</span>
+      <span class="id-row-level">${levelTag}</span>
+      <div class="id-row-brief" title="${(d.description || '').replace(/"/g,'&quot;')}">${demandBrief}</div>
+      <span class="id-row-status">${getStatusBadge(d.status)}</span>
+      <span class="id-row-date">${formatDate(d.created_at)}</span>
+      <div class="id-row-actions">
+        ${isMerchant ? `<button class="btn btn-xs btn-primary" onclick="inviteInfluencer('${d.influencer_id}','${d.id}')">邀请</button>` : ''}
+        ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-xs btn-outline" onclick="editInfluencerDemand('${d.id}')">编辑</button>` : ''}
+        ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-xs btn-danger-outline" onclick="deleteInfluencerDemand('${d.id}')">删除</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function getIdSortIcon(field) {
+  if (idSortField !== field) return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 4 18 9"/><polyline points="6 15 12 20 18 15"/></svg>';
+  return idSortOrder === 'asc'
+    ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 14 12 8 18 14"/></svg>'
+    : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 10 12 16 18 10"/></svg>';
+}
+
+function switchIdSort(field) {
+  if (idSortField === field) {
+    idSortOrder = idSortOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    idSortField = field;
+    idSortOrder = 'asc';
+  }
+  renderInfluencerDemands();
+}
+
+// 列表视图客户端排序（避免后端无对应 ORDER BY 字段）
+function sortInfluencerDemandRows(rows, field, order) {
+  const dir = order === 'asc' ? 1 : -1;
+  const levelRank = { 'S级':5, 'A级':4, 'B级':3, 'C级':2, 'D级':1 };
+  const arr = rows.slice();
+  arr.sort((a, b) => {
+    let va, vb;
+    switch(field) {
+      case 'type':
+        va = a.demand_category || ''; vb = b.demand_category || ''; break;
+      case 'fans':
+        va = a.fans_count || a.inf_fans_count || 0; vb = b.fans_count || b.inf_fans_count || 0; break;
+      case 'level':
+        va = levelRank[a.level] || 0; vb = levelRank[b.level] || 0; break;
+      case 'status':
+        va = a.status || ''; vb = b.status || ''; break;
+      case 'created_at':
+      default:
+        va = a.created_at || ''; vb = b.created_at || ''; break;
+    }
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
+  return arr;
+}
+
+function switchIdView(mode) { idViewMode = mode; renderInfluencerDemands(); }
 function toggleIdFilter() { idFilterPanelOpen = !idFilterPanelOpen; renderInfluencerDemands(); }
 function onIdFilterChange(key, value) { idFilters[key] = value; }
 function applyIdFilter() { renderInfluencerDemands(1, 20); }
@@ -1615,6 +1770,417 @@ async function saveInfluencerDemandEdit(id) {
   else { showToast(res.error || '更新失败', 'error'); }
 }
 
+// ============ 商家需求（招募）大厅 V2 ============
+let mrFilters = {
+  recruitment_type: '', status: '', level: '',
+  fans_min: '', fans_max: '', target_province: '', keyword: ''
+};
+let mrFilterPanelOpen = false;
+let mrViewMode = 'list';
+let mrSortField = 'created_at';
+let mrSortOrder = 'desc';
+
+const MR_TYPES = ['图书推广', '课程推广', '综合招募', '专场直播'];
+const MR_LEVELS = ['S级', 'A级', 'B级', 'C级', 'D级'];
+const MR_COOPERATION_MODES = ['纯佣', '投流', '寄样', '视频专场', '直播带货', '混合'];
+
+async function renderMerchantRecruitments(page = 1, pageSize = 20) {
+  const container = document.getElementById('page-container');
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
+
+  const isMerchant = currentUser.role === 'merchant';
+  const isInfluencer = currentUser.role === 'influencer';
+  const isAdmin = currentUser.role === 'admin';
+
+  let url = `/recruitments?page=${page}&pageSize=${pageSize}`;
+  if (isMerchant) url += `&merchant_id=${currentUser.id}`;
+  if (mrFilters.recruitment_type) url += `&recruitment_type=${encodeURIComponent(mrFilters.recruitment_type)}`;
+  if (mrFilters.status) url += `&status=${encodeURIComponent(mrFilters.status)}`;
+  if (mrFilters.level) url += `&level=${encodeURIComponent(mrFilters.level)}`;
+  if (mrFilters.fans_min) url += `&fans_min=${encodeURIComponent(mrFilters.fans_min)}`;
+  if (mrFilters.fans_max) url += `&fans_max=${encodeURIComponent(mrFilters.fans_max)}`;
+  if (mrFilters.target_province) url += `&target_province=${encodeURIComponent(mrFilters.target_province)}`;
+  if (mrFilters.keyword) url += `&keyword=${encodeURIComponent(mrFilters.keyword)}`;
+  url += getOperatorFilter();
+
+  const res = await fetchAPI(url);
+  if (!res.success) { container.innerHTML = '<p>加载失败</p>'; return; }
+
+  let rows = res.data;
+  if (mrViewMode === 'list') rows = sortMrRows(rows, mrSortField, mrSortOrder);
+
+  const title = isMerchant ? '我的招募' : '商家需求';
+  const subtitle = isInfluencer
+    ? '商家正在招募的达人合作机会'
+    : (isMerchant ? '我发布的招募需求' : '所有商家的招募需求');
+  const activeCount = getMrActiveFilterCount();
+
+  container.innerHTML = `
+    ${renderBackButton()}
+    <div class="page-header">
+      <h2>${title}</h2>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px">${subtitle}</div>
+      <div class="page-header-actions">
+        ${currentUser.role !== 'influencer' ? '<button class="btn btn-sm btn-danger-outline" onclick="clearAllMerchantRecruitments()">清空</button>' : ''}
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="md-toolbar">
+      <div class="md-toolbar-left">
+        <button class="btn btn-sm ${mrFilterPanelOpen?'btn-primary':'btn-outline'}" onclick="toggleMrFilter()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          筛选${activeCount > 0 ? ' ('+activeCount+')' : ''}
+        </button>
+        ${activeCount>0?'<button class="btn btn-sm btn-outline" onclick="resetMrFilter()">清空筛选</button>':''}
+        <span style="color:#94a3b8;font-size:13px;margin-left:8px;">共 ${res.pagination?.total || 0} 条</span>
+      </div>
+      <div class="md-toolbar-right">
+        <button class="btn btn-sm ${mrViewMode==='list'?'btn-primary':'btn-outline'}" onclick="switchMrView('list')" title="列表视图">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg> 列表
+        </button>
+        <button class="btn btn-sm ${mrViewMode==='card'?'btn-primary':'btn-outline'}" onclick="switchMrView('card')" title="卡片视图">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> 卡片
+        </button>
+      </div>
+    </div>
+
+    <div class="filter-panel" style="display:${mrFilterPanelOpen?'block':'none'}">
+      <div class="filter-row">
+        <div class="filter-item">
+          <label>招募类型</label>
+          <select onchange="onMrFilterChange('recruitment_type', this.value); applyMrFilter()">
+            <option value="">全部</option>
+            ${MR_TYPES.map(t => `<option value="${t}" ${mrFilters.recruitment_type===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>状态</label>
+          <select onchange="onMrFilterChange('status', this.value); applyMrFilter()">
+            <option value="">全部</option>
+            <option value="recruiting" ${mrFilters.status==='recruiting'?'selected':''}>招募中</option>
+            <option value="paused" ${mrFilters.status==='paused'?'selected':''}>已暂停</option>
+            <option value="completed" ${mrFilters.status==='completed'?'selected':''}>已完成</option>
+            <option value="closed" ${mrFilters.status==='closed'?'selected':''}>已关闭</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>目标达人等级</label>
+          <select onchange="onMrFilterChange('level', this.value); applyMrFilter()">
+            <option value="">全部</option>
+            ${MR_LEVELS.map(l => `<option value="${l}" ${mrFilters.level===l?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>目标地域</label>
+          <input type="text" placeholder="如：广东" value="${mrFilters.target_province || ''}"
+            onchange="onMrFilterChange('target_province', this.value); applyMrFilter()">
+        </div>
+      </div>
+      <div class="filter-row" style="margin-top:10px;">
+        <div class="filter-item" style="flex:0 0 auto;">
+          <label>目标粉丝量</label>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" placeholder="最低" value="${mrFilters.fans_min || ''}" style="width:90px"
+              onchange="onMrFilterChange('fans_min', this.value); applyMrFilter()">
+            <span style="color:#94a3b8">-</span>
+            <input type="number" placeholder="最高" value="${mrFilters.fans_max || ''}" style="width:90px"
+              onchange="onMrFilterChange('fans_max', this.value); applyMrFilter()">
+          </div>
+        </div>
+        <div class="filter-item" style="flex:1">
+          <input type="text" id="mr-filter-keyword" placeholder="搜索招募标题 / 商家名 / 描述..." value="${mrFilters.keyword || ''}"
+            onkeypress="if(event.key==='Enter'){ onMrFilterChange('keyword', this.value); applyMrFilter(); }">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="onMrFilterChange('keyword', document.getElementById('mr-filter-keyword').value); applyMrFilter()">搜索</button>
+        ${activeCount>0?'<button class="btn btn-sm btn-outline" onclick="resetMrFilter()">重置</button>':''}
+      </div>
+    </div>
+
+    <div class="${mrViewMode==='card' ? 'demand-grid' : 'mr-list'}">
+      ${rows.length === 0
+        ? '<div class="empty-state"><div class="icon">-</div><p>暂无招募需求</p>'+(activeCount>0?'<button class="btn btn-sm btn-primary" onclick="resetMrFilter()" style="margin-top:12px">清除筛选条件</button>':'')+'</div>'
+        : mrViewMode === 'card'
+          ? rows.map(r => renderMrCardV2(r, isInfluencer, isMerchant, isAdmin)).join('')
+          : renderMrTableHeader() + rows.map(r => renderMrRow(r, isInfluencer, isMerchant, isAdmin)).join('')
+      }
+    </div>
+    ${renderPagination(res.pagination, 'pageMerchantRecruitments')}`;
+}
+
+function renderMrCardV2(r, isInfluencer, isMerchant, isAdmin) {
+  const typeColor = r.recruitment_type === '图书推广' ? '#3b82f6'
+                  : r.recruitment_type === '课程推广' ? '#8b5cf6'
+                  : r.recruitment_type === '专场直播' ? '#ec4899'
+                  : '#16a34a';
+  const statusBadge = getRecruitmentStatusBadge(r.status);
+  const fansRange = (r.target_fans_min || r.target_fans_max)
+    ? `${formatNumber(r.target_fans_min || 0)} - ${r.target_fans_max ? formatNumber(r.target_fans_max) : '不限'}`
+    : '不限';
+  const levels = (r.target_levels || '').split(',').filter(Boolean);
+  const merchantName = r.merchant_company || r.merchant_name || '-';
+
+  return `
+    <div class="demand-card-v2">
+      <div class="demand-header">
+        <span class="type-badge" style="background:${typeColor}15;color:${typeColor}">${r.recruitment_type || '招募'}</span>
+        <span class="demand-title">${r.title}</span>
+        ${statusBadge}
+      </div>
+      <div class="demand-body">
+        <div class="demand-info-grid">
+          <div class="info-item"><span class="info-label">发布商家</span><span class="info-value">${merchantName}</span></div>
+          <div class="info-item"><span class="info-label">目标粉丝量</span><span class="info-value">${fansRange}</span></div>
+          ${levels.length>0 ? `<div class="info-item"><span class="info-label">目标等级</span><span class="info-value">${levels.join('/')}</span></div>` : ''}
+          ${r.target_provinces ? `<div class="info-item"><span class="info-label">目标地域</span><span class="info-value">${r.target_provinces}</span></div>` : ''}
+          ${r.target_categories ? `<div class="info-item"><span class="info-label">目标赛道</span><span class="info-value" title="${r.target_categories}">${(r.target_categories||'').slice(0,16)}${(r.target_categories||'').length>16?'…':''}</span></div>` : ''}
+          ${r.target_audience ? `<div class="info-item"><span class="info-label">目标受众</span><span class="info-value">${r.target_audience}</span></div>` : ''}
+        </div>
+        <div class="demand-info-grid">
+          ${r.cooperation_mode ? `<div class="info-item"><span class="info-label">合作方式</span><span class="info-value">${r.cooperation_mode}</span></div>` : ''}
+          ${r.commission_offer ? `<div class="info-item highlight"><span class="info-label">佣金条件</span><span class="info-value price-text">${r.commission_offer}</span></div>` : ''}
+          ${(r.budget_min || r.budget_max) ? `<div class="info-item"><span class="info-label">预算</span><span class="info-value">¥${r.budget_min||0}${r.budget_max?'-'+r.budget_max:''}</span></div>` : ''}
+          ${r.deadline ? `<div class="info-item"><span class="info-label">截止时间</span><span class="info-value">${formatDate(r.deadline)}</span></div>` : ''}
+        </div>
+        ${r.description ? `<div class="demand-desc">${r.description.length>120 ? r.description.slice(0,120)+'…' : r.description}</div>` : ''}
+      </div>
+      <div class="demand-footer">
+        <span class="demand-meta">${formatDate(r.created_at)}</span>
+        <div class="demand-actions">
+          ${isInfluencer && r.status === 'recruiting' ? `<button class="btn btn-sm btn-primary" onclick="applyForRecruitment('${r.id}','${r.merchant_id}')">我要应聘</button>` : ''}
+          ${isAdmin ? `<button class="btn btn-sm btn-primary" onclick="recommendInfluencerForRecruitment('${r.id}')">推荐达人</button>` : ''}
+          ${(isMerchant || isAdmin) ? `<button class="btn btn-sm btn-outline" onclick="editMerchantRecruitment('${r.id}')">编辑</button>` : ''}
+          ${(isMerchant || isAdmin) ? `<button class="btn btn-sm btn-danger-outline" onclick="deleteMerchantRecruitment('${r.id}')">删除</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderMrTableHeader() {
+  const sortTh = (label, field, align='left') => {
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    const icon = `<span class="sort-icon">${getMrSortIcon(field)}</span>`;
+    return `<div class="demand-th ${cls}" onclick="switchMrSort('${field}')">${label}${icon}</div>`;
+  };
+  const plainTh = (label, align='left') => {
+    const cls = align === 'right' ? 'th-right' : (align === 'center' ? 'th-center' : '');
+    return `<div class="demand-th no-hover ${cls}">${label}</div>`;
+  };
+  return `
+    <div class="mr-row-header">
+      ${sortTh('类型', 'type', 'center')}
+      ${plainTh('招募信息', 'left')}
+      ${sortTh('粉丝量要求', 'fans', 'center')}
+      ${plainTh('等级', 'center')}
+      ${plainTh('佣金条件', 'left')}
+      ${sortTh('状态', 'status', 'center')}
+      ${sortTh('创建时间', 'created_at', 'right')}
+      ${plainTh('操作', 'right')}
+    </div>`;
+}
+
+function renderMrRow(r, isInfluencer, isMerchant, isAdmin) {
+  const typeColor = r.recruitment_type === '图书推广' ? '#3b82f6'
+                  : r.recruitment_type === '课程推广' ? '#8b5cf6'
+                  : r.recruitment_type === '专场直播' ? '#ec4899'
+                  : '#16a34a';
+  const merchantName = r.merchant_company || r.merchant_name || '-';
+  const subParts = [merchantName];
+  if (r.target_provinces) subParts.push(r.target_provinces);
+  if (r.cooperation_mode) subParts.push(r.cooperation_mode);
+  const fansRange = (r.target_fans_min || r.target_fans_max)
+    ? `${formatNumber(r.target_fans_min || 0)}-${r.target_fans_max ? formatNumber(r.target_fans_max) : '不限'}`
+    : '不限';
+  const levels = (r.target_levels || '').split(',').filter(Boolean).join('/') || '不限';
+
+  return `
+    <div class="mr-row" data-id="${r.id}">
+      <span class="type-badge-sm" style="background:${typeColor}15;color:${typeColor}">${(r.recruitment_type||'').slice(0,2)}</span>
+      <div class="mr-row-main">
+        <div class="mr-row-title">${r.title}</div>
+        <div class="mr-row-sub">${subParts.join(' · ')}</div>
+      </div>
+      <span class="mr-row-fans">${fansRange}</span>
+      <span class="mr-row-level">${levels}</span>
+      <span class="mr-row-commission">${r.commission_offer || '-'}</span>
+      <span class="mr-row-status">${getRecruitmentStatusBadge(r.status)}</span>
+      <span class="mr-row-date">${formatDate(r.created_at)}</span>
+      <div class="mr-row-actions">
+        ${isInfluencer && r.status === 'recruiting' ? `<button class="btn btn-xs btn-primary" onclick="applyForRecruitment('${r.id}','${r.merchant_id}')">应聘</button>` : ''}
+        ${isAdmin ? `<button class="btn btn-xs btn-primary" onclick="recommendInfluencerForRecruitment('${r.id}')">推荐</button>` : ''}
+        ${(isMerchant || isAdmin) ? `<button class="btn btn-xs btn-outline" onclick="editMerchantRecruitment('${r.id}')">编辑</button>` : ''}
+        ${(isMerchant || isAdmin) ? `<button class="btn btn-xs btn-danger-outline" onclick="deleteMerchantRecruitment('${r.id}')">删除</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function getRecruitmentStatusBadge(status) {
+  const map = {
+    recruiting: { color: '#16a34a', bg: '#dcfce7', label: '招募中' },
+    paused:     { color: '#f59e0b', bg: '#fef3c7', label: '已暂停' },
+    completed:  { color: '#3b82f6', bg: '#dbeafe', label: '已完成' },
+    closed:     { color: '#94a3b8', bg: '#f1f5f9', label: '已关闭' },
+  };
+  const s = map[status] || map.recruiting;
+  return `<span style="background:${s.bg};color:${s.color};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap">${s.label}</span>`;
+}
+
+function getMrSortIcon(field) {
+  if (mrSortField !== field) return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 4 18 9"/><polyline points="6 15 12 20 18 15"/></svg>';
+  return mrSortOrder === 'asc'
+    ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 14 12 8 18 14"/></svg>'
+    : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 10 12 16 18 10"/></svg>';
+}
+
+function switchMrSort(field) {
+  if (mrSortField === field) {
+    mrSortOrder = mrSortOrder === 'asc' ? 'desc' : 'asc';
+  } else {
+    mrSortField = field;
+    mrSortOrder = 'asc';
+  }
+  renderMerchantRecruitments();
+}
+
+function sortMrRows(rows, field, order) {
+  const dir = order === 'asc' ? 1 : -1;
+  const arr = rows.slice();
+  arr.sort((a, b) => {
+    let va, vb;
+    switch(field) {
+      case 'type': va = a.recruitment_type || ''; vb = b.recruitment_type || ''; break;
+      case 'fans': va = a.target_fans_min || 0; vb = b.target_fans_min || 0; break;
+      case 'status': va = a.status || ''; vb = b.status || ''; break;
+      case 'created_at':
+      default: va = a.created_at || ''; vb = b.created_at || ''; break;
+    }
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
+  return arr;
+}
+
+function switchMrView(mode) { mrViewMode = mode; renderMerchantRecruitments(); }
+function toggleMrFilter() { mrFilterPanelOpen = !mrFilterPanelOpen; renderMerchantRecruitments(); }
+function onMrFilterChange(key, value) { mrFilters[key] = value; }
+function applyMrFilter() { renderMerchantRecruitments(1, 20); }
+function resetMrFilter() {
+  mrFilters = { recruitment_type: '', status: '', level: '', fans_min: '', fans_max: '', target_province: '', keyword: '' };
+  renderMerchantRecruitments(1, 20);
+}
+function getMrActiveFilterCount() {
+  return Object.values(mrFilters).filter(v => v !== '' && v != null).length;
+}
+function pageMerchantRecruitments(page, pageSize) { renderMerchantRecruitments(page, pageSize || 20); }
+
+async function deleteMerchantRecruitment(id) {
+  if (!confirm('确定删除此招募需求？')) return;
+  await fetchAPI(`/recruitments/${id}`, { method: 'DELETE' });
+  showToast('删除成功'); renderMerchantRecruitments();
+}
+async function clearAllMerchantRecruitments() {
+  if (!confirm('确定清空所有招募需求？')) return;
+  let url = '/recruitments/all/clear';
+  if (currentUser.role === 'merchant') url += `?merchant_id=${currentUser.id}`;
+  await fetchAPI(url, { method: 'DELETE' });
+  showToast('已清空'); renderMerchantRecruitments();
+}
+
+async function applyForRecruitment(recruitmentId, merchantId) {
+  const msg = prompt('请输入应聘留言（可选）：', '我希望参与这次招募');
+  if (msg === null) return;
+  const res = await fetchAPI('/cooperation/apply', {
+    method: 'POST',
+    body: JSON.stringify({
+      influencer_id: currentUser.id,
+      merchant_id: merchantId,
+      demand_id: recruitmentId,
+      demand_type: 'recruitment_apply',
+      message: msg
+    })
+  });
+  if (res.success) showToast('已发起应聘，商家将收到通知');
+  else showToast(res.error || '应聘失败', 'error');
+}
+
+async function recommendInfluencerForRecruitment(recruitmentId) {
+  // 简单实现：跳转到达人广场让管理员手动选择并发起合作
+  showToast('请前往达人广场筛选合适达人后发起邀请合作');
+  navigateTo('influencer-plaza');
+}
+
+async function editMerchantRecruitment(id) {
+  const res = await fetchAPI(`/recruitments/${id}`);
+  if (!res.success) { showToast('加载失败', 'error'); return; }
+  const r = res.data;
+  const body = `
+    <div class="form-grid-2">
+      <div class="form-group" style="grid-column:1/-1"><label>招募标题 *</label><input id="emr-title" value="${escapeHtml(r.title || '')}"></div>
+      <div class="form-group"><label>招募类型</label>
+        <select id="emr-type">
+          ${MR_TYPES.map(t => `<option value="${t}" ${r.recruitment_type===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>状态</label>
+        <select id="emr-status">
+          <option value="recruiting" ${r.status==='recruiting'?'selected':''}>招募中</option>
+          <option value="paused" ${r.status==='paused'?'selected':''}>已暂停</option>
+          <option value="completed" ${r.status==='completed'?'selected':''}>已完成</option>
+          <option value="closed" ${r.status==='closed'?'selected':''}>已关闭</option>
+        </select>
+      </div>
+      <div class="form-group"><label>目标等级（多选）</label>
+        <input id="emr-levels" value="${escapeHtml(r.target_levels || '')}" placeholder="如：S级,A级">
+      </div>
+      <div class="form-group"><label>目标地域</label><input id="emr-provinces" value="${escapeHtml(r.target_provinces || '')}" placeholder="如：广东,北京"></div>
+      <div class="form-group"><label>目标粉丝量（最低）</label><input type="number" id="emr-fans-min" min="0" value="${r.target_fans_min || 0}"></div>
+      <div class="form-group"><label>目标粉丝量（最高）</label><input type="number" id="emr-fans-max" min="0" value="${r.target_fans_max || 0}"></div>
+      <div class="form-group"><label>目标赛道</label><input id="emr-categories" value="${escapeHtml(r.target_categories || '')}" placeholder="如：亲子教育,图书"></div>
+      <div class="form-group"><label>目标受众</label><input id="emr-audience" value="${escapeHtml(r.target_audience || '')}"></div>
+      <div class="form-group"><label>合作方式</label>
+        <select id="emr-mode">
+          <option value="">不限</option>
+          ${MR_COOPERATION_MODES.map(m => `<option value="${m}" ${r.cooperation_mode===m?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>佣金条件</label><input id="emr-commission" value="${escapeHtml(r.commission_offer || '')}" placeholder="如：纯佣 25%"></div>
+      <div class="form-group"><label>预算（最低）</label><input type="number" id="emr-budget-min" min="0" step="0.01" value="${r.budget_min || 0}"></div>
+      <div class="form-group"><label>预算（最高）</label><input type="number" id="emr-budget-max" min="0" step="0.01" value="${r.budget_max || 0}"></div>
+      <div class="form-group"><label>截止时间</label><input type="date" id="emr-deadline" value="${(r.deadline||'').slice(0,10)}"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>招募描述</label><textarea id="emr-desc" rows="3">${escapeHtml(r.description || '')}</textarea></div>
+    </div>
+  `;
+  openModal('编辑招募需求', body, `
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="saveMerchantRecruitmentEdit('${id}')">保存</button>
+  `);
+}
+
+async function saveMerchantRecruitmentEdit(id) {
+  const payload = {
+    title: document.getElementById('emr-title').value.trim(),
+    recruitment_type: document.getElementById('emr-type').value,
+    status: document.getElementById('emr-status').value,
+    target_levels: document.getElementById('emr-levels').value.trim(),
+    target_provinces: document.getElementById('emr-provinces').value.trim(),
+    target_fans_min: document.getElementById('emr-fans-min').value || 0,
+    target_fans_max: document.getElementById('emr-fans-max').value || 0,
+    target_categories: document.getElementById('emr-categories').value.trim(),
+    target_audience: document.getElementById('emr-audience').value.trim(),
+    cooperation_mode: document.getElementById('emr-mode').value,
+    commission_offer: document.getElementById('emr-commission').value.trim(),
+    budget_min: document.getElementById('emr-budget-min').value || 0,
+    budget_max: document.getElementById('emr-budget-max').value || 0,
+    deadline: document.getElementById('emr-deadline').value || null,
+    description: document.getElementById('emr-desc').value.trim()
+  };
+  if (!payload.title) { showToast('招募标题必填', 'error'); return; }
+  const res = await fetchAPI(`/recruitments/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+  if (res.success) { showToast('已更新'); closeModal(); renderMerchantRecruitments(); }
+  else { showToast(res.error || '更新失败', 'error'); }
+}
+
 // 商家邀请达人合作
 async function inviteInfluencer(influencerId, demandId) {
   const msg = prompt('请输入邀请合作留言（可选）：', '诚邀您合作推广');
@@ -1642,7 +2208,7 @@ let infFilters = {
   cooperation_type: '',
   filter_sales_id: ''
 };
-let infViewMode = 'card';   // card | list
+let infViewMode = 'list';   // card | list（默认列表）
 let infSortField = 'fans_count';
 let infSortOrder = 'desc';
 let infFilterPanelOpen = false;
@@ -1722,7 +2288,7 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20) {
       <!-- 顶部 Hero 数据条 -->
       <div class="inf-hero">
         <div class="inf-hero-title">
-          <h2>达人池</h2>
+          <h2>达人广场</h2>
           <p>视频号优质达人资源库</p>
         </div>
         <div class="inf-hero-stats">
@@ -1865,37 +2431,15 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20) {
             <option value="level:asc" ${infSortField==='level'&&infSortOrder==='asc'?'selected':''}>等级 A→D</option>
             <option value="created_at:desc" ${infSortField==='created_at'&&infSortOrder==='desc'?'selected':''}>最新加入</option>
           </select>
-          ${isAdmin ? `
-            <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">添加达人</button>
-            <button class="btn btn-sm btn-outline" onclick="showInfluencerExcelUpload()">批量上传</button>
-            <button class="btn btn-sm btn-danger-outline" onclick="clearAllInfluencers()">清空</button>
-          ` : ''}
         </div>
         <div class="md-toolbar-right">
-          <button class="btn btn-sm ${infViewMode==='card'?'btn-primary':'btn-outline'}" onclick="switchInfView('card')" title="卡片视图">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> 卡片
-          </button>
           <button class="btn btn-sm ${infViewMode==='list'?'btn-primary':'btn-outline'}" onclick="switchInfView('list')" title="列表视图">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg> 列表
           </button>
+          <button class="btn btn-sm ${infViewMode==='card'?'btn-primary':'btn-outline'}" onclick="switchInfView('card')" title="卡片视图">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> 卡片
+          </button>
         </div>
-      </div>
-
-      <!-- Excel 上传区（隐藏） -->
-      <div id="influencer-upload-area" style="display:none;margin-bottom:16px">
-        <div class="card"><div class="card-header"><h3>批量上传达人</h3></div><div class="card-body">
-          <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
-            <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">下载导入模板</a>
-            <span style="font-size:12px;color:#94a3b8;align-self:center">支持"X万"格式（如 50万），同名达人自动更新</span>
-          </div>
-          <div class="upload-area" onclick="document.getElementById('influencer-excel-input').click()">
-            <div class="upload-icon">+</div>
-            <div class="upload-text">点击上传达人Excel文件</div>
-            <div class="upload-hint">支持.xlsx格式</div>
-          </div>
-          <input type="file" id="influencer-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleInfluencerExcelUpload(event)">
-          <div id="influencer-import-result" style="margin-top:12px"></div>
-        </div></div>
       </div>
 
       <!-- 达人列表 -->
@@ -2238,7 +2782,12 @@ async function handleInfluencerExcelUpload(e) {
         ${data.data.errors && data.data.errors.length> 0 ? `<div class="result-errors">${data.data.errors.slice(0, 5).join('<br>')}</div>` : ''}
       </div>`;
       showToast(`达人导入成功！成功${data.data.success}条`);
-      setTimeout(() => renderInfluencerPlaza(), 1500);
+      // 根据当前所在模块决定刷新哪个页面
+      const currentModule = document.getElementById('page-container')?.getAttribute('data-module');
+      setTimeout(() => {
+        if (currentModule === 'influencer-manage') renderInfluencerManage();
+        else renderInfluencerPlaza();
+      }, 1500);
     } else {
       resultDiv.innerHTML = `<div class="import-result-box error">导入失败：${data.error}</div>`;
       showToast(data.error || '导入失败', 'error');
@@ -2339,85 +2888,131 @@ async function submitAddInfluencer(e) {
   if (res.success) {
     showToast('达人添加成功！');
     closeModal();
-    renderInfluencerPlaza();
+    const currentModule = document.getElementById('page-container')?.getAttribute('data-module');
+    if (currentModule === 'influencer-manage') renderInfluencerManage();
+    else renderInfluencerPlaza();
   } else {
     showToast(res.error || '添加失败', 'error');
   }
 }
 
 // ============ 发布需求 ============
+// 发布表单下拉枚举（与列表筛选保持一致）
+const PUB_BOOK_CATEGORIES = ['少儿科普', '绘本', '教辅', '文学', '家庭教育', '童书', '人文社科', '其他'];
+const PUB_GRADE_LEVELS = ['学龄前', '小学', '初中', '高中', '成人', '通用'];
+const PUB_SUBJECTS = ['语文', '数学', '英语', '科学', '艺术', '编程', '通用', '其他'];
+const PUB_AUDIENCES = ['学龄前儿童', '小学生', '初中生', '高中生', '大学生', '家长', '老师', '成人', '银发族'];
+const PUB_INF_CATEGORIES = ['图书需求', '课程需求', '其他'];
+
+let pubActiveTab = 'book';
+let pubInfluencerOptions = []; // 管理员代发达人需求时缓存的达人列表
+
 function renderPublish() {
   const container = document.getElementById('page-container');
   const isInfluencer = currentUser.role === 'influencer';
-  const isMerchant = currentUser.role === 'merchant';
-  
+
   let tabs = '';
   if (isInfluencer) {
-    tabs = `<button class="tab-btn active" onclick="showPublishTab('influencer-demand')">达人需求发布</button>`;
+    tabs = `<button class="tab-btn active" data-tab="influencer-demand" onclick="showPublishTab('influencer-demand')">达人需求发布</button>`;
   } else {
     tabs = `
-      <button class="tab-btn active" onclick="showPublishTab('book')">图书需求</button>
-      <button class="tab-btn" onclick="showPublishTab('course')">课程需求</button>
-      ${currentUser.role === 'admin' ? '<button class="tab-btn" onclick="showPublishTab(\'influencer-demand\')">达人需求</button>' : ''}
-      <button class="tab-btn" onclick="showPublishTab('excel')">Excel导入</button>
+      <button class="tab-btn ${pubActiveTab==='book'?'active':''}" data-tab="book" onclick="showPublishTab('book')">图书需求</button>
+      <button class="tab-btn ${pubActiveTab==='course'?'active':''}" data-tab="course" onclick="showPublishTab('course')">课程需求</button>
+      <button class="tab-btn ${pubActiveTab==='recruitment'?'active':''}" data-tab="recruitment" onclick="showPublishTab('recruitment')">商家招募</button>
+      ${currentUser.role === 'admin' ? `<button class="tab-btn ${pubActiveTab==='influencer-demand'?'active':''}" data-tab="influencer-demand" onclick="showPublishTab('influencer-demand')">达人需求</button>` : ''}
+      <button class="tab-btn ${pubActiveTab==='excel'?'active':''}" data-tab="excel" onclick="showPublishTab('excel')">Excel导入</button>
     `;
   }
-  
+
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header"><h2>发布需求</h2></div>
-    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">${tabs}</div>
+    <div class="publish-tabs">${tabs}</div>
     <div id="publish-content"></div>`;
-  
-  showPublishTab(isInfluencer ? 'influencer-demand' : 'book');
+
+  showPublishTab(isInfluencer ? 'influencer-demand' : pubActiveTab);
 }
 
 function showPublishTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-  event.target.classList.add('active');
+  pubActiveTab = tab;
+  // 显式按 data-tab 设置高亮，不依赖 event
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-tab') === tab);
+  });
   const content = document.getElementById('publish-content');
-  
+  if (!content) return;
+
   if (tab === 'book') {
     content.innerHTML = renderBookForm();
   } else if (tab === 'course') {
     content.innerHTML = renderCourseForm();
+  } else if (tab === 'recruitment') {
+    content.innerHTML = renderRecruitmentForm();
+    // 商家发布时拉取自己的货盘列表（便于关联）
+    if (currentUser.role === 'merchant' || currentUser.role === 'admin') loadPubLinkableDemands();
   } else if (tab === 'influencer-demand') {
     content.innerHTML = renderInfluencerDemandForm();
+    // 管理员代发：异步加载达人候选
+    if (currentUser.role === 'admin') loadPubInfluencerOptions();
   } else if (tab === 'excel') {
     content.innerHTML = renderExcelImport();
   }
+}
+
+function renderPublisherInfoBar(scope) {
+  // 商家发布时显示发布者信息条
+  if (currentUser.role !== 'merchant') return '';
+  const company = currentUser.company || currentUser.name || '';
+  const scopeLabel = scope === 'book' ? '图书需求' : (scope === 'course' ? '课程需求' : '需求');
+  return `
+    <div class="publisher-info-bar">
+      <span class="publisher-info-label">发布者</span>
+      <span class="publisher-info-value">${company}</span>
+      <span class="publisher-info-tip">${scopeLabel}发布后将显示在「商家货盘 - 我的需求」</span>
+    </div>`;
 }
 
 function renderBookForm() {
   const merchantId = currentUser.role === 'merchant' ? currentUser.id : '';
   return `
     <div class="card"><div class="card-header"><h3>发布图书需求</h3></div><div class="card-body">
+      ${renderPublisherInfoBar('book')}
       <form onsubmit="submitBookDemand(event)">
         <div class="form-row">
-          <div class="form-group"><label>图书商家 *</label><input id="pub-book-merchant" required placeholder="出版社/图书商家名称"></div>
           <div class="form-group"><label>图书名称 *</label><input id="pub-book-name" required placeholder="图书名称"></div>
+          <div class="form-group"><label>图书分类 *</label>
+            <select id="pub-book-category" required>
+              <option value="">请选择</option>
+              ${PUB_BOOK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>目标人群（多值逗号分隔）</label><input id="pub-book-audience" placeholder="如：小学生,家长"></div>
-          <div class="form-group"><label>图书分类（多值逗号分隔）*</label><input id="pub-book-category" required placeholder="如：教育图书,科普"></div>
+          <div class="form-group"><label>图书商家 *</label><input id="pub-book-merchant" required placeholder="出版社/图书商家名称"></div>
+          <div class="form-group"><label>目标人群</label>
+            <select id="pub-book-audience">
+              <option value="">请选择</option>
+              ${PUB_AUDIENCES.map(a => `<option value="${a}">${a}</option>`).join('')}
+            </select>
+          </div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>图书规格</label><select id="pub-book-spec"><option value="单本">单本</option><option value="套组">套组</option></select></div>
-          <div class="form-group"><label>售价（元）</label><input type="number" id="pub-book-price" step="0.01" placeholder="39.9"></div>
+          <div class="form-group"><label>规格</label><select id="pub-book-spec"><option value="单本">单本</option><option value="套组">套组</option></select></div>
+          <div class="form-group"><label>售价（元）</label><input type="number" id="pub-book-price" min="0" step="0.01" placeholder="39.9"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>纯佣金(%)</label><input type="number" id="pub-book-commission" placeholder="25"></div>
-          <div class="form-group"><label>投流佣金(%)</label><input type="number" id="pub-book-ad-commission" placeholder="35"></div>
+          <div class="form-group"><label>纯佣金 (%)</label><input type="number" id="pub-book-commission" min="0" max="100" step="0.01" placeholder="25"></div>
+          <div class="form-group"><label>投流佣金 (%)</label><input type="number" id="pub-book-ad-commission" min="0" max="100" step="0.01" placeholder="35"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>物流快递</label><input id="pub-book-logistics" placeholder="中通快递"></div>
-          <div class="form-group"><label>库存</label><input type="number" id="pub-book-stock" placeholder="5000"></div>
+          <div class="form-group"><label>物流</label><input id="pub-book-logistics" placeholder="如：中通快递"></div>
+          <div class="form-group"><label>库存</label><input type="number" id="pub-book-stock" min="0" step="1" placeholder="5000"></div>
         </div>
         <div class="form-group"><label>图书介绍</label><textarea id="pub-book-intro" rows="3" placeholder="简单介绍图书内容"></textarea></div>
         <div class="form-group"><label>微信小店商品链接</label><input id="pub-book-link" placeholder="https://"></div>
         <div class="form-group"><label>图书图片URL</label><input id="pub-book-image" placeholder="图片链接（可选）"></div>
         <input type="hidden" id="pub-book-merchant-id" value="${merchantId}">
-            <button type="submit" class="btn btn-primary btn-block">发布图书需求</button>
+        <button type="submit" class="btn btn-primary btn-block">发布图书需求</button>
       </form>
     </div></div>`;
 }
@@ -2426,49 +3021,279 @@ function renderCourseForm() {
   const merchantId = currentUser.role === 'merchant' ? currentUser.id : '';
   return `
     <div class="card"><div class="card-header"><h3>发布课程需求</h3></div><div class="card-body">
+      ${renderPublisherInfoBar('course')}
       <form onsubmit="submitCourseDemand(event)">
         <div class="form-row">
           <div class="form-group"><label>课程名称 *</label><input id="pub-course-name" required placeholder="课程名称"></div>
-          <div class="form-group"><label>课程价格（元）</label><input type="number" id="pub-course-price" step="0.01" placeholder="1999"></div>
+          <div class="form-group"><label>课程价格（元）</label><input type="number" id="pub-course-price" min="0" step="0.01" placeholder="1999"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>学段（多值逗号分隔）</label><input id="pub-course-grade" placeholder="如：小学,初中"></div>
-          <div class="form-group"><label>学科（多值逗号分隔）</label><input id="pub-course-subject" placeholder="如：编程,数学"></div>
+          <div class="form-group"><label>学段</label>
+            <select id="pub-course-grade">
+              <option value="">请选择</option>
+              ${PUB_GRADE_LEVELS.map(g => `<option value="${g}">${g}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>学科</label>
+            <select id="pub-course-subject">
+              <option value="">请选择</option>
+              ${PUB_SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>纯佣金 (%)</label><input type="number" id="pub-course-commission" min="0" max="100" step="0.01" placeholder="如 30"></div>
+          <div class="form-group"><label>投流佣金 (%)</label><input type="number" id="pub-course-ad-commission" min="0" max="100" step="0.01" placeholder="如 40"></div>
         </div>
         <div class="form-group"><label>课程介绍</label><textarea id="pub-course-intro" rows="3" placeholder="课程内容介绍"></textarea></div>
         <div class="form-group"><label>课程链接</label><input id="pub-course-link" placeholder="https://"></div>
         <div class="form-group"><label>课程图片URL</label><input id="pub-course-image" placeholder="图片链接（可选）"></div>
         <input type="hidden" id="pub-course-merchant-id" value="${merchantId}">
-            <button type="submit" class="btn btn-primary btn-block">发布课程需求</button>
+        <button type="submit" class="btn btn-primary btn-block">发布课程需求</button>
       </form>
     </div></div>`;
 }
 
+// ========== 商家招募需求 发布表单 ==========
+let pubLinkableDemands = []; // 商家自己已发布的货盘（用于关联）
+
+function renderRecruitmentForm() {
+  if (currentUser.role === 'influencer') {
+    return `<div class="card"><div class="card-body"><div class="empty-state"><p>达人无法发布招募需求</p></div></div></div>`;
+  }
+  const merchantId = currentUser.role === 'merchant' ? currentUser.id : '';
+  const isAdmin = currentUser.role === 'admin';
+  return `
+    <div class="card"><div class="card-header"><h3>发布商家招募需求</h3></div><div class="card-body">
+      ${renderPublisherInfoBar('recruitment')}
+      <form onsubmit="submitRecruitment(event)">
+        ${isAdmin ? `
+        <div class="form-row">
+          <div class="form-group" style="grid-column:1/-1"><label>代发商家 * <span style="color:#94a3b8;font-weight:400;font-size:12px">（管理员代发，必选）</span></label>
+            <select id="pub-mr-merchant-id" required>
+              <option value="">请选择商家...</option>
+              ${pubMerchantOptions.map(m => `<option value="${m.id}">${escapeHtml(m.company || m.name)}</option>`).join('')}
+            </select>
+          </div>
+        </div>` : `<input type="hidden" id="pub-mr-merchant-id" value="${merchantId}">`}
+        <div class="form-row">
+          <div class="form-group" style="grid-column:1/-1"><label>招募标题 *</label><input id="pub-mr-title" required placeholder="如：寻找30万+亲子赛道达人推广《小学数学思维训练》"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>招募类型 *</label>
+            <select id="pub-mr-type" required>
+              ${MR_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>关联货盘（可选）</label>
+            <select id="pub-mr-linked">
+              <option value="">不关联</option>
+            </select>
+            <span style="font-size:11px;color:#94a3b8">可关联到具体的图书/课程货盘，便于达人了解推广商品</span>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>目标达人等级（可多选，用 , 分隔）</label>
+            <input id="pub-mr-levels" placeholder="如：S级,A级">
+          </div>
+          <div class="form-group"><label>目标地域（可多省，用 , 分隔）</label>
+            <input id="pub-mr-provinces" placeholder="如：广东,北京,上海">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>目标粉丝量（最低）</label><input type="number" id="pub-mr-fans-min" min="0" step="1" placeholder="如 100000"></div>
+          <div class="form-group"><label>目标粉丝量（最高）</label><input type="number" id="pub-mr-fans-max" min="0" step="1" placeholder="如 1000000，留空表示不限"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>目标赛道</label><input id="pub-mr-categories" placeholder="如：亲子教育,图书,少儿"></div>
+          <div class="form-group"><label>目标受众</label><input id="pub-mr-audience" placeholder="如：家长,学生"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>合作方式</label>
+            <select id="pub-mr-mode">
+              <option value="">请选择</option>
+              ${MR_COOPERATION_MODES.map(m => `<option value="${m}">${m}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>佣金条件</label><input id="pub-mr-commission" placeholder="如：纯佣 25%、CPS 30%"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>预算（最低，元）</label><input type="number" id="pub-mr-budget-min" min="0" step="0.01" placeholder="0"></div>
+          <div class="form-group"><label>预算（最高，元）</label><input type="number" id="pub-mr-budget-max" min="0" step="0.01" placeholder="0 表示不限"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>截止时间</label><input type="date" id="pub-mr-deadline"></div>
+          <div class="form-group"></div>
+        </div>
+        <div class="form-group"><label>招募描述</label><textarea id="pub-mr-desc" rows="4" placeholder="详细描述你想找什么样的达人、合作内容、要求等"></textarea></div>
+        <button type="submit" class="btn btn-primary btn-block">发布招募需求</button>
+      </form>
+    </div></div>`;
+}
+
+let pubMerchantOptions = []; // 管理员代发招募时缓存的商家列表
+
+async function loadPubLinkableDemands() {
+  // 拉取当前商家的货盘列表（管理员则拉所有）
+  const isMerchant = currentUser.role === 'merchant';
+  const isAdmin = currentUser.role === 'admin';
+  let url = '/demands?page=1&pageSize=200';
+  if (isMerchant) url += `&merchant_id=${currentUser.id}`;
+  try {
+    const res = await fetchAPI(url);
+    if (res && res.success) {
+      pubLinkableDemands = res.data || [];
+      const select = document.getElementById('pub-mr-linked');
+      if (select) {
+        select.innerHTML = '<option value="">不关联</option>' +
+          pubLinkableDemands.map(d => {
+            const label = `[${d.demand_type==='book'?'图书':'课程'}] ${d.title || d.book_name || d.course_name || '未命名'}`;
+            return `<option value="${d.id}">${escapeHtml(label)}</option>`;
+          }).join('');
+      }
+    }
+    // 管理员还需要加载商家列表
+    if (isAdmin) {
+      const mres = await fetchAPI('/merchants?page=1&pageSize=500');
+      if (mres && mres.success) {
+        pubMerchantOptions = mres.data || [];
+        const select = document.getElementById('pub-mr-merchant-id');
+        if (select) {
+          select.innerHTML = '<option value="">请选择商家...</option>' +
+            pubMerchantOptions.map(m => `<option value="${m.id}">${escapeHtml(m.company || m.name)}</option>`).join('');
+        }
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+async function submitRecruitment(e) {
+  e.preventDefault();
+  const merchantId = document.getElementById('pub-mr-merchant-id').value;
+  if (!merchantId) { showToast('请选择商家或重新登录', 'error'); return; }
+  const title = document.getElementById('pub-mr-title').value.trim();
+  if (!title) { showToast('招募标题必填', 'error'); return; }
+  const data = {
+    merchant_id: merchantId,
+    title,
+    recruitment_type: document.getElementById('pub-mr-type').value,
+    linked_demand_id: document.getElementById('pub-mr-linked').value || null,
+    target_levels: document.getElementById('pub-mr-levels').value.trim(),
+    target_provinces: document.getElementById('pub-mr-provinces').value.trim(),
+    target_fans_min: document.getElementById('pub-mr-fans-min').value || 0,
+    target_fans_max: document.getElementById('pub-mr-fans-max').value || 0,
+    target_categories: document.getElementById('pub-mr-categories').value.trim(),
+    target_audience: document.getElementById('pub-mr-audience').value.trim(),
+    cooperation_mode: document.getElementById('pub-mr-mode').value,
+    commission_offer: document.getElementById('pub-mr-commission').value.trim(),
+    budget_min: document.getElementById('pub-mr-budget-min').value || 0,
+    budget_max: document.getElementById('pub-mr-budget-max').value || 0,
+    deadline: document.getElementById('pub-mr-deadline').value || null,
+    description: document.getElementById('pub-mr-desc').value.trim()
+  };
+  if (currentUser.role === 'admin') data.operator_id = currentUser.id;
+  const res = await fetchAPI('/recruitments', { method: 'POST', body: JSON.stringify(data) });
+  if (res.success) {
+    showToast('招募需求发布成功，正在跳转到列表...');
+    e.target.reset();
+    setTimeout(() => navigateTo('merchant-recruitments'), 800);
+  } else {
+    showToast(res.error || '发布失败', 'error');
+  }
+}
+
 function renderInfluencerDemandForm() {
+  const isAdmin = currentUser.role === 'admin';
+  const isInfluencer = currentUser.role === 'influencer';
   return `
     <div class="card"><div class="card-header"><h3>发布达人需求</h3></div><div class="card-body">
       <form onsubmit="submitInfluencerDemand(event)">
+        ${isAdmin ? `
         <div class="form-row">
-          <div class="form-group"><label>视频号账号名称</label><input id="pub-inf-account" value="${currentUser.role === 'influencer' ? currentUser.name : ''}" placeholder="达人视频号名称"></div>
-          <div class="form-group"><label>需求类型（可多选）</label><input id="pub-inf-category" placeholder="如：图书需求,课程需求"></div>
+          <div class="form-group"><label>代发达人 * <span style="color:#94a3b8;font-weight:400;font-size:12px">（管理员代发，必选）</span></label>
+            <select id="pub-inf-id" required onchange="onPubInfluencerChange()">
+              <option value="">${pubInfluencerOptions.length===0?'加载中...':'请选择达人...'}</option>
+              ${pubInfluencerOptions.map(i => `<option value="${i.id}" data-name="${escapeHtml(i.name)}" data-fans="${i.fans}">${escapeHtml(i.name)} (${formatNumber(i.fans)} 粉丝${i.level?' · '+i.level:''})</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>视频号账号</label><input id="pub-inf-account" readonly placeholder="选择达人后自动填充" style="background:#f8fafc"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>图书售价范围（最低）</label><input type="number" id="pub-inf-book-min" placeholder="0"></div>
-          <div class="form-group"><label>图书售价范围（最高）</label><input type="number" id="pub-inf-book-max" placeholder="100"></div>
+          <div class="form-group"><label>需求类型 *</label>
+            <select id="pub-inf-category" required>
+              ${PUB_INF_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" min="0" step="1" readonly placeholder="选择达人后自动填充" style="background:#f8fafc"></div>
+        </div>` : `
+        <div class="form-row">
+          <div class="form-group"><label>视频号账号名称</label><input id="pub-inf-account" value="${isInfluencer ? escapeHtml(currentUser.name || '') : ''}" placeholder="达人视频号名称" ${isInfluencer ? 'readonly style="background:#f8fafc"' : ''}></div>
+          <div class="form-group"><label>需求类型 *</label>
+            <select id="pub-inf-category" required>
+              ${PUB_INF_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" min="0" step="1" placeholder="500000" value="${currentUser.fans_count || ''}"></div>`}
+        <div class="form-row">
+          <div class="form-group"><label>图书分类</label>
+            <select id="pub-inf-book-cat">
+              <option value="">请选择（图书需求时）</option>
+              ${PUB_BOOK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>学科分类</label>
+            <select id="pub-inf-subject">
+              <option value="">请选择</option>
+              ${PUB_SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>期望图书</label><input id="pub-inf-book-name" placeholder="如：少儿科普百科 / DK系列（图书需求时填写）"></div>
+        <div class="form-row">
+          <div class="form-group"><label>图书可接受售价（最低，元）</label><input type="number" id="pub-inf-book-min" min="0" step="0.01" placeholder="0"></div>
+          <div class="form-group"><label>图书可接受售价（最高，元）</label><input type="number" id="pub-inf-book-max" min="0" step="0.01" placeholder="100"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>课程价格范围（最低）</label><input type="number" id="pub-inf-course-min" placeholder="0"></div>
-          <div class="form-group"><label>课程价格范围（最高）</label><input type="number" id="pub-inf-course-max" placeholder="3000"></div>
+          <div class="form-group"><label>课程可接受价（最低，元）</label><input type="number" id="pub-inf-course-min" min="0" step="0.01" placeholder="0"></div>
+          <div class="form-group"><label>课程可接受价（最高，元）</label><input type="number" id="pub-inf-course-max" min="0" step="0.01" placeholder="3000"></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label>图书分类</label><input id="pub-inf-book-cat" placeholder="如：科普读物,教育图书"></div>
-          <div class="form-group"><label>学科分类</label><input id="pub-inf-subject" placeholder="如：数学,编程"></div>
-        </div>
-        <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" placeholder="500000" value="${currentUser.fans_count || ''}"></div>
-        <div class="form-group"><label>需求描述</label><textarea id="pub-inf-desc" rows="3" placeholder="描述您的需求"></textarea></div>
-            <button type="submit" class="btn btn-primary btn-block">I 发布达人需求</button>
+        <div class="form-group"><label>需求描述</label><textarea id="pub-inf-desc" rows="3" placeholder="描述您的需求（如：选品偏好、佣金期望、合作方式等）"></textarea></div>
+        <button type="submit" class="btn btn-primary btn-block">发布达人需求</button>
       </form>
     </div></div>`;
+}
+
+async function loadPubInfluencerOptions() {
+  if (pubInfluencerOptions.length > 0) {
+    // 已加载过则直接刷一次 select（防止 dom 重渲染丢失）
+    refreshPubInfluencerSelect();
+    return;
+  }
+  try {
+    const res = await fetchAPI('/cooperation/matchmaking/suggest/influencers?limit=300');
+    if (res && res.success) {
+      pubInfluencerOptions = (res.data || []).filter(x => x.id);
+      refreshPubInfluencerSelect();
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function refreshPubInfluencerSelect() {
+  const select = document.getElementById('pub-inf-id');
+  if (!select) return;
+  select.innerHTML = '<option value="">请选择达人...</option>' +
+    pubInfluencerOptions.map(i => `<option value="${i.id}" data-name="${escapeHtml(i.name)}" data-fans="${i.fans}">${escapeHtml(i.name)} (${formatNumber(i.fans)} 粉丝${i.level?' · '+i.level:''})</option>`).join('');
+}
+
+function onPubInfluencerChange() {
+  const sel = document.getElementById('pub-inf-id');
+  if (!sel) return;
+  const opt = sel.options[sel.selectedIndex];
+  const acct = document.getElementById('pub-inf-account');
+  const fans = document.getElementById('pub-inf-fans');
+  if (acct) acct.value = opt?.getAttribute('data-name') || '';
+  if (fans) fans.value = opt?.getAttribute('data-fans') || '';
 }
 
 function renderExcelImport() {
@@ -2500,6 +3325,7 @@ function renderExcelImport() {
 async function submitBookDemand(e) {
   e.preventDefault();
   const merchantId = document.getElementById('pub-book-merchant-id').value || currentUser.id;
+  if (!merchantId) { showToast('未识别商家身份，请重新登录', 'error'); return; }
   const data = {
     merchant_id: merchantId,
     book_merchant: document.getElementById('pub-book-merchant').value,
@@ -2518,48 +3344,79 @@ async function submitBookDemand(e) {
   };
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
   const res = await fetchAPI('/demands/book', { method: 'POST', body: JSON.stringify(data) });
-  if (res.success) { showToast('图书需求发布成功！'); e.target.reset(); }
-  else { showToast(res.error || '发布失败', 'error'); }
+  if (res.success) {
+    showToast('图书需求发布成功，正在跳转到列表...');
+    e.target.reset();
+    setTimeout(() => navigateTo('merchant-demands'), 800);
+  } else {
+    showToast(res.error || '发布失败', 'error');
+  }
 }
 
 async function submitCourseDemand(e) {
   e.preventDefault();
   const merchantId = document.getElementById('pub-course-merchant-id').value || currentUser.id;
+  if (!merchantId) { showToast('未识别商家身份，请重新登录', 'error'); return; }
   const data = {
     merchant_id: merchantId,
     course_name: document.getElementById('pub-course-name').value,
     unit_price: document.getElementById('pub-course-price').value,
     grade_level: document.getElementById('pub-course-grade').value,
     subject: document.getElementById('pub-course-subject').value,
+    pure_commission: document.getElementById('pub-course-commission').value,
+    ad_commission: document.getElementById('pub-course-ad-commission').value,
     course_introduction: document.getElementById('pub-course-intro').value,
     course_link: document.getElementById('pub-course-link').value,
     course_image: document.getElementById('pub-course-image').value,
   };
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
   const res = await fetchAPI('/demands/course', { method: 'POST', body: JSON.stringify(data) });
-  if (res.success) { showToast('课程需求发布成功！'); e.target.reset(); }
-  else { showToast(res.error || '发布失败', 'error'); }
+  if (res.success) {
+    showToast('课程需求发布成功，正在跳转到列表...');
+    e.target.reset();
+    setTimeout(() => navigateTo('merchant-demands'), 800);
+  } else {
+    showToast(res.error || '发布失败', 'error');
+  }
 }
 
 async function submitInfluencerDemand(e) {
   e.preventDefault();
+  let influencerId, accountName;
+  if (currentUser.role === 'admin') {
+    influencerId = document.getElementById('pub-inf-id').value;
+    if (!influencerId) { showToast('请先选择代发达人', 'error'); return; }
+    accountName = document.getElementById('pub-inf-account').value;
+  } else if (currentUser.role === 'influencer') {
+    influencerId = currentUser.id;
+    accountName = document.getElementById('pub-inf-account').value || currentUser.name;
+  } else {
+    showToast('当前角色无权发布达人需求', 'error');
+    return;
+  }
   const data = {
-    influencer_id: currentUser.role === 'influencer' ? currentUser.id : 'admin',
-    video_account_name: document.getElementById('pub-inf-account').value,
+    influencer_id: influencerId,
+    video_account_name: accountName,
     demand_category: document.getElementById('pub-inf-category').value,
+    book_name: document.getElementById('pub-inf-book-name')?.value || '',
+    book_category: document.getElementById('pub-inf-book-cat').value,
+    subject_category: document.getElementById('pub-inf-subject').value,
     book_price_min: document.getElementById('pub-inf-book-min').value || 0,
     book_price_max: document.getElementById('pub-inf-book-max').value || 0,
     course_price_min: document.getElementById('pub-inf-course-min').value || 0,
     course_price_max: document.getElementById('pub-inf-course-max').value || 0,
-    book_category: document.getElementById('pub-inf-book-cat').value,
-    subject_category: document.getElementById('pub-inf-subject').value,
     fans_count: document.getElementById('pub-inf-fans').value || 0,
     description: document.getElementById('pub-inf-desc').value,
   };
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
   const res = await fetchAPI('/demands/influencer-demands', { method: 'POST', body: JSON.stringify(data) });
-  if (res.success) { showToast('达人需求发布成功！'); e.target.reset(); }
-  else { showToast(res.error || '发布失败', 'error'); }
+  if (res.success) {
+    showToast('达人需求发布成功，正在跳转到列表...');
+    e.target.reset();
+    setTimeout(() => navigateTo('influencer-demands'), 800);
+  } else {
+    showToast(res.error || '发布失败', 'error');
+  }
 }
 
 async function handleExcelUpload(e) {
@@ -3497,74 +4354,420 @@ async function viewDemandDetail(demandId) {
   `, '<button class="btn btn-outline" onclick="closeModal()">关闭</button>');
 }
 
-// ============ 商家管理（管理员可见） ============
+// ============ 达人管理（仅超级管理员可见） ============
+let imFilters = { keyword: '', level: '', has_mcn: '' };
+let imPage = 1;
+const im_PAGE_SIZE = 30;
+
+async function renderInfluencerManage() {
+  // 仅超级管理员可访问
+  if (currentUser.role !== 'admin' || !currentUser.is_super) {
+    document.getElementById('page-container').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">-</div>
+        <p>权限不足，仅超级管理员可访问"达人管理"模块</p>
+        <button class="btn btn-sm btn-primary" style="margin-top:12px" onclick="navigateTo('influencer-plaza')">前往达人广场</button>
+      </div>`;
+    return;
+  }
+
+  const container = document.getElementById('page-container');
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
+
+  // 拉取数据：列表 + Hero 统计
+  let url = `/influencers?page=${imPage}&pageSize=${im_PAGE_SIZE}`;
+  if (imFilters.keyword) url += `&keyword=${encodeURIComponent(imFilters.keyword)}`;
+  if (imFilters.level) url += `&level=${encodeURIComponent(imFilters.level)}`;
+  if (imFilters.has_mcn) url += `&has_mcn=${encodeURIComponent(imFilters.has_mcn)}`;
+
+  const [listRes, heroRes] = await Promise.all([
+    fetchAPI(url),
+    fetchAPI('/influencers/hero-stats')
+  ]);
+  if (!listRes.success) { container.innerHTML = '<p>加载失败</p>'; return; }
+
+  const hero = heroRes.success ? heroRes.data : { total: 0, levels: [], mcnCount: 0, mutualCount: 0, newCount: 0, highSales: 0 };
+  const levelCount = {};
+  (hero.levels || []).forEach(x => { levelCount[x.level] = x.c; });
+
+  container.innerHTML = `
+    ${renderBackButton()}
+    <div class="page-header">
+      <h2>达人管理</h2>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px">达人资源的批量增改删与导入导出（仅超管可见）</div>
+    </div>
+
+    <!-- Hero 统计 -->
+    <div class="im-hero">
+      ${renderImHeroCard('达人总数', hero.total, '#3b82f6')}
+      ${renderImHeroCard('S级', levelCount['S级'] || 0, '#dc2626')}
+      ${renderImHeroCard('A级', levelCount['A级'] || 0, '#ea580c')}
+      ${renderImHeroCard('B级', levelCount['B级'] || 0, '#16a34a')}
+      ${renderImHeroCard('C级', levelCount['C级'] || 0, '#0ea5e9')}
+      ${renderImHeroCard('D级', levelCount['D级'] || 0, '#94a3b8')}
+      ${renderImHeroCard('已签 MCN', hero.mcnCount, '#8b5cf6')}
+      ${renderImHeroCard('近 30 天新增', hero.newCount, '#ec4899')}
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="md-toolbar">
+      <div class="md-toolbar-left">
+        <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">+ 添加达人</button>
+        <button class="btn btn-sm btn-primary" onclick="showImBatchUpload()">批量上传</button>
+        <button class="btn btn-sm btn-outline" onclick="exportInfluencers()">导出CSV</button>
+        <button class="btn btn-sm btn-danger-outline" onclick="clearAllInfluencersFromManage()" style="margin-left:auto">清空所有达人</button>
+      </div>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="filter-panel" style="display:block;margin-top:12px">
+      <div class="filter-row">
+        <div class="filter-item" style="flex:1">
+          <input type="text" id="im-keyword" placeholder="搜索：达人账号 / 所在地 / 内容赛道..."
+            value="${escapeHtml(imFilters.keyword || '')}"
+            onkeypress="if(event.key==='Enter') applyImFilter()">
+        </div>
+        <div class="filter-item">
+          <label>等级</label>
+          <select onchange="onImFilterChange('level', this.value); applyImFilter()">
+            <option value="">全部</option>
+            ${['S级','A级','B级','C级','D级'].map(l => `<option value="${l}" ${imFilters.level===l?'selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>MCN</label>
+          <select onchange="onImFilterChange('has_mcn', this.value); applyImFilter()">
+            <option value="">全部</option>
+            <option value="是" ${imFilters.has_mcn==='是'?'selected':''}>已签 MCN</option>
+            <option value="否" ${imFilters.has_mcn==='否'?'selected':''}>未签 MCN</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="applyImFilter()">搜索</button>
+        ${(imFilters.keyword || imFilters.level || imFilters.has_mcn) ? '<button class="btn btn-sm btn-outline" onclick="resetImFilter()">重置</button>' : ''}
+      </div>
+    </div>
+
+    <!-- 批量上传区（隐藏） -->
+    <div id="im-upload-area" style="display:none;margin-top:12px">
+      <div class="card"><div class="card-header"><h3>批量上传达人</h3></div><div class="card-body">
+        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">下载导入模板</a>
+          <span style="font-size:12px;color:#94a3b8">支持"X万"格式（如 50万），同名达人自动更新</span>
+        </div>
+        <div class="upload-area" onclick="document.getElementById('im-excel-input').click()">
+          <div class="upload-icon">+</div>
+          <div class="upload-text">点击上传达人 Excel 文件</div>
+          <div class="upload-hint">支持 .xlsx / .xls 格式</div>
+        </div>
+        <input type="file" id="im-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleInfluencerExcelUpload(event)">
+        <div id="influencer-import-result" style="margin-top:12px"></div>
+      </div></div>
+    </div>
+
+    <!-- 列表 -->
+    <div class="im-list" style="margin-top:16px">
+      ${renderImTableHeader()}
+      ${listRes.data.length === 0
+        ? '<div class="empty-state" style="padding:40px"><p>暂无符合条件的达人</p></div>'
+        : listRes.data.map(inf => renderImRow(inf)).join('')}
+    </div>
+    ${renderPagination(listRes.pagination, 'pageInfluencerManage')}
+  `;
+}
+
+function renderImHeroCard(label, val, color) {
+  return `
+    <div class="im-hero-card">
+      <div class="im-hero-val" style="color:${color}">${formatNumber(val || 0)}</div>
+      <div class="im-hero-label">${label}</div>
+    </div>`;
+}
+
+function renderImTableHeader() {
+  return `
+    <div class="im-row im-row-header">
+      <div class="im-th">等级</div>
+      <div class="im-th">达人账号</div>
+      <div class="im-th th-right">粉丝量</div>
+      <div class="im-th">内容赛道</div>
+      <div class="im-th">所在地</div>
+      <div class="im-th">MCN</div>
+      <div class="im-th">归属销售</div>
+      <div class="im-th th-right">月销总额</div>
+      <div class="im-th th-right">操作</div>
+    </div>`;
+}
+
+function renderImRow(inf) {
+  const levelColor = getLevelColor(inf.level);
+  const totalSales = (inf.monthly_short_video_sales || 0) + (inf.monthly_live_sales || 0);
+  const region = (inf.region || '').split(',')[0] || '-';
+  const salesName = inf.sales_owner_name || inf.sales_owner || '<span style="color:#cbd5e1">-</span>';
+  return `
+    <div class="im-row">
+      <div class="im-cell"><span class="level-badge" style="background:${levelColor}">${inf.level || '-'}</span></div>
+      <div class="im-cell im-cell-name">
+        <div class="im-name-main">${escapeHtml(inf.video_account_name || '-')}</div>
+        ${inf.official_account_name ? `<div class="im-name-sub">${escapeHtml(inf.official_account_name)}</div>` : ''}
+      </div>
+      <div class="im-cell th-right">${formatNumber(inf.fans_count || 0)}</div>
+      <div class="im-cell" title="${escapeHtml(inf.video_category_track || '')}">${(inf.video_category_track || '-').slice(0, 16)}${(inf.video_category_track || '').length > 16 ? '…' : ''}</div>
+      <div class="im-cell">${region}</div>
+      <div class="im-cell">${inf.has_mcn === '是' ? `<span style="color:#8b5cf6">${escapeHtml(inf.mcn_name || 'MCN')}</span>` : '<span style="color:#cbd5e1">-</span>'}</div>
+      <div class="im-cell" style="color:#16a34a;font-weight:600">${salesName}</div>
+      <div class="im-cell th-right">¥${formatNumber(totalSales)}</div>
+      <div class="im-cell th-right im-actions">
+        <button class="btn btn-xs btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
+        <button class="btn btn-xs btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>
+        <button class="btn btn-xs btn-danger-outline" onclick="deleteInfluencerFromManage('${inf.id}','${escapeHtml(inf.video_account_name || '').replace(/'/g, '&apos;')}')">删除</button>
+      </div>
+    </div>`;
+}
+
+function onImFilterChange(key, value) { imFilters[key] = value; }
+function applyImFilter() {
+  const kw = document.getElementById('im-keyword');
+  if (kw) imFilters.keyword = kw.value.trim();
+  imPage = 1;
+  renderInfluencerManage();
+}
+function resetImFilter() {
+  imFilters = { keyword: '', level: '', has_mcn: '' };
+  imPage = 1;
+  renderInfluencerManage();
+}
+function pageInfluencerManage(page) {
+  imPage = page;
+  renderInfluencerManage();
+}
+function showImBatchUpload() {
+  const area = document.getElementById('im-upload-area');
+  if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
+}
+function exportInfluencers() {
+  const params = new URLSearchParams();
+  if (imFilters.keyword) params.set('keyword', imFilters.keyword);
+  if (imFilters.level) params.set('level', imFilters.level);
+  if (imFilters.has_mcn) params.set('has_mcn', imFilters.has_mcn);
+  const url = '/api/influencers/export' + (params.toString() ? '?' + params.toString() : '');
+  // 直接通过浏览器下载
+  window.open(url, '_blank');
+  showToast('正在下载，请稍候...');
+}
+async function clearAllInfluencersFromManage() {
+  if (!confirm('⚠ 危险操作：将清空全部达人数据，且不可恢复。确定继续？')) return;
+  if (!confirm('请再次确认：你即将永久删除所有达人记录！')) return;
+  await fetchAPI('/influencers/all/clear', { method: 'DELETE' });
+  showToast('已清空');
+  renderInfluencerManage();
+}
+async function deleteInfluencerFromManage(id, name) {
+  if (!confirm(`确定删除达人「${name}」？此操作不可恢复。`)) return;
+  const res = await fetchAPI(`/influencers/${id}`, { method: 'DELETE' });
+  if (res.success) { showToast('已删除'); renderInfluencerManage(); }
+  else { showToast(res.error || '删除失败', 'error'); }
+}
+
+// ============ 商家管理（管理员可见，仿达人管理样式） ============
+let mmFilters = { keyword: '', industry: '', has_sales: '', status: 'active' };
+let mmPage = 1;
+const MM_PAGE_SIZE = 30;
+const MM_INDUSTRIES = ['图书出版', '在线教育', '教辅出版', '数字内容', '课程平台', 'MCN代理', '其他'];
+
 async function renderMerchantManage() {
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
-  
-  // 获取商家列表（销售角色只看归属自己的+无归属的）
-  let url = '/merchants';
-  if (currentUser.role === 'admin' && !currentUser.is_super && currentUser.admin_role === '销售') {
-    url += `?sales_owner_id=${currentUser.id}`;
+
+  // 销售管理员只看归属自己的+无归属的
+  const isSalesAdmin = currentUser.role === 'admin' && !currentUser.is_super && currentUser.admin_role === '销售';
+  const isSuper = currentUser.role === 'admin' && currentUser.is_super;
+
+  let listUrl = `/merchants?page=${mmPage}&pageSize=${MM_PAGE_SIZE}`;
+  let statsUrl = '/merchants/manage-stats';
+  if (isSalesAdmin) {
+    listUrl += `&sales_owner_id=${currentUser.id}`;
+    statsUrl += `?sales_owner_id=${currentUser.id}`;
   }
-  const [merchantRes, salesRes] = await Promise.all([
-    fetchAPI(url),
+  if (mmFilters.keyword) listUrl += `&keyword=${encodeURIComponent(mmFilters.keyword)}`;
+  if (mmFilters.industry) listUrl += `&industry=${encodeURIComponent(mmFilters.industry)}`;
+  if (mmFilters.has_sales) listUrl += `&has_sales=${encodeURIComponent(mmFilters.has_sales)}`;
+  if (mmFilters.status) listUrl += `&status=${encodeURIComponent(mmFilters.status)}`;
+
+  const [listRes, statsRes, salesRes] = await Promise.all([
+    fetchAPI(listUrl),
+    fetchAPI(statsUrl),
     fetchAPI('/admins/sales-list')
   ]);
-  
-  if (!merchantRes.success) { container.innerHTML = '<div class="empty-state"><p>加载失败</p></div>'; return; }
-  const merchants = merchantRes.data || [];
-  const salesList = salesRes.data || [];
-  
+  if (!listRes.success) { container.innerHTML = '<div class="empty-state"><p>加载失败</p></div>'; return; }
+
+  const merchants = listRes.data || [];
+  const stats = statsRes.success ? statsRes.data : { total: 0, withSales: 0, newCount: 0, activeCount: 0, industries: [] };
+  window._salesList = salesRes.data || [];
+
+  // 计算各行业分布的前 3
+  const industryMap = {};
+  (stats.industries || []).forEach(x => { if (x.industry) industryMap[x.industry] = x.c; });
+
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
       <h2>商家管理</h2>
-      <button class="btn btn-primary" onclick="showAddMerchant()">+ 添加商家</button>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px">商家档案的增改删与归属销售管理${isSalesAdmin ? '（你只看到归属自己的商家）' : ''}</div>
     </div>
-    <div class="info-box" style="margin-bottom:20px;padding:12px 16px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:10px;border-left:4px solid var(--primary-500)">
-      <p style="font-size:13px;color:var(--gray-600);margin:0"> 商家可通过下拉选择方式登录系统。归属销售字段为非必填，设置后对应销售登录可看到归属自己的商家数据。</p>
+
+    <!-- Hero 4 卡 -->
+    <div class="im-hero">
+      ${renderImHeroCard('商家总数', stats.total || 0, '#3b82f6')}
+      ${renderImHeroCard('有归属销售', stats.withSales || 0, '#16a34a')}
+      ${renderImHeroCard('近 30 天新增', stats.newCount || 0, '#ec4899')}
+      ${renderImHeroCard('近 30 天活跃', stats.activeCount || 0, '#f59e0b')}
     </div>
-    <div class="admin-list">
-      ${merchants.length === 0 ? '<div class="empty-state"><div class="icon">-</div><p>暂无商家数据</p></div>' : merchants.map(m => `
-        <div class="admin-card">
-          <div class="admin-card-header">
-            <div style="display:flex;align-items:center;gap:10px">
-              <div class="admin-avatar"><div>
-              <div>
-                <div class="admin-name">${m.name}</div>
-                <div class="admin-username">${m.company}</div>
-              </div>
-            </div>
-            <span class="badge" style="background:#e0f2fe;color:#0284c7">${m.industry || '未分类'}</span>
-          </div>
-          <div class="admin-card-body">
-            <div class="admin-info-item"><span class="info-label">手机</span><span>${m.phone || '-'}</span></div>
-            <div class="admin-info-item"><span class="info-label">邮箱</span><span>${m.email || '-'}</span></div>
-            <div class="admin-info-item"><span class="info-label">描述</span><span>${m.description || '-'}</span></div>
-            <div class="admin-info-item"><span class="info-label">归属销售</span><span style="color:${m.sales_owner_name ? 'var(--success)' : 'var(--gray-400)'}">${m.sales_owner_name || '未设置'}</span></div>
-            <div class="admin-info-item"><span class="info-label">创建时间</span><span>${formatDate(m.created_at)}</span></div>
-          </div>
-          <div class="admin-card-actions">
-            <button class="btn btn-sm btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteMerchant('${m.id}','${m.name}')">删除</button>
-          </div>
+
+    <!-- 工具栏 -->
+    <div class="md-toolbar">
+      <div class="md-toolbar-left">
+        <button class="btn btn-sm btn-success" onclick="showAddMerchant()">+ 添加商家</button>
+        <button class="btn btn-sm btn-outline" onclick="exportMerchants()">导出CSV</button>
+        ${isSuper ? `<button class="btn btn-sm ${mmFilters.status==='deleted'?'btn-primary':'btn-outline'}" onclick="toggleMmDeletedView()">${mmFilters.status==='deleted'?'返回正常列表':'查看已删除'}</button>` : ''}
+      </div>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="filter-panel" style="display:block;margin-top:12px">
+      <div class="filter-row">
+        <div class="filter-item" style="flex:1">
+          <input type="text" id="mm-keyword" placeholder="搜索：联系人 / 公司名 / 手机号 / 邮箱..."
+            value="${escapeHtml(mmFilters.keyword || '')}"
+            onkeypress="if(event.key==='Enter') applyMmFilter()">
         </div>
-      `).join('')}
+        <div class="filter-item">
+          <label>行业</label>
+          <select onchange="onMmFilterChange('industry', this.value); applyMmFilter()">
+            <option value="">全部</option>
+            ${MM_INDUSTRIES.map(i => `<option value="${i}" ${mmFilters.industry===i?'selected':''}>${i}${industryMap[i]?` (${industryMap[i]})`:''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>归属销售</label>
+          <select onchange="onMmFilterChange('has_sales', this.value); applyMmFilter()">
+            <option value="">全部</option>
+            <option value="yes" ${mmFilters.has_sales==='yes'?'selected':''}>已分配</option>
+            <option value="no" ${mmFilters.has_sales==='no'?'selected':''}>未分配</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="applyMmFilter()">搜索</button>
+        ${(mmFilters.keyword || mmFilters.industry || mmFilters.has_sales) ? '<button class="btn btn-sm btn-outline" onclick="resetMmFilter()">重置</button>' : ''}
+      </div>
+    </div>
+
+    <!-- 列表 -->
+    <div class="im-list" style="margin-top:16px">
+      ${renderMmTableHeader(isSuper)}
+      ${merchants.length === 0
+        ? '<div class="empty-state" style="padding:40px"><p>暂无符合条件的商家</p></div>'
+        : merchants.map(m => renderMmRow(m, isSuper)).join('')}
+    </div>
+    ${renderPagination(listRes.pagination, 'pageMerchantManage')}
+  `;
+}
+
+function renderMmTableHeader(isSuper) {
+  return `
+    <div class="im-row im-row-header mm-row">
+      <div class="im-th">公司名称</div>
+      <div class="im-th">联系人</div>
+      <div class="im-th">行业</div>
+      <div class="im-th">手机号</div>
+      <div class="im-th">归属销售</div>
+      <div class="im-th th-right">货盘数</div>
+      <div class="im-th">状态</div>
+      <div class="im-th">创建时间</div>
+      <div class="im-th th-right">操作</div>
     </div>`;
-  
-  // 保存销售列表到全局，供弹窗使用
-  window._salesList = salesList;
+}
+
+function renderMmRow(m, isSuper) {
+  const isDeleted = m.status === 'deleted';
+  const sales = m.sales_owner_name
+    ? `<span style="color:#16a34a;font-weight:600">${escapeHtml(m.sales_owner_name)}</span>`
+    : '<span style="color:#cbd5e1">未分配</span>';
+  const statusBadge = isDeleted
+    ? '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已删除</span>'
+    : '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">正常</span>';
+  const industryTag = m.industry
+    ? `<span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:4px;font-size:11px">${escapeHtml(m.industry)}</span>`
+    : '<span style="color:#cbd5e1">未分类</span>';
+
+  return `
+    <div class="im-row mm-row${isDeleted ? ' mm-row-deleted' : ''}">
+      <div class="im-cell im-cell-name">
+        <div class="im-name-main">${escapeHtml(m.company || '-')}</div>
+        ${m.email ? `<div class="im-name-sub">${escapeHtml(m.email)}</div>` : ''}
+      </div>
+      <div class="im-cell">${escapeHtml(m.name || '-')}</div>
+      <div class="im-cell">${industryTag}</div>
+      <div class="im-cell">${escapeHtml(m.phone || '-')}</div>
+      <div class="im-cell">${sales}</div>
+      <div class="im-cell th-right" style="font-weight:600">${m.demand_count || 0}</div>
+      <div class="im-cell">${statusBadge}</div>
+      <div class="im-cell" style="font-size:12px;color:#94a3b8">${formatDate(m.created_at)}</div>
+      <div class="im-cell th-right im-actions">
+        ${isDeleted
+          ? (isSuper ? `<button class="btn btn-xs btn-success" onclick="restoreMerchant('${m.id}')">恢复</button>` : '')
+          : `
+            <button class="btn btn-xs btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
+            <button class="btn btn-xs btn-outline" onclick="resetMerchantPassword('${m.id}','${escapeHtml(m.company || '').replace(/'/g, '&apos;')}')">重置密码</button>
+            <button class="btn btn-xs btn-danger-outline" onclick="deleteMerchant('${m.id}','${escapeHtml(m.company || m.name || '').replace(/'/g, '&apos;')}')">删除</button>
+          `
+        }
+      </div>
+    </div>`;
+}
+
+function onMmFilterChange(key, value) { mmFilters[key] = value; }
+function applyMmFilter() {
+  const kw = document.getElementById('mm-keyword');
+  if (kw) mmFilters.keyword = kw.value.trim();
+  mmPage = 1;
+  renderMerchantManage();
+}
+function resetMmFilter() {
+  mmFilters = { keyword: '', industry: '', has_sales: '', status: mmFilters.status };
+  mmPage = 1;
+  renderMerchantManage();
+}
+function pageMerchantManage(page) {
+  mmPage = page;
+  renderMerchantManage();
+}
+function toggleMmDeletedView() {
+  mmFilters.status = mmFilters.status === 'deleted' ? 'active' : 'deleted';
+  mmPage = 1;
+  renderMerchantManage();
+}
+function exportMerchants() {
+  const params = new URLSearchParams();
+  if (mmFilters.keyword) params.set('keyword', mmFilters.keyword);
+  if (mmFilters.industry) params.set('industry', mmFilters.industry);
+  if (mmFilters.has_sales) params.set('has_sales', mmFilters.has_sales);
+  const url = '/api/merchants/export' + (params.toString() ? '?' + params.toString() : '');
+  window.open(url, '_blank');
+  showToast('正在下载，请稍候...');
 }
 
 async function showAddMerchant() {
   const salesList = window._salesList || [];
   openModal('添加商家', `
-    <div class="form-group"><label>联系人姓名 *</label><input type="text" id="m-name" placeholder="如：张经理" required></div>
     <div class="form-group"><label>公司名称 *</label><input type="text" id="m-company" placeholder="如：知行图书出版社" required></div>
+    <div class="form-group"><label>联系人姓名 *</label><input type="text" id="m-name" placeholder="如：张经理" required></div>
     <div class="form-group"><label>手机号 *</label><input type="text" id="m-phone" placeholder="手机号码" required></div>
-    <div class="form-group"><label>邮箱</label><input type="text" id="m-email" placeholder="选填"></div>
-    <div class="form-group"><label>行业</label><input type="text" id="m-industry" placeholder="如：图书出版、在线教育"></div>
+    <div class="form-group"><label>邮箱</label><input type="email" id="m-email" placeholder="选填"></div>
+    <div class="form-group"><label>行业</label>
+      <select id="m-industry">
+        <option value="">请选择</option>
+        ${MM_INDUSTRIES.map(i => `<option value="${i}">${i}</option>`).join('')}
+      </select>
+    </div>
     <div class="form-group"><label>描述</label><textarea id="m-desc" rows="2" placeholder="商家简介"></textarea></div>
     <div class="form-group">
       <label>归属销售（非必填）</label>
@@ -3574,28 +4777,30 @@ async function showAddMerchant() {
       </select>
       <p style="font-size:11px;color:var(--gray-400);margin-top:4px">设置后，对应销售登录可看到此商家信息</p>
     </div>
+    <div class="info-box" style="padding:10px 12px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e;margin-top:8px">
+       初始登录密码为 <strong>123456</strong>，可让商家登录后自行修改或随时使用"重置密码"功能
+    </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">取消</button>
-    <button class="btn btn-primary" onclick="confirmAddMerchant()">V 确认添加</button>
+    <button class="btn btn-primary" onclick="confirmAddMerchant()">确认添加</button>
   `);
 }
 
 async function confirmAddMerchant() {
-  const name = document.getElementById('m-name').value.trim();
-  const company = document.getElementById('m-company').value.trim();
-  const phone = document.getElementById('m-phone').value.trim();
-  const email = document.getElementById('m-email').value.trim();
-  const industry = document.getElementById('m-industry').value.trim();
-  const description = document.getElementById('m-desc').value.trim();
-  const sales_owner_id = document.getElementById('m-sales-owner').value;
-  
-  if (!name || !company || !phone) { showToast('联系人、公司名称、手机号为必填', 'error'); return; }
-  
-  const res = await fetchAPI('/merchants', {
-    method: 'POST',
-    body: JSON.stringify({ name, company, phone, email, industry, description, sales_owner_id })
-  });
-  if (res.success) { showToast('商家添加成功'); closeModal(); renderMerchantManage(); }
+  const data = {
+    name: document.getElementById('m-name').value.trim(),
+    company: document.getElementById('m-company').value.trim(),
+    phone: document.getElementById('m-phone').value.trim(),
+    email: document.getElementById('m-email').value.trim(),
+    industry: document.getElementById('m-industry').value,
+    description: document.getElementById('m-desc').value.trim(),
+    sales_owner_id: document.getElementById('m-sales-owner').value
+  };
+  if (!data.name || !data.company || !data.phone) {
+    showToast('联系人、公司名称、手机号为必填', 'error'); return;
+  }
+  const res = await fetchAPI('/merchants', { method: 'POST', body: JSON.stringify(data) });
+  if (res.success) { showToast(res.message || '商家添加成功'); closeModal(); renderMerchantManage(); }
   else { showToast(res.error || '添加失败', 'error'); }
 }
 
@@ -3604,20 +4809,28 @@ async function editMerchant(id) {
   if (!res.success) { showToast('获取商家信息失败', 'error'); return; }
   const m = res.data;
   const salesList = window._salesList || [];
-  
   openModal('编辑商家', `
-    <div class="form-group"><label>联系人姓名 *</label><input type="text" id="em-name" value="${m.name}" required></div>
-    <div class="form-group"><label>公司名称 *</label><input type="text" id="em-company" value="${m.company}" required></div>
-    <div class="form-group"><label>手机号 *</label><input type="text" id="em-phone" value="${m.phone}" required></div>
-    <div class="form-group"><label>邮箱</label><input type="text" id="em-email" value="${m.email || ''}"></div>
-    <div class="form-group"><label>行业</label><input type="text" id="em-industry" value="${m.industry || ''}"></div>
-    <div class="form-group"><label>描述</label><textarea id="em-desc" rows="2">${m.description || ''}</textarea></div>
+    <div class="form-group"><label>公司名称 *</label><input type="text" id="em-company" value="${escapeHtml(m.company || '')}" required></div>
+    <div class="form-group"><label>联系人姓名 *</label><input type="text" id="em-name" value="${escapeHtml(m.name || '')}" required></div>
+    <div class="form-group"><label>手机号 *</label><input type="text" id="em-phone" value="${escapeHtml(m.phone || '')}" required></div>
+    <div class="form-group"><label>邮箱</label><input type="email" id="em-email" value="${escapeHtml(m.email || '')}"></div>
+    <div class="form-group"><label>行业</label>
+      <select id="em-industry">
+        <option value="">请选择</option>
+        ${MM_INDUSTRIES.map(i => `<option value="${i}" ${m.industry===i?'selected':''}>${i}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group"><label>描述</label><textarea id="em-desc" rows="2">${escapeHtml(m.description || '')}</textarea></div>
     <div class="form-group">
-      <label>归属销售（非必填）</label>
+      <label>归属销售</label>
       <select id="em-sales-owner">
         <option value="">-- 不设置 --</option>
         ${salesList.map(s => `<option value="${s.id}" ${m.sales_owner_id === s.id ? 'selected' : ''}>${s.name} (@${s.username})</option>`).join('')}
       </select>
+    </div>
+    <div style="background:#f8fafc;padding:8px 12px;border-radius:6px;margin-top:8px;font-size:11px;color:#94a3b8">
+      货盘数 ${m.demand_count || 0} 条 · 招募数 ${m.recruitment_count || 0} 条 · 撮合数 ${m.matchmaking_count || 0} 条<br>
+      创建时间 ${formatDate(m.created_at)}　最后更新 ${formatDate(m.updated_at)}
     </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">取消</button>
@@ -3626,29 +4839,51 @@ async function editMerchant(id) {
 }
 
 async function confirmEditMerchant(id) {
-  const name = document.getElementById('em-name').value.trim();
-  const company = document.getElementById('em-company').value.trim();
-  const phone = document.getElementById('em-phone').value.trim();
-  const email = document.getElementById('em-email').value.trim();
-  const industry = document.getElementById('em-industry').value.trim();
-  const description = document.getElementById('em-desc').value.trim();
-  const sales_owner_id = document.getElementById('em-sales-owner').value;
-  
-  if (!name || !company || !phone) { showToast('联系人、公司名称、手机号为必填', 'error'); return; }
-  
-  const res = await fetchAPI(`/merchants/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify({ name, company, phone, email, industry, description, sales_owner_id })
-  });
+  const data = {
+    name: document.getElementById('em-name').value.trim(),
+    company: document.getElementById('em-company').value.trim(),
+    phone: document.getElementById('em-phone').value.trim(),
+    email: document.getElementById('em-email').value.trim(),
+    industry: document.getElementById('em-industry').value,
+    description: document.getElementById('em-desc').value.trim(),
+    sales_owner_id: document.getElementById('em-sales-owner').value
+  };
+  if (!data.name || !data.company || !data.phone) {
+    showToast('联系人、公司名称、手机号为必填', 'error'); return;
+  }
+  const res = await fetchAPI(`/merchants/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   if (res.success) { showToast('商家信息已更新'); closeModal(); renderMerchantManage(); }
   else { showToast(res.error || '更新失败', 'error'); }
 }
 
 async function deleteMerchant(id, name) {
-  if (!confirm(`确定删除商家「${name}」？删除后相关数据将无法恢复。`)) return;
+  if (!confirm(`确定删除商家「${name}」？\n\n（软删除：将标记为已删除状态，可在"查看已删除"中恢复）`)) return;
   const res = await fetchAPI(`/merchants/${id}`, { method: 'DELETE' });
-  if (res.success) { showToast('商家已删除'); renderMerchantManage(); }
-  else { showToast(res.error || '删除失败', 'error'); }
+  if (res.success) { showToast(res.message || '已删除'); renderMerchantManage(); return; }
+  // 关联数据预检失败 → 询问是否强制删除
+  if (res.data && res.data.requireForce) {
+    if (confirm(`${res.error}\n\n是否强制删除？关联数据将变为孤儿数据。`)) {
+      const force = await fetchAPI(`/merchants/${id}?force=1`, { method: 'DELETE' });
+      if (force.success) { showToast('已强制删除'); renderMerchantManage(); }
+      else { showToast(force.error || '删除失败', 'error'); }
+    }
+  } else {
+    showToast(res.error || '删除失败', 'error');
+  }
+}
+
+async function restoreMerchant(id) {
+  if (!confirm('确定恢复此商家？')) return;
+  const res = await fetchAPI(`/merchants/${id}/restore`, { method: 'PUT' });
+  if (res.success) { showToast('已恢复'); renderMerchantManage(); }
+  else { showToast(res.error || '恢复失败', 'error'); }
+}
+
+async function resetMerchantPassword(id, name) {
+  if (!confirm(`确定将商家「${name}」的密码重置为 123456？`)) return;
+  const res = await fetchAPI(`/merchants/${id}/reset-password`, { method: 'PUT', body: JSON.stringify({ password: '123456' }) });
+  if (res.success) showToast(res.message || '密码已重置');
+  else showToast(res.error || '重置失败', 'error');
 }
 
 // ============ 管理员管理（仅超管可见） ============
