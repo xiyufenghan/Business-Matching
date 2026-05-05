@@ -48,18 +48,30 @@ app.post('/api/login', (req, res) => {
     }});
   }
 
-  // 2. 匹配商家（按 name 或 company 匹配，排除已删除）
-  let merchant = db.prepare("SELECT * FROM merchants WHERE (name = ? OR company = ?) AND password = ? AND status != 'deleted'").get(username, username, password);
+  // 2. 匹配商家：优先手机号登录（新规），兼容 name / company（旧数据）
+  let merchant = db.prepare("SELECT * FROM merchants WHERE phone = ? AND status != 'deleted'").get(username);
   if (!merchant) {
     merchant = db.prepare("SELECT * FROM merchants WHERE (name = ? OR company = ?) AND status != 'deleted'").get(username, username);
   }
   if (merchant && merchant.password === password) {
+    if (merchant.invite_status === 'pending') {
+      return res.status(403).json({ success: false, error: '账号尚未激活，请先使用邀请链接完成激活' });
+    }
+    if (merchant.invite_status === 'disabled') {
+      return res.status(403).json({ success: false, error: '账号已停用，请联系管理员' });
+    }
     return res.json({ success: true, data: { id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry }});
   }
 
   // 3. 匹配达人（按 video_account_name）
   const inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ? AND password = ?').get(username, password);
   if (inf) {
+    if (inf.invite_status === 'pending') {
+      return res.status(403).json({ success: false, error: '账号尚未激活，请先使用邀请链接完成激活' });
+    }
+    if (inf.invite_status === 'disabled') {
+      return res.status(403).json({ success: false, error: '账号已停用，请联系管理员' });
+    }
     return res.json({ success: true, data: { id: inf.id, name: inf.video_account_name, role: 'influencer', ...inf }});
   }
 
@@ -75,6 +87,7 @@ app.use('/api/excel', require('./routes/excel-import'));
 app.use('/api/cooperation', require('./routes/cooperation'));
 app.use('/api/admins', require('./routes/admins'));
 app.use('/api/recruitments', require('./routes/recruitments'));
+app.use('/api/invitations', require('./routes/invitations'));
 
 // 首页
 app.get('/', (req, res) => {

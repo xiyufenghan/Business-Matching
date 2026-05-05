@@ -755,12 +755,19 @@ router.put('/:id', (req, res) => {
 });
 
 // ========== 单独添加达人 (必须放在 /:id 之前) ==========
+// 可选参数 invite_mode=1：走邀请制（status=pending，生成 invite_code，不设密码）
 router.post('/add', (req, res) => {
   try {
-    let { level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, operator_id, sales_owner_id } = req.body;
-    
+    let { level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, operator_id, sales_owner_id, invite_mode, invited_by } = req.body;
+
     if (!video_account_name) {
       return res.status(400).json({ success: false, error: '视频号账号名称为必填' });
+    }
+
+    // 唯一性：video_account_name 全局唯一
+    const dup = req.db.prepare('SELECT id FROM influencers WHERE video_account_name = ?').get(video_account_name);
+    if (dup) {
+      return res.status(400).json({ success: false, error: '该视频号账号名已存在' });
     }
     
     // 联动：若传了 sales_owner_id，则以管理员当前 name 覆盖 sales_owner 文本
@@ -783,9 +790,15 @@ router.post('/add', (req, res) => {
     }
     
     const id = uuidv4();
+    const isInviteMode = invite_mode === 1 || invite_mode === '1' || invite_mode === true;
+    const inviteCode = isInviteMode ? uuidv4() : null;
+    const inviteStatus = isInviteMode ? 'pending' : 'active';
+    const finalPassword = isInviteMode ? '' : '123456';
+
     req.db.prepare(`
-      INSERT INTO influencers (id, level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, password, operator_id, sales_owner_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO influencers (id, level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, password, operator_id, sales_owner_id,
+        invite_code, invite_status, invited_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, level || '', video_account_name,
       video_category_track || '',
@@ -797,12 +810,13 @@ router.post('/add', (req, res) => {
       live_frequency || '', has_mcn || '否',
       mcn_name || '', region || '',
       has_joined_mutual_select || '否',
-      sales_owner || '', official_account_name || '', '123456',
-      operator_id || null, sales_owner_id || null
+      sales_owner || '', official_account_name || '', finalPassword,
+      operator_id || null, sales_owner_id || null,
+      inviteCode, inviteStatus, invited_by || null
     );
-    
+
     const newInf = req.db.prepare('SELECT * FROM influencers WHERE id = ?').get(id);
-    res.json({ success: true, data: newInf, message: '达人添加成功' });
+    res.status(201).json({ success: true, data: newInf, invite_code: inviteCode });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -843,6 +857,48 @@ router.delete('/:id', (req, res) => {
   try {
     req.db.prepare('DELETE FROM influencers WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '删除成功' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========== 获取邀请链接（pending 状态可用） ==========
+router.get('/:id/invite-code', (req, res) => {
+  try {
+    const inf = req.db.prepare('SELECT id, video_account_name, invite_code, invite_status FROM influencers WHERE id = ?').get(req.params.id);
+    if (!inf) return res.status(404).json({ success: false, error: '达人不存在' });
+    if (inf.invite_status !== 'pending') return res.status(400).json({ success: false, error: '该达人账号已激活，无需邀请' });
+    let code = inf.invite_code;
+    if (!code) {
+      code = uuidv4();
+      req.db.prepare('UPDATE influencers SET invite_code = ? WHERE id = ?').run(code, req.params.id);
+    }
+    res.json({ success: true, data: { code, video_account_name: inf.video_account_name } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========== 停用/启用 达人账号 ==========
+router.put('/:id/invite-status', (req, res) => {
+  try {
+    const { invite_status } = req.body;
+    if (!['active', 'disabled'].includes(invite_status)) {
+      return res.status(400).json({ success: false, error: '只能设为 active 或 disabled' });
+    }
+    req.db.prepare('UPDATE influencers SET invite_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(invite_status, req.params.id);
+    res.json({ success: true, message: invite_status === 'active' ? '已启用' : '已停用' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========== 重置密码 ==========
+router.put('/:id/reset-password', (req, res) => {
+  try {
+    const newPwd = req.body.password || '123456';
+    req.db.prepare('UPDATE influencers SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newPwd, req.params.id);
+    res.json({ success: true, message: `密码已重置为 ${newPwd}` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

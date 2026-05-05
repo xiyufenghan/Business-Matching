@@ -128,6 +128,119 @@ function closeSidebar() {
 }
 
 // ============ 登录与权限 ============
+
+// ============ 激活页（/?activate=CODE） ============
+// 在页面加载时检测 URL 参数，若带 activate=xxx 则显示激活页
+(function initActivateCheck() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('activate');
+  const autoUser = params.get('u');
+  if (code) {
+    // 隐藏登录页，显示激活页
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginPage = document.getElementById('login-page');
+      const activatePage = document.getElementById('activate-page');
+      if (loginPage) loginPage.style.display = 'none';
+      if (activatePage) activatePage.style.display = 'flex';
+      loadActivateInfo(code);
+    });
+    return;
+  }
+  // 非激活场景：若 URL 带 ?u= 则自动预填登录账号输入框（来自激活跳转）
+  if (autoUser) {
+    document.addEventListener('DOMContentLoaded', () => {
+      const inp = document.getElementById('login-username');
+      if (inp) inp.value = autoUser;
+      const pwd = document.getElementById('login-password');
+      if (pwd) pwd.focus();
+    });
+  }
+})();
+
+async function loadActivateInfo(code) {
+  const loadingEl = document.getElementById('activate-loading');
+  const errorEl = document.getElementById('activate-error');
+  const formEl = document.getElementById('activate-form');
+  const subtitle = document.getElementById('activate-subtitle');
+  try {
+    const res = await fetch('/api/invitations/validate?code=' + encodeURIComponent(code));
+    const data = await res.json();
+    if (!data.success) {
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'block';
+      errorEl.textContent = data.error || '邀请链接无效';
+      subtitle.textContent = '请联系邀请人重新获取';
+      return;
+    }
+    // 显示表单
+    loadingEl.style.display = 'none';
+    formEl.style.display = 'block';
+    subtitle.textContent = `您好，${data.data.display_name}`;
+    document.getElementById('activate-verify-label').textContent =
+      data.data.kind === 'merchant' ? '确认公司名称' : '确认视频号账号名';
+    document.getElementById('activate-verify-hint').textContent = data.data.verify_hint || '';
+    // 暂存 code 到 form
+    formEl.dataset.code = code;
+  } catch (e) {
+    loadingEl.style.display = 'none';
+    errorEl.style.display = 'block';
+    errorEl.textContent = '网络错误，请稍后重试';
+  }
+}
+
+async function handleActivate(event) {
+  event.preventDefault();
+  const formEl = document.getElementById('activate-form');
+  const code = formEl.dataset.code;
+  const verifyValue = document.getElementById('activate-verify-value').value.trim();
+  const password = document.getElementById('activate-password').value;
+  const password2 = document.getElementById('activate-password2').value;
+  const errorEl = document.getElementById('activate-form-error');
+
+  if (password !== password2) {
+    errorEl.style.display = 'block';
+    errorEl.textContent = '两次密码输入不一致';
+    return;
+  }
+  if (password.length < 6) {
+    errorEl.style.display = 'block';
+    errorEl.textContent = '密码至少 6 位';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/invitations/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, verify_value: verifyValue, password })
+    });
+    const data = await res.json();
+    if (data.success) {
+      const loginUsername = (data.data && data.data.login_username) || '';
+      const kind = (data.data && data.data.kind) || '';
+      let msg = '账号激活成功！\n\n';
+      if (loginUsername) {
+        if (kind === 'merchant') {
+          msg += `登录账号（手机号）：${loginUsername}\n密码：刚才设置的密码\n\n即将跳转到登录页...`;
+        } else {
+          msg += `登录账号：${loginUsername}\n密码：刚才设置的密码\n\n即将跳转到登录页...`;
+        }
+      } else {
+        msg += '即将跳转到登录页，请使用刚才设置的密码登录。';
+      }
+      alert(msg);
+      // 带上用户名到登录页自动填
+      window.location.href = '/?u=' + encodeURIComponent(loginUsername);
+    } else {
+      errorEl.style.display = 'block';
+      errorEl.textContent = data.error || '激活失败';
+    }
+  } catch (e) {
+    errorEl.style.display = 'block';
+    errorEl.textContent = '网络错误，请稍后重试';
+  }
+}
+
 async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById('login-username').value.trim();
@@ -212,7 +325,7 @@ function updateUserInfo() {
 }
 
 async function checkNotifications() {
-  if (currentUser.role === 'admin') return;
+  if (!currentUser) return;
   const res = await fetchAPI(`/cooperation/notifications/count?user_id=${currentUser.id}&role=${currentUser.role}`);
   if (res.success) {
     notificationCount = res.data.count;
@@ -246,8 +359,7 @@ function renderNavMenu() {
           { id: 'influencer-demands', icon: 'target', label: '达人需求' },
         ]},
         { id: 'business', label: '撮合作业', items: [
-          { id: 'publish', icon: 'edit', label: '发布需求' },
-          { id: 'matchmaking', icon: 'link', label: '合作管理', badge: notificationCount },
+          { id: 'matchmaking', icon: 'link', label: '撮合管理', badge: notificationCount },
         ]},
         { id: 'system', label: '系统管理', items: [
           { id: 'merchant-manage', icon: 'building', label: '商家管理' },
@@ -267,11 +379,11 @@ function renderNavMenu() {
           { id: 'influencer-demands', icon: 'target', label: '达人需求' },
         ]},
         { id: 'business', label: '撮合作业', items: [
-          { id: 'publish', icon: 'edit', label: '发布需求' },
-          { id: 'matchmaking', icon: 'link', label: '合作管理', badge: notificationCount },
+          { id: 'matchmaking', icon: 'link', label: '撮合管理', badge: notificationCount },
         ]},
         { id: 'system', label: '系统管理', items: [
           { id: 'merchant-manage', icon: 'building', label: '商家管理' },
+          { id: 'influencer-manage', icon: 'star', label: '达人管理' },
         ]},
       ];
     }
@@ -287,7 +399,6 @@ function renderNavMenu() {
       { id: 'business', label: '我的货盘', items: [
         { id: 'merchant-demands', icon: 'store', label: '我的需求' },
         { id: 'merchant-recruitments', icon: 'megaphone', label: '我的招募' },
-        { id: 'publish', icon: 'edit', label: '发布需求' },
       ]},
       { id: 'cooperation', label: '合作管理', items: [
         { id: 'matchmaking', icon: 'link', label: '合作管理', badge: notificationCount },
@@ -305,7 +416,6 @@ function renderNavMenu() {
       ]},
       { id: 'business', label: '我的需求', items: [
         { id: 'influencer-demands', icon: 'target', label: '我的需求' },
-        { id: 'publish', icon: 'edit', label: '发布需求' },
       ]},
     ];
   }
@@ -358,7 +468,6 @@ function navigateTo(page, isBack = false) {
     case 'influencer-demands': renderInfluencerDemands(); break;
     case 'merchant-recruitments': renderMerchantRecruitments(); break;
     case 'influencer-plaza': renderInfluencerPlaza(); break;
-    case 'publish': renderPublish(); break;
     case 'matchmaking': renderMatchmaking(); break;
     case 'profile': renderProfile(); break;
     case 'merchant-manage': renderMerchantManage(); break;
@@ -986,6 +1095,8 @@ async function renderMerchantDemands(page = 1, pageSize = 20) {
     <!-- 工具栏：视图切换 + 筛选/清空 -->
     <div class="md-toolbar">
       <div class="md-toolbar-left">
+        ${currentUser.role !== 'influencer' ? `<button class="btn btn-sm btn-success" onclick="showPublishGoodsModal()">+ 发布货品</button>` : ''}
+        ${(currentUser.role === 'admin') ? `<button class="btn btn-sm btn-outline" onclick="showImportGoodsModal()">Excel 导入</button>` : ''}
         ${!isInfluencer ? `<button class="btn btn-sm ${mdFilterPanelOpen?'btn-primary':'btn-outline'}" onclick="toggleMdFilter()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           筛选${getActiveFilterCount() > 0 ? ' ('+getActiveFilterCount()+')' : ''}
@@ -1828,6 +1939,7 @@ async function renderMerchantRecruitments(page = 1, pageSize = 20) {
     <!-- 工具栏 -->
     <div class="md-toolbar">
       <div class="md-toolbar-left">
+        ${currentUser.role !== 'influencer' ? `<button class="btn btn-sm btn-success" onclick="showPublishRecruitmentModal()">+ 发布招募</button>` : ''}
         <button class="btn btn-sm ${mrFilterPanelOpen?'btn-primary':'btn-outline'}" onclick="toggleMrFilter()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
           筛选${activeCount > 0 ? ' ('+activeCount+')' : ''}
@@ -2804,11 +2916,12 @@ async function showAddInfluencerModal() {
   // 获取销售列表
   const salesRes = await fetchAPI('/admins/sales-list');
   const salesList = salesRes.data || [];
-  
+  const isSalesAdmin = currentUser.role === 'admin' && !currentUser.is_super && currentUser.admin_role === '销售';
+
   const modal = document.getElementById('modal-overlay');
   modal.innerHTML = `
     <div class="modal">
-      <div class="modal-header"><h3>添加达人</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+      <div class="modal-header"><h3>邀请达人</h3><button class="modal-close" onclick="closeModal()">×</button></div>
       <div class="modal-body">
         <form onsubmit="submitAddInfluencer(event)">
           <div class="form-row">
@@ -2841,18 +2954,26 @@ async function showAddInfluencerModal() {
           </div>
           <div class="form-row">
             <div class="form-group"><label>是否入驻互选</label><select id="add-inf-mutual"><option value="是">是</option><option value="否">否</option></select></div>
-            <div class="form-group"><label>归属销售（文本）</label><input id="add-inf-sales" placeholder="负责销售名称"></div>
+            <div class="form-group"><label>公众号账号名称</label><input id="add-inf-official" placeholder="公众号名称"></div>
           </div>
-          <div class="form-group">
-            <label>归属销售（系统关联，非必填）</label>
-            <select id="add-inf-sales-owner-id">
-              <option value="">-- 不设置 --</option>
-              ${salesList.map(s => `<option value="${s.id}">${s.name} (@${s.username})</option>`).join('')}
-            </select>
-            <p style="font-size:11px;color:var(--gray-400);margin-top:4px">设置后，对应销售登录可看到此达人信息</p>
+          ${isSalesAdmin ? `
+            <div class="info-box" style="padding:10px 12px;background:#ecfdf5;border-radius:6px;font-size:12px;color:#15803d;margin-bottom:10px">
+               邀请后将自动归属到你（${currentUser.name}）名下
+            </div>
+          ` : `
+            <div class="form-group">
+              <label>归属销售（系统关联，非必填）</label>
+              <select id="add-inf-sales-owner-id">
+                <option value="">-- 不设置 --</option>
+                ${salesList.map(s => `<option value="${s.id}">${s.name} (@${s.username})</option>`).join('')}
+              </select>
+              <p style="font-size:11px;color:var(--gray-400);margin-top:4px">设置后，对应销售登录可看到此达人信息</p>
+            </div>
+          `}
+          <div class="info-box" style="padding:10px 12px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e;margin-bottom:10px">
+            邀请后系统会生成专属邀请链接，将链接发给达人，对方打开链接设置密码即可激活账号
           </div>
-          <div class="form-group"><label>公众号账号名称</label><input id="add-inf-official" placeholder="公众号名称"></div>
-          <button type="submit" class="btn btn-primary btn-block">V 确认添加</button>
+          <button type="submit" class="btn btn-primary btn-block">确认邀请</button>
         </form>
       </div>
     </div>`;
@@ -2862,6 +2983,7 @@ async function showAddInfluencerModal() {
 // 提交添加单个达人
 async function submitAddInfluencer(e) {
   e.preventDefault();
+  const isSalesAdmin = currentUser.role === 'admin' && !currentUser.is_super && currentUser.admin_role === '销售';
   const data = {
     level: document.getElementById('add-inf-level').value,
     video_account_name: document.getElementById('add-inf-name').value,
@@ -2878,19 +3000,26 @@ async function submitAddInfluencer(e) {
     has_mcn: document.getElementById('add-inf-mcn').value,
     mcn_name: document.getElementById('add-inf-mcn-name').value,
     has_joined_mutual_select: document.getElementById('add-inf-mutual').value,
-    sales_owner: document.getElementById('add-inf-sales').value,
     official_account_name: document.getElementById('add-inf-official').value,
-    sales_owner_id: document.getElementById('add-inf-sales-owner-id')?.value || '',
+    // 销售普管 → 自动归属自己；超管 → 允许选择
+    sales_owner_id: isSalesAdmin ? currentUser.id : (document.getElementById('add-inf-sales-owner-id')?.value || ''),
+    invite_mode: 1,
+    invited_by: currentUser.id
   };
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
-  
+
   const res = await fetchAPI('/influencers/add', { method: 'POST', body: JSON.stringify(data) });
   if (res.success) {
-    showToast('达人添加成功！');
     closeModal();
     const currentModule = document.getElementById('page-container')?.getAttribute('data-module');
     if (currentModule === 'influencer-manage') renderInfluencerManage();
     else renderInfluencerPlaza();
+    // 显示邀请链接弹窗
+    if (res.invite_code) {
+      showInviteLinkModal(res.invite_code, data.video_account_name);
+    } else {
+      showToast('达人已添加');
+    }
   } else {
     showToast(res.error || '添加失败', 'error');
   }
@@ -3167,6 +3296,192 @@ async function loadPubLinkableDemands() {
   } catch (e) { /* ignore */ }
 }
 
+// 发布成功后的统一处理：在 modal 内显示成功提示 + 继续添加/完成 按钮
+function onPublishSuccess(form, refreshFn, label) {
+  // 静默刷新背后的列表
+  if (typeof refreshFn === 'function') {
+    try { refreshFn(); } catch (e) { /* ignore */ }
+  }
+  showToast(`${label}发布成功`);
+  // 替换 modal body 为成功提示 + 操作按钮
+  const modalBody = document.querySelector('#modal-overlay .modal-body');
+  const modalFooter = document.querySelector('#modal-overlay .modal-footer');
+  if (modalBody) {
+    modalBody.innerHTML = `
+      <div style="text-align:center;padding:32px 16px">
+        <div style="font-size:48px;color:#16a34a;line-height:1">✓</div>
+        <div style="font-size:18px;font-weight:600;color:#1e293b;margin-top:12px">${label}发布成功</div>
+        <div style="font-size:13px;color:#94a3b8;margin-top:6px">已自动加入到列表，可继续添加或关闭</div>
+      </div>`;
+  }
+  if (modalFooter) {
+    modalFooter.innerHTML = `
+      <button class="btn btn-outline" onclick="closeModal()">完成</button>
+      <button class="btn btn-primary" onclick="onPublishContinue()">继续添加</button>`;
+  }
+}
+
+// 重新打开同一种发布弹窗（"继续添加"按钮）
+function onPublishContinue() {
+  const opener = window._currentPublishOpener;
+  closeModal();
+  if (typeof opener === 'function') {
+    setTimeout(() => opener(), 100);
+  }
+}
+
+// 工具：把 render*Form 返回的整页 HTML 提取为 modal-friendly 的 form 内容
+// - 去掉外层 card 包装
+// - 去掉表单底部的 submit button
+function extractFormForModal(fullHtml) {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = fullHtml;
+  // 找到 form 元素
+  const form = wrap.querySelector('form');
+  if (!form) return fullHtml;
+  // 移除 form 内的 type=submit / btn-block 按钮
+  form.querySelectorAll('button[type="submit"], .btn-block').forEach(b => b.remove());
+  // 同时移除 publisher-info-bar（modal 标题已经体现"为谁发布"）
+  form.querySelectorAll('.publisher-info-bar').forEach(b => b.remove());
+  return form.outerHTML;
+}
+
+// ========== 商家货盘 - 发布货品 modal（图书/课程双 tab） ==========
+let _publishGoodsType = 'book'; // 'book' | 'course'
+
+function showPublishGoodsModal(type) {
+  if (currentUser.role === 'influencer') return;
+  _publishGoodsType = type || _publishGoodsType || 'book';
+
+  // 缓存"重新打开"回调（用于 继续添加）
+  window._currentPublishOpener = () => showPublishGoodsModal(_publishGoodsType);
+
+  const subtitle = currentUser.role === 'merchant'
+    ? `<span style="color:#94a3b8;font-size:12px">发布到「${currentUser.company || currentUser.name}」的货盘</span>`
+    : (currentUser.role === 'admin' ? `<span style="color:#94a3b8;font-size:12px">管理员代发</span>` : '');
+
+  // 顶部 tab 切换 + 表单内容
+  const formHtml = _publishGoodsType === 'book'
+    ? extractFormForModal(renderBookForm())
+    : extractFormForModal(renderCourseForm());
+
+  const body = `
+    <div style="margin-bottom:14px">${subtitle}</div>
+    <div class="publish-tabs" style="margin-bottom:14px">
+      <button class="tab-btn ${_publishGoodsType==='book'?'active':''}" onclick="switchPublishGoodsTab('book')">图书货品</button>
+      <button class="tab-btn ${_publishGoodsType==='course'?'active':''}" onclick="switchPublishGoodsTab('course')">课程货品</button>
+    </div>
+    <div id="publish-goods-form-content">${formHtml}</div>
+  `;
+  const footer = `
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="submitPublishGoodsFromModal()">发布</button>
+  `;
+  openModal(_publishGoodsType === 'book' ? '发布图书货品' : '发布课程货品', body, footer);
+}
+
+function switchPublishGoodsTab(type) {
+  _publishGoodsType = type;
+  // 重渲染表单内容（保留外层 modal）
+  const content = document.getElementById('publish-goods-form-content');
+  if (!content) return;
+  content.innerHTML = type === 'book'
+    ? extractFormForModal(renderBookForm())
+    : extractFormForModal(renderCourseForm());
+  // 切换 tab 高亮
+  document.querySelectorAll('#modal-overlay .tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#modal-overlay .tab-btn').forEach(b => {
+    if (b.textContent.includes(type === 'book' ? '图书' : '课程')) b.classList.add('active');
+  });
+  // 标题
+  const title = document.getElementById('modal-title');
+  if (title) title.textContent = type === 'book' ? '发布图书货品' : '发布课程货品';
+}
+
+function submitPublishGoodsFromModal() {
+  const form = document.querySelector('#modal-overlay form');
+  if (!form) return;
+  // 触发 form 的 submit 事件（form 上已绑定 onsubmit="submitBookDemand(event)" 或 submitCourseDemand）
+  if (typeof form.requestSubmit === 'function') form.requestSubmit();
+  else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+}
+
+// ========== 商家货盘 - Excel 导入 modal ==========
+function showImportGoodsModal() {
+  if (currentUser.role !== 'admin') return;
+  window._currentPublishOpener = () => showImportGoodsModal();
+  const body = `
+    <div style="margin-bottom:14px;font-size:13px;color:#475569">
+      支持图书需求 / 课程需求 / 达人信息 三种类型批量导入
+    </div>
+    ${renderExcelImport()}
+  `;
+  const footer = `<button class="btn btn-outline" onclick="closeModal()">关闭</button>`;
+  openModal('Excel 批量导入', body, footer);
+}
+
+// ========== 商家需求 - 发布招募 modal ==========
+function showPublishRecruitmentModal() {
+  if (currentUser.role === 'influencer') {
+    showToast('达人无法发布招募需求', 'error'); return;
+  }
+  window._currentPublishOpener = () => showPublishRecruitmentModal();
+
+  const subtitle = currentUser.role === 'merchant'
+    ? `<span style="color:#94a3b8;font-size:12px">为「${currentUser.company || currentUser.name}」发布招募</span>`
+    : `<span style="color:#94a3b8;font-size:12px">管理员代发招募</span>`;
+
+  const body = `
+    <div style="margin-bottom:14px">${subtitle}</div>
+    ${extractFormForModal(renderRecruitmentForm())}
+  `;
+  const footer = `
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="submitFromModal()">发布招募</button>
+  `;
+  openModal('发布商家招募需求', body, footer);
+
+  // 异步加载关联数据（货盘 + 商家选项）
+  if (currentUser.role === 'merchant' || currentUser.role === 'admin') {
+    setTimeout(() => loadPubLinkableDemands(), 50);
+  }
+}
+
+// ========== 达人需求 - 发布需求 modal ==========
+function showPublishInfluencerDemandModal() {
+  if (currentUser.role === 'merchant') {
+    showToast('商家无法发布达人需求', 'error'); return;
+  }
+  window._currentPublishOpener = () => showPublishInfluencerDemandModal();
+
+  const subtitle = currentUser.role === 'influencer'
+    ? `<span style="color:#94a3b8;font-size:12px">发布我的需求</span>`
+    : `<span style="color:#94a3b8;font-size:12px">管理员代发达人需求</span>`;
+
+  const body = `
+    <div style="margin-bottom:14px">${subtitle}</div>
+    ${extractFormForModal(renderInfluencerDemandForm())}
+  `;
+  const footer = `
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="submitFromModal()">发布</button>
+  `;
+  openModal('发布达人需求', body, footer);
+
+  // 管理员代发：异步加载达人候选
+  if (currentUser.role === 'admin') {
+    setTimeout(() => loadPubInfluencerOptions(), 50);
+  }
+}
+
+// 通用：触发 modal 内 form 的 submit 事件
+function submitFromModal() {
+  const form = document.querySelector('#modal-overlay form');
+  if (!form) return;
+  if (typeof form.requestSubmit === 'function') form.requestSubmit();
+  else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+}
+
 async function submitRecruitment(e) {
   e.preventDefault();
   const merchantId = document.getElementById('pub-mr-merchant-id').value;
@@ -3194,9 +3509,10 @@ async function submitRecruitment(e) {
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
   const res = await fetchAPI('/recruitments', { method: 'POST', body: JSON.stringify(data) });
   if (res.success) {
-    showToast('招募需求发布成功，正在跳转到列表...');
-    e.target.reset();
-    setTimeout(() => navigateTo('merchant-recruitments'), 800);
+    onPublishSuccess(e.target, () => {
+      const m = document.getElementById('page-container')?.getAttribute('data-module');
+      if (m === 'merchant-recruitments') renderMerchantRecruitments();
+    }, '招募需求');
   } else {
     showToast(res.error || '发布失败', 'error');
   }
@@ -3345,9 +3661,10 @@ async function submitBookDemand(e) {
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
   const res = await fetchAPI('/demands/book', { method: 'POST', body: JSON.stringify(data) });
   if (res.success) {
-    showToast('图书需求发布成功，正在跳转到列表...');
-    e.target.reset();
-    setTimeout(() => navigateTo('merchant-demands'), 800);
+    onPublishSuccess(e.target, () => {
+      const m = document.getElementById('page-container')?.getAttribute('data-module');
+      if (m === 'merchant-demands') renderMerchantDemands();
+    }, '图书货品');
   } else {
     showToast(res.error || '发布失败', 'error');
   }
@@ -3372,9 +3689,10 @@ async function submitCourseDemand(e) {
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
   const res = await fetchAPI('/demands/course', { method: 'POST', body: JSON.stringify(data) });
   if (res.success) {
-    showToast('课程需求发布成功，正在跳转到列表...');
-    e.target.reset();
-    setTimeout(() => navigateTo('merchant-demands'), 800);
+    onPublishSuccess(e.target, () => {
+      const m = document.getElementById('page-container')?.getAttribute('data-module');
+      if (m === 'merchant-demands') renderMerchantDemands();
+    }, '课程货品');
   } else {
     showToast(res.error || '发布失败', 'error');
   }
@@ -3411,9 +3729,10 @@ async function submitInfluencerDemand(e) {
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
   const res = await fetchAPI('/demands/influencer-demands', { method: 'POST', body: JSON.stringify(data) });
   if (res.success) {
-    showToast('达人需求发布成功，正在跳转到列表...');
-    e.target.reset();
-    setTimeout(() => navigateTo('influencer-demands'), 800);
+    onPublishSuccess(e.target, () => {
+      const m = document.getElementById('page-container')?.getAttribute('data-module');
+      if (m === 'influencer-demands') renderInfluencerDemands();
+    }, '达人需求');
   } else {
     showToast(res.error || '发布失败', 'error');
   }
@@ -3469,20 +3788,37 @@ async function handleExcelUpload(e) {
 }
 
 // ============ 合作管理（管理员） ============
+let mmSourceType = ''; // '' / '手动创建' / '邀约转化' / '申请转化'
+let mmOnlyUpgrade = false; // 仅看升级佣金高于原佣金的撮合
+
 async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = '') {
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
-  
+
+  const baseQuery = getOperatorFilter();
+  const stTail = mmSourceType ? `&source_type=${encodeURIComponent(mmSourceType)}` : '';
+  const upTail = mmOnlyUpgrade ? '&only_upgrade=1' : '';
+  // 拼 stats query
+  const statsQs = [];
+  if (baseQuery) statsQs.push(baseQuery.substring(1));
+  if (stTail) statsQs.push(stTail.substring(1));
+  if (upTail) statsQs.push(upTail.substring(1));
+  const statsUrl = '/cooperation/matchmaking/stats' + (statsQs.length ? '?' + statsQs.join('&') : '');
+
   const [statsRes, listRes] = await Promise.all([
-    fetchAPI('/cooperation/matchmaking/stats' + (getOperatorFilter() ? '?' + getOperatorFilter().substring(1) : '')),
-    fetchAPI(`/cooperation/matchmaking?page=${page}&pageSize=${pageSize}${stage ? '&stage=' + encodeURIComponent(stage) : ''}${keyword ? '&keyword=' + encodeURIComponent(keyword) : ''}${getOperatorFilter()}`)
+    fetchAPI(statsUrl),
+    fetchAPI(`/cooperation/matchmaking?page=${page}&pageSize=${pageSize}${stage ? '&stage=' + encodeURIComponent(stage) : ''}${keyword ? '&keyword=' + encodeURIComponent(keyword) : ''}${stTail}${upTail}${baseQuery}`)
   ]);
-  
+
   const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
   const stageStats = statsRes.success ? statsRes.data.stages : [];
   const getStageCount = (s) => { const found = stageStats.find(x => x.stage === s); return found ? found.count : 0; };
   const totalCount = statsRes.success ? statsRes.data.total : 0;
-  
+  const totalGmv = statsRes.success ? (statsRes.data.totalGmv || 0) : 0;
+  const dealCount = statsRes.success ? (statsRes.data.dealCount || 0) : 0;
+  const sourceTypeStats = statsRes.success ? (statsRes.data.sourceTypes || []) : [];
+  const stCount = (t) => { const f = sourceTypeStats.find(x => x.source_type === t); return f ? f.count : 0; };
+
   // 按环节分组数据
   const groupedData = {};
   stages.forEach(s => { groupedData[s] = []; });
@@ -3492,21 +3828,56 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
       else groupedData['需求发布'].push(mm);
     });
   }
-  
+
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
-      <h2>合作管理</h2>
+      <h2>撮合管理</h2>
       <div style="display:flex;gap:8px;align-items:center">
-        <span style="font-size:13px;color:var(--gray-500)">共 ${totalCount} 条记录</span>
-        <button class="btn btn-primary" onclick="showCreateMatchmaking()">+ 新建合作</button>
+        <span style="font-size:13px;color:var(--gray-500)">共 ${totalCount} 条</span>
+        <button class="btn btn-primary" onclick="showCreateMatchmaking()">+ 新建撮合</button>
+      </div>
+    </div>
+    <div class="mm-summary">
+      <div class="mm-summary-item">
+        <div class="mm-summary-label">累计成交 GMV</div>
+        <div class="mm-summary-value mm-summary-gmv">¥${formatNumber(totalGmv)}</div>
+        <div class="mm-summary-sub">来自 ${dealCount} 单「开始合作」</div>
+      </div>
+      <div class="mm-summary-item">
+        <div class="mm-summary-label">合作匹配（待跟进）</div>
+        <div class="mm-summary-value" style="color:#f59e0b">${getStageCount('合作匹配')}</div>
+        <div class="mm-summary-sub">需运营尽快推进</div>
+      </div>
+      <div class="mm-summary-item">
+        <div class="mm-summary-label">样品寄送中</div>
+        <div class="mm-summary-value" style="color:#6366f1">${getStageCount('样品寄送')}</div>
+        <div class="mm-summary-sub">寄出待确认</div>
+      </div>
+      <div class="mm-summary-item">
+        <div class="mm-summary-label">开始合作</div>
+        <div class="mm-summary-value" style="color:#10b981">${getStageCount('开始合作')}</div>
+        <div class="mm-summary-sub">已落地</div>
       </div>
     </div>
     <div class="search-filter-bar">
-      <input type="text" id="mm-search" placeholder="搜索撮合记录..." value="${keyword}" onkeypress="if(event.key==='Enter')searchMatchmaking()">
+      <input type="text" id="mm-search" placeholder="搜索：商家/达人/需求/商品名..." value="${keyword}" onkeypress="if(event.key==='Enter')searchMatchmaking()">
       <button class="btn btn-primary btn-sm" onclick="searchMatchmaking()">搜索</button>
-      ${stage ? `<button class="btn btn-outline btn-sm" onclick="filterMatchmakingByStage('')">查看全部</button>` : `<span style="font-size:12px;color:var(--gray-400);margin-left:8px"> 点击环节标题可单独查看该环节</span>`}
+      ${stage ? `<button class="btn btn-outline btn-sm" onclick="filterMatchmakingByStage('')">查看全部环节</button>` : ''}
+      <span class="mm-chip-group">
+        <span class="mm-chip-label">来源：</span>
+        <button class="mm-chip ${mmSourceType === '' ? 'active' : ''}" onclick="filterMatchmakingBySourceType('')">全部 ${totalCount}</button>
+        <button class="mm-chip mm-chip-manual ${mmSourceType === '手动创建' ? 'active' : ''}" onclick="filterMatchmakingBySourceType('手动创建')">手动 ${stCount('手动创建')}</button>
+        <button class="mm-chip mm-chip-invite ${mmSourceType === '邀约转化' ? 'active' : ''}" onclick="filterMatchmakingBySourceType('邀约转化')">邀约转化 ${stCount('邀约转化')}</button>
+        <button class="mm-chip mm-chip-apply ${mmSourceType === '申请转化' ? 'active' : ''}" onclick="filterMatchmakingBySourceType('申请转化')">申请转化 ${stCount('申请转化')}</button>
+      </span>
+      <span class="mm-chip-group">
+        <button class="mm-chip mm-chip-upgrade ${mmOnlyUpgrade ? 'active' : ''}" onclick="toggleMatchmakingUpgradeOnly()" title="仅看升级佣金>原佣金的高佣金合作">
+          ⬆ 仅看升级佣金${mmOnlyUpgrade ? ' ✓' : ''}
+        </button>
+      </span>
     </div>
+    ${stage || mmSourceType ? '' : '<div class="mm-tip"> 点击环节标题可单独查看该环节</div>'}
     <div class="matchmaking-kanban">
       ${stages.map((s, idx) => {
         const stageItems = stage ? (s === stage ? groupedData[s] : []) : groupedData[s];
@@ -3515,7 +3886,7 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
         const stageIcon = ['', '~', 'D', '^'][idx];
         const stageColor = ['#3b82f6', '#f59e0b', '#6366f1', '#10b981'][idx];
         const stageBgLight = ['#eff6ff', '#fffbeb', '#eef2ff', '#ecfdf5'][idx];
-        
+
         return `
           <div class="kanban-column ${isFiltered ? 'kanban-column-dim' : ''} ${isActive ? 'kanban-column-active' : ''}" data-stage="${s}">
             <div class="kanban-column-header" style="background:linear-gradient(135deg, ${stageColor}, ${stageColor}dd);" onclick="filterMatchmakingByStage('${isActive ? '' : s}')">
@@ -3526,7 +3897,7 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
               <span class="kanban-col-count">${getStageCount(s)}</span>
             </div>
             <div class="kanban-column-body" style="background:${stageBgLight}">
-              ${stageItems.length === 0 ? 
+              ${stageItems.length === 0 ?
                 `<div class="kanban-empty">
                   <div class="kanban-empty-icon">${stageIcon}</div>
                   <div class="kanban-empty-text">暂无「${s}」记录</div>
@@ -3541,25 +3912,64 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
 }
 
 // 看板列中的紧凑卡片
+// 来源类型徽标：邀约转化(蓝)/申请转化(紫)/手动创建(灰)
+function renderSourceTypeBadge(sourceType, sourceLabel) {
+  const t = sourceType || '手动创建';
+  const label = sourceLabel || t;
+  let cls = 'kanban-source kanban-source-manual';
+  if (t === '邀约转化') cls = 'kanban-source kanban-source-invite';
+  else if (t === '申请转化') cls = 'kanban-source kanban-source-apply';
+  return `<span class="${cls}" title="撮合来源：${label}">${label}</span>`;
+}
+
+// 升级佣金"⬆ 升级"胶囊（hover 显示自定义 tooltip）
+function renderUpgradeBadge(commissionRate, upgradeRate) {
+  const cr = commissionRate != null && commissionRate !== '' ? parseFloat(commissionRate) : null;
+  const ucr = upgradeRate != null && upgradeRate !== '' ? parseFloat(upgradeRate) : null;
+  if (cr == null || ucr == null || isNaN(cr) || isNaN(ucr) || ucr <= cr) return '';
+  const diff = +(ucr - cr).toFixed(2);
+  // 用内联 onmouseenter/onmouseleave 直接控制，不走事件代理，最稳
+  return `<span class="upgrade-star" onmouseenter="showUpgradeTip(this)" onmouseleave="hideUpgradeTip(this)">⬆ 升级<span class="upgrade-tip">达人佣金已升级<br>原 ${formatPercent(cr)} → 升级 ${formatPercent(ucr)}（+${diff}%）<br>结算请按升级佣金率核算</span></span>`;
+}
+
+function showUpgradeTip(star) {
+  // 关键：tooltip 必须挂在 document.body 顶层，彻底脱离任何祖先 transform/overflow:hidden 的束缚
+  // （父级 .kanban-column :hover 有 transform，会让 fixed 元素相对它定位；overflow:hidden 还会裁切）
+  let tip = star.__tipEl;
+  if (!tip) {
+    // 第一次：从 star 内部把 tip 摘出来挂到 body
+    tip = star.querySelector('.upgrade-tip');
+    if (!tip) return;
+    document.body.appendChild(tip);
+    star.__tipEl = tip;
+  }
+  const rect = star.getBoundingClientRect();
+  tip.style.left = (rect.left + rect.width / 2) + 'px';
+  tip.style.top = (rect.top - 8) + 'px';
+  tip.classList.add('is-visible');
+}
+function hideUpgradeTip(star) {
+  if (star.__tipEl) star.__tipEl.classList.remove('is-visible');
+}
+
 function renderKanbanMatchmakingCard(mm, stageColor) {
-  // 升级佣金大于原佣金时触发红色五角星标签
-  const _cr = mm.commission_rate != null && mm.commission_rate !== '' ? parseFloat(mm.commission_rate) : null;
-  const _ucr = mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? parseFloat(mm.upgrade_commission_rate) : null;
-  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr> _cr;
+  const upgradeBadge = renderUpgradeBadge(mm.commission_rate, mm.upgrade_commission_rate);
+  const hasUpgrade = !!upgradeBadge;
   
   return `
     <div class="kanban-card" data-id="${mm.id}" style="border-top:3px solid ${stageColor}">
       <div class="kanban-card-header">
         <div class="kanban-card-parties">
-          ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)}> 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
+          ${upgradeBadge}
           <div class="kanban-party kanban-merchant" title="${mm.merchant_company || mm.merchant_name || ''}">${mm.merchant_company || mm.merchant_name || '未知商家'}</div>
           <div class="kanban-arrow-down">⬇</div>
           <div class="kanban-party kanban-influencer" title="${mm.video_account_name || ''}">I ${mm.video_account_name || '未知达人'}</div>
         </div>
       </div>
-      ${mm.product_name ? `
+      ${(mm.product_name || mm.demand_title) ? `
       <div class="kanban-card-product">
-        <div class="kanban-product-name" title="${mm.product_name}"> ${mm.product_name}</div>
+        ${mm.demand_kind ? `<span class="kanban-demand-kind">${mm.demand_kind}</span>` : ''}
+        <div class="kanban-product-name" title="${mm.product_name || mm.demand_title}">${mm.product_name || mm.demand_title}</div>
         ${mm.stage === '开始合作' && mm.order_count != null && mm.order_count !== '' ? `
         <div class="kanban-product-meta">
           <span>D ${mm.order_count}单</span>
@@ -3574,11 +3984,11 @@ function renderKanbanMatchmakingCard(mm, stageColor) {
       <div class="kanban-card-commission">
         ${mm.cooperation_mode ? `<span class="kanban-tag">${mm.cooperation_mode}</span>` : ''}
         ${mm.commission_rate != null && mm.commission_rate !== '' ? `<span class="kanban-tag kanban-tag-rate">佣金 ${formatPercent(mm.commission_rate)}</span>` : ''}
-        ${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? `<span class="kanban-tag ${hasUpgrade ? 'kanban-tag-upgrade' : 'kanban-tag-rate'}">${hasUpgrade ? '⭐ ' : ''}升级 ${formatPercent(mm.upgrade_commission_rate)}</span>` : ''}
+        ${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? `<span class="kanban-tag ${hasUpgrade ? 'kanban-tag-upgrade' : 'kanban-tag-rate'}">${hasUpgrade ? '⬆ ' : ''}升级 ${formatPercent(mm.upgrade_commission_rate)}</span>` : ''}
       </div>` : ''}
       <div class="kanban-card-footer">
         <span class="kanban-date">${formatDate(mm.matchmaking_time || mm.created_at)}</span>
-        ${mm.source ? `<span class="kanban-source">${mm.source}</span>` : ''}
+        ${renderSourceTypeBadge(mm.source_type, mm.source)}
       </div>
       <div class="kanban-card-actions">
         <button class="btn-tiny btn-tiny-view" onclick="viewMatchmakingDetail('${mm.id}')">详情</button>
@@ -3592,10 +4002,8 @@ function renderKanbanMatchmakingCard(mm, stageColor) {
 function renderVerticalMatchmakingCard(mm, stageColor) {
   const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
   const currentIdx = stages.indexOf(mm.stage);
-  // 升级佣金大于原佣金时触发红色五角星标签
-  const _cr = mm.commission_rate != null && mm.commission_rate !== '' ? parseFloat(mm.commission_rate) : null;
-  const _ucr = mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? parseFloat(mm.upgrade_commission_rate) : null;
-  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr> _cr;
+  const upgradeBadge = renderUpgradeBadge(mm.commission_rate, mm.upgrade_commission_rate);
+  const hasUpgrade = !!upgradeBadge;
   
   return `
     <div class="matchmaking-vcard" data-id="${mm.id}">
@@ -3607,7 +4015,7 @@ function renderVerticalMatchmakingCard(mm, stageColor) {
       <div class="matchmaking-vcard-content">
         <div class="vcard-header">
           <div class="vcard-parties">
-            ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)}> 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
+            ${upgradeBadge}
             <span class="vcard-merchant">${mm.merchant_company || mm.merchant_name || '未知商家'}</span>
             <span class="vcard-arrow">⟷</span>
             <span class="vcard-influencer">I ${mm.video_account_name || '未知达人'}</span>
@@ -3626,7 +4034,7 @@ function renderVerticalMatchmakingCard(mm, stageColor) {
           ${mm.order_count != null && mm.order_count !== '' ? `<div class="vcard-detail-item"><span class="detail-label">D 订单量</span><span class="detail-value">${mm.order_count}</span></div>` : ''}
           ${mm.cooperation_mode ? `<div class="vcard-detail-item"><span class="detail-label">~ 合作模式</span><span class="detail-value">${mm.cooperation_mode}</span></div>` : ''}
           ${mm.commission_rate != null && mm.commission_rate !== '' ? `<div class="vcard-detail-item"><span class="detail-label"> 佣金率</span><span class="detail-value">${formatPercent(mm.commission_rate)}</span></div>` : ''}
-          ${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? `<div class="vcard-detail-item"><span class="detail-label">${hasUpgrade ? '⭐ 升级佣金' : ' 升级佣金'}</span><span class="detail-value" style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${formatPercent(mm.upgrade_commission_rate)}</span></div>` : ''}
+          ${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? `<div class="vcard-detail-item"><span class="detail-label">${hasUpgrade ? '⬆ 升级佣金' : '升级佣金'}</span><span class="detail-value" style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${formatPercent(mm.upgrade_commission_rate)}</span></div>` : ''}
           ${mm.gmv != null && mm.gmv !== '' ? `<div class="vcard-detail-item"><span class="detail-label">% GMV</span><span class="detail-value">¥${mm.gmv}</span></div>` : ''}
           ${mm.matchmaking_time ? `<div class="vcard-detail-item"><span class="detail-label">⏰ 撮合时间</span><span class="detail-value">${formatDate(mm.matchmaking_time)}</span></div>` : ''}
           <div class="vcard-detail-item"><span class="detail-label">备注</span><span class="detail-value">${mm.notes || '-'}</span></div>
@@ -3646,25 +4054,32 @@ function renderVerticalMatchmakingCard(mm, stageColor) {
 function filterMatchmakingByStage(stage) { renderMatchmaking(1, 20, stage, ''); }
 function searchMatchmaking() { renderMatchmaking(1, 20, '', document.getElementById('mm-search').value); }
 function pageMatchmaking(page, pageSize) { renderMatchmaking(page, pageSize || 20); }
+function filterMatchmakingBySourceType(t) { mmSourceType = t; renderMatchmaking(1, 20, '', ''); }
+function toggleMatchmakingUpgradeOnly() { mmOnlyUpgrade = !mmOnlyUpgrade; renderMatchmaking(1, 20, '', ''); }
 
 async function viewMatchmakingDetail(id) {
   const res = await fetchAPI(`/cooperation/matchmaking/${id}`);
   if (!res.success) { showToast('获取详情失败', 'error'); return; }
   const mm = res.data;
   const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
-  const _cr = mm.commission_rate != null && mm.commission_rate !== '' ? parseFloat(mm.commission_rate) : null;
-  const _ucr = mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? parseFloat(mm.upgrade_commission_rate) : null;
-  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr> _cr;
+  const upgradeBadge = renderUpgradeBadge(mm.commission_rate, mm.upgrade_commission_rate);
+  const hasUpgrade = !!upgradeBadge;
   
   openModal('撮合详情', `
     <div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)}> 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        ${upgradeBadge}
         ${getStageBadge(mm.stage)}
+        ${renderSourceTypeBadge(mm.source_type, mm.source)}
         <strong>${mm.merchant_company || mm.merchant_name || ''}</strong> ⟷ <strong style="color:var(--primary-600)">${mm.video_account_name || ''}</strong>
       </div>
+      ${mm.cooperation ? `
+      <div style="margin-bottom:12px;padding:10px 12px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:6px;font-size:12px">
+        <div style="font-weight:600;color:#92400e;margin-bottom:4px">原始${mm.cooperation.initiative === 'merchant' ? '商家邀约' : '达人申请'}（${formatDate(mm.cooperation.created_at)}）</div>
+        <div style="color:#78350f">${mm.cooperation.message ? `留言："${mm.cooperation.message}"` : '无留言'} · 状态：${mm.cooperation.status === 'confirmed' ? '已确认' : mm.cooperation.status}</div>
+      </div>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;background:var(--primary-light);padding:12px;border-radius:8px">
-        <div><span style="color:var(--gray-400)">需求：</span>${mm.demand_title || '-'}</div>
+        <div><span style="color:var(--gray-400)">需求：</span>${mm.demand_title ? `${mm.demand_kind ? `<span class="kanban-demand-kind" style="margin-right:6px">${mm.demand_kind}</span>` : ''}${mm.demand_title}` : '-'}</div>
         <div><span style="color:var(--gray-400)">来源：</span>${mm.source || '-'}</div>
         <div><span style="color:var(--gray-400)">商家归属销售：</span>${mm.merchant_sales_owner_name ? `<span style="color:var(--primary-700);font-weight:600">${mm.merchant_sales_owner_name}</span><span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#dcfce7;color:#166534;border-radius:10px;font-size:11px">销售</span>` : '<span style="color:var(--gray-400)">未分配</span>'}</div>
         <div><span style="color:var(--gray-400)">I 达人归属销售：</span>${mm.influencer_sales_owner_name ? `<span style="color:var(--primary-700);font-weight:600">${mm.influencer_sales_owner_name}</span><span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#dcfce7;color:#166534;border-radius:10px;font-size:11px">销售</span>` : (mm.inf_sales_owner_text ? mm.inf_sales_owner_text : '<span style="color:var(--gray-400)">未分配</span>')}</div>
@@ -3676,7 +4091,7 @@ async function viewMatchmakingDetail(id) {
         <div><span style="color:var(--gray-400)">D 订单量：</span>${mm.order_count != null && mm.order_count !== '' ? mm.order_count : '-'}</div>
         <div><span style="color:var(--gray-400)">~ 合作模式：</span>${mm.cooperation_mode || '-'}</div>
         <div><span style="color:var(--gray-400)"> 佣金率：</span>${mm.commission_rate != null && mm.commission_rate !== '' ? formatPercent(mm.commission_rate) : '-'}</div>
-        <div><span style="color:var(--gray-400)">${hasUpgrade ? '⭐ 升级佣金' : ' 升级佣金'}：</span><span style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? formatPercent(mm.upgrade_commission_rate) : '-'}</span></div>
+        <div><span style="color:var(--gray-400)">${hasUpgrade ? '⬆ 升级佣金' : '升级佣金'}：</span><span style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? formatPercent(mm.upgrade_commission_rate) : '-'}</span></div>
         <div><span style="color:var(--gray-400)">% GMV：</span>${mm.gmv != null && mm.gmv !== '' ? '¥' + mm.gmv : '-'}<span style="color:var(--gray-400);font-size:11px;margin-left:6px">（价格×订单量自动计算）</span></div>
         <div><span style="color:var(--gray-400)">⏰ 撮合时间：</span>${mm.matchmaking_time ? formatDate(mm.matchmaking_time) : '-'}</div>
         <div><span style="color:var(--gray-400)">备注：</span>${mm.notes || '-'}</div>
@@ -3734,15 +4149,15 @@ async function editMatchmakingDetail(id) {
         </select>
       </div>
       <div class="form-group"><label>佣金率(%)</label><input type="number" step="0.01" id="edit-mm-commission-rate" value="${mm.commission_rate != null ? mm.commission_rate : ''}" placeholder="如：25 表示 25%" oninput="checkUpgradeStar('edit-mm')"></div>
-      <div class="form-group"><label>⭐ 升级佣金(%) <span style="color:var(--gray-400);font-weight:normal;font-size:12px">大于原佣金时自动打红星</span></label><input type="number" step="0.01" id="edit-mm-upgrade-commission-rate" value="${mm.upgrade_commission_rate != null ? mm.upgrade_commission_rate : ''}" placeholder="如：30 表示升级后30%" oninput="checkUpgradeStar('edit-mm')"></div>
+      <div class="form-group"><label>⬆ 升级佣金(%) <span style="color:var(--gray-400);font-weight:normal;font-size:12px">大于原佣金时自动标记升级</span></label><input type="number" step="0.01" id="edit-mm-upgrade-commission-rate" value="${mm.upgrade_commission_rate != null ? mm.upgrade_commission_rate : ''}" placeholder="如：30 表示升级后30%" oninput="checkUpgradeStar('edit-mm')"></div>
       <div class="form-group"><label>GMV(元) <span style="color:var(--primary-600);font-weight:normal;font-size:12px">自动计算 = 价格 × 订单量</span></label><input type="number" step="0.01" id="edit-mm-gmv" value="${mm.gmv != null ? mm.gmv : ''}" placeholder="自动计算或手动输入" style="background:#f8fafc"></div>
       <div class="form-group" style="grid-column:1/-1">
         <label>撮合时间</label>
         <input type="datetime-local" id="edit-mm-matchmaking-time" value="${mm.matchmaking_time ? formatDateTimeLocal(mm.matchmaking_time) : ''}">
       </div>
       <div id="edit-mm-upgrade-preview" class="upgrade-preview" style="grid-column:1/-1;display:${(mm.upgrade_commission_rate != null && mm.commission_rate != null && parseFloat(mm.upgrade_commission_rate)> parseFloat(mm.commission_rate)) ? 'flex' : 'none'}">
-        <span class="upgrade-star">★</span>
-        <span>升级佣金高于原佣金，该撮合将显示红色五角星标签</span>
+        <span class="upgrade-star">⬆ 升级</span>
+        <span>升级佣金高于原佣金，该撮合将显示红色升级标签</span>
       </div>
     </div>
     <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)">其他信息</h4>
@@ -3972,25 +4387,31 @@ async function deleteMatchmaking(id) {
 }
 
 async function showCreateMatchmaking() {
-  // 获取商家和达人列表
+  // 获取商家和达人列表（已删除商家由后端默认过滤）
   const [merchantRes, infRes] = await Promise.all([
-    fetchAPI('/login/merchant-list'),
-    fetchAPI('/login/influencer-list')
+    fetchAPI('/merchants?pageSize=9999'),
+    fetchAPI('/influencers?pageSize=9999')
   ]);
-  
-  openModal('新建合作', `
+  const merchants = (merchantRes && merchantRes.data) || [];
+  const influencers = (infRes && infRes.data) || [];
+  if (merchants.length === 0 || influencers.length === 0) {
+    showToast('商家或达人数据加载失败，请刷新重试', 'error');
+    return;
+  }
+
+  openModal('新建撮合', `
     <div class="form-group">
       <label>选择商家 *</label>
       <select id="mm-merchant">
         <option value="">请选择</option>
-        ${(merchantRes.data || []).map(m => `<option value="${m.id}">${m.name} (${m.company})</option>`).join('')}
+        ${merchants.map(m => `<option value="${m.id}">${m.name || ''}${m.company ? ' (' + m.company + ')' : ''}</option>`).join('')}
       </select>
     </div>
     <div class="form-group">
       <label>选择达人 *</label>
       <select id="mm-influencer">
         <option value="">请选择</option>
-        ${(infRes.data || []).map(i => `<option value="${i.id}">${i.video_account_name}</option>`).join('')}
+        ${influencers.map(i => `<option value="${i.id}">${i.video_account_name || i.official_account_name || i.id}</option>`).join('')}
       </select>
     </div>
     <div class="form-group">
@@ -4024,15 +4445,15 @@ async function showCreateMatchmaking() {
         </select>
       </div>
       <div class="form-group"><label>佣金率(%)</label><input type="number" step="0.01" id="mm-commission-rate" placeholder="如：25" oninput="checkUpgradeStar('mm')"></div>
-      <div class="form-group"><label>⭐ 升级佣金(%) <span style="color:var(--gray-400);font-weight:normal;font-size:12px">大于原佣金时自动打红星</span></label><input type="number" step="0.01" id="mm-upgrade-commission-rate" placeholder="如：30" oninput="checkUpgradeStar('mm')"></div>
+      <div class="form-group"><label>⬆ 升级佣金(%) <span style="color:var(--gray-400);font-weight:normal;font-size:12px">大于原佣金时自动标记升级</span></label><input type="number" step="0.01" id="mm-upgrade-commission-rate" placeholder="如：30" oninput="checkUpgradeStar('mm')"></div>
       <div class="form-group"><label>GMV(元) <span style="color:var(--primary-600);font-weight:normal;font-size:12px">自动计算 = 价格 × 订单量</span></label><input type="number" step="0.01" id="mm-gmv" placeholder="自动计算或手动输入" style="background:#f8fafc"></div>
       <div class="form-group" style="grid-column:1/-1">
         <label>撮合时间</label>
         <input type="datetime-local" id="mm-matchmaking-time">
       </div>
       <div id="mm-upgrade-preview" class="upgrade-preview" style="grid-column:1/-1;display:none">
-        <span class="upgrade-star">★</span>
-        <span>升级佣金高于原佣金，该撮合将显示红色五角星标签</span>
+        <span class="upgrade-star">⬆ 升级</span>
+        <span>升级佣金高于原佣金，该撮合将显示红色升级标签</span>
       </div>
     </div>
     <div class="form-group">
@@ -4271,10 +4692,13 @@ async function renderInfluencerProfile() {
 
 // 确认/拒绝合作
 async function confirmCooperation(id) {
-  if (!confirm('确认同意合作？')) return;
+  if (!confirm('确认同意合作？\n\n确认后，运营会自动收到一条「合作匹配」阶段的撮合工单进行后续跟进。')) return;
   const res = await fetchAPI(`/cooperation/confirm/${id}`, { method: 'PUT' });
-  if (res.success) { showToast('已确认合作！对方将收到通知'); renderProfile(); checkNotifications(); }
-  else { showToast(res.error || '操作失败', 'error'); }
+  if (res.success) {
+    showToast(res.message || '已确认合作！');
+    renderProfile();
+    checkNotifications();
+  } else { showToast(res.error || '操作失败', 'error'); }
 }
 
 async function rejectCooperation(id) {
@@ -4360,16 +4784,17 @@ let imPage = 1;
 const im_PAGE_SIZE = 30;
 
 async function renderInfluencerManage() {
-  // 仅超级管理员可访问
-  if (currentUser.role !== 'admin' || !currentUser.is_super) {
+  // 管理员（超管 + 销售普管）可访问
+  if (currentUser.role !== 'admin') {
     document.getElementById('page-container').innerHTML = `
       <div class="empty-state">
         <div class="icon">-</div>
-        <p>权限不足，仅超级管理员可访问"达人管理"模块</p>
+        <p>权限不足，仅管理员可访问"达人管理"模块</p>
         <button class="btn btn-sm btn-primary" style="margin-top:12px" onclick="navigateTo('influencer-plaza')">前往达人广场</button>
       </div>`;
     return;
   }
+  const isSuper = currentUser.is_super;
 
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
@@ -4379,10 +4804,12 @@ async function renderInfluencerManage() {
   if (imFilters.keyword) url += `&keyword=${encodeURIComponent(imFilters.keyword)}`;
   if (imFilters.level) url += `&level=${encodeURIComponent(imFilters.level)}`;
   if (imFilters.has_mcn) url += `&has_mcn=${encodeURIComponent(imFilters.has_mcn)}`;
+  // 销售普管只看归属自己的达人
+  if (!isSuper) url += `&sales_owner_id=${encodeURIComponent(currentUser.id)}`;
 
   const [listRes, heroRes] = await Promise.all([
     fetchAPI(url),
-    fetchAPI('/influencers/hero-stats')
+    fetchAPI('/influencers/hero-stats' + (isSuper ? '' : `?sales_owner_id=${encodeURIComponent(currentUser.id)}`))
   ]);
   if (!listRes.success) { container.innerHTML = '<p>加载失败</p>'; return; }
 
@@ -4394,7 +4821,7 @@ async function renderInfluencerManage() {
     ${renderBackButton()}
     <div class="page-header">
       <h2>达人管理</h2>
-      <div style="font-size:12px;color:#94a3b8;margin-top:4px">达人资源的批量增改删与导入导出（仅超管可见）</div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:4px">达人资源的批量增改删与导入导出${isSuper ? '' : '（你只看到归属自己的达人）'}</div>
     </div>
 
     <!-- Hero 统计 -->
@@ -4412,7 +4839,7 @@ async function renderInfluencerManage() {
     <!-- 工具栏 -->
     <div class="md-toolbar">
       <div class="md-toolbar-left">
-        <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">+ 添加达人</button>
+        <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">+ 邀请达人</button>
         <button class="btn btn-sm btn-primary" onclick="showImBatchUpload()">批量上传</button>
         <button class="btn btn-sm btn-outline" onclick="exportInfluencers()">导出CSV</button>
         <button class="btn btn-sm btn-danger-outline" onclick="clearAllInfluencersFromManage()" style="margin-left:auto">清空所有达人</button>
@@ -4494,6 +4921,7 @@ function renderImTableHeader() {
       <div class="im-th">MCN</div>
       <div class="im-th">归属销售</div>
       <div class="im-th th-right">月销总额</div>
+      <div class="im-th">状态</div>
       <div class="im-th th-right">操作</div>
     </div>`;
 }
@@ -4503,6 +4931,41 @@ function renderImRow(inf) {
   const totalSales = (inf.monthly_short_video_sales || 0) + (inf.monthly_live_sales || 0);
   const region = (inf.region || '').split(',')[0] || '-';
   const salesName = inf.sales_owner_name || inf.sales_owner || '<span style="color:#cbd5e1">-</span>';
+
+  // 邀请状态徽标
+  let statusBadge;
+  if (inf.invite_status === 'pending') {
+    statusBadge = '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">待激活</span>';
+  } else if (inf.invite_status === 'disabled') {
+    statusBadge = '<span style="background:#e5e7eb;color:#6b7280;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已停用</span>';
+  } else {
+    statusBadge = '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已激活</span>';
+  }
+
+  // 操作按钮（按 invite_status 分）
+  let actions = '';
+  if (inf.invite_status === 'pending') {
+    actions = `
+      <button class="btn btn-xs btn-primary" onclick="copyInfluencerInviteLink('${inf.id}')">复制邀请链接</button>
+      <button class="btn btn-xs btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>
+      <button class="btn btn-xs btn-danger-outline" onclick="deleteInfluencerFromManage('${inf.id}','${escapeHtml(inf.video_account_name || '').replace(/'/g, '&apos;')}')">删除</button>
+    `;
+  } else if (inf.invite_status === 'disabled') {
+    actions = `
+      <button class="btn btn-xs btn-success" onclick="toggleInfluencerEnabled('${inf.id}', 'active')">启用</button>
+      <button class="btn btn-xs btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>
+      <button class="btn btn-xs btn-danger-outline" onclick="deleteInfluencerFromManage('${inf.id}','${escapeHtml(inf.video_account_name || '').replace(/'/g, '&apos;')}')">删除</button>
+    `;
+  } else {
+    actions = `
+      <button class="btn btn-xs btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
+      <button class="btn btn-xs btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>
+      <button class="btn btn-xs btn-outline" onclick="resetInfluencerPassword('${inf.id}','${escapeHtml(inf.video_account_name || '').replace(/'/g, '&apos;')}')">重置密码</button>
+      <button class="btn btn-xs btn-outline" onclick="toggleInfluencerEnabled('${inf.id}', 'disabled')">停用</button>
+      <button class="btn btn-xs btn-danger-outline" onclick="deleteInfluencerFromManage('${inf.id}','${escapeHtml(inf.video_account_name || '').replace(/'/g, '&apos;')}')">删除</button>
+    `;
+  }
+
   return `
     <div class="im-row">
       <div class="im-cell"><span class="level-badge" style="background:${levelColor}">${inf.level || '-'}</span></div>
@@ -4516,12 +4979,36 @@ function renderImRow(inf) {
       <div class="im-cell">${inf.has_mcn === '是' ? `<span style="color:#8b5cf6">${escapeHtml(inf.mcn_name || 'MCN')}</span>` : '<span style="color:#cbd5e1">-</span>'}</div>
       <div class="im-cell" style="color:#16a34a;font-weight:600">${salesName}</div>
       <div class="im-cell th-right">¥${formatNumber(totalSales)}</div>
-      <div class="im-cell th-right im-actions">
-        <button class="btn btn-xs btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
-        <button class="btn btn-xs btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>
-        <button class="btn btn-xs btn-danger-outline" onclick="deleteInfluencerFromManage('${inf.id}','${escapeHtml(inf.video_account_name || '').replace(/'/g, '&apos;')}')">删除</button>
-      </div>
+      <div class="im-cell">${statusBadge}</div>
+      <div class="im-cell th-right im-actions">${actions}</div>
     </div>`;
+}
+
+// 复制达人邀请链接
+async function copyInfluencerInviteLink(id) {
+  const res = await fetchAPI(`/influencers/${id}/invite-code`);
+  if (!res.success) { showToast(res.error || '获取邀请链接失败', 'error'); return; }
+  showInviteLinkModal(res.data.code, res.data.video_account_name);
+}
+
+// 启用/停用达人账号
+async function toggleInfluencerEnabled(id, targetStatus) {
+  const tip = targetStatus === 'active' ? '启用' : '停用';
+  if (!confirm(`确定${tip}该达人账号？${targetStatus === 'disabled' ? '\n停用后该达人将无法登录' : ''}`)) return;
+  const res = await fetchAPI(`/influencers/${id}/invite-status`, {
+    method: 'PUT',
+    body: JSON.stringify({ invite_status: targetStatus })
+  });
+  if (res.success) { showToast(res.message || '操作成功'); renderInfluencerManage(); }
+  else { showToast(res.error || '操作失败', 'error'); }
+}
+
+// 重置达人密码
+async function resetInfluencerPassword(id, name) {
+  if (!confirm(`确定将达人「${name}」的密码重置为 123456？`)) return;
+  const res = await fetchAPI(`/influencers/${id}/reset-password`, { method: 'PUT', body: JSON.stringify({}) });
+  if (res.success) { showToast(res.message || '密码已重置'); }
+  else { showToast(res.error || '重置失败', 'error'); }
 }
 
 function onImFilterChange(key, value) { imFilters[key] = value; }
@@ -4626,10 +5113,28 @@ async function renderMerchantManage() {
     <!-- 工具栏 -->
     <div class="md-toolbar">
       <div class="md-toolbar-left">
-        <button class="btn btn-sm btn-success" onclick="showAddMerchant()">+ 添加商家</button>
+        <button class="btn btn-sm btn-success" onclick="showAddMerchant()">+ 邀请商家</button>
+        <button class="btn btn-sm btn-primary" onclick="showMmBatchUpload()">批量导入</button>
         <button class="btn btn-sm btn-outline" onclick="exportMerchants()">导出CSV</button>
         ${isSuper ? `<button class="btn btn-sm ${mmFilters.status==='deleted'?'btn-primary':'btn-outline'}" onclick="toggleMmDeletedView()">${mmFilters.status==='deleted'?'返回正常列表':'查看已删除'}</button>` : ''}
       </div>
+    </div>
+
+    <!-- 批量导入区（默认隐藏）-->
+    <div id="mm-upload-area" style="display:none;margin-top:12px">
+      <div class="card"><div class="card-header"><h3>批量导入商家</h3></div><div class="card-body">
+        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <a href="/api/merchants/excel/template" class="btn btn-outline btn-sm">下载导入模板</a>
+          <span style="font-size:12px;color:#94a3b8">导入的商家将自动走邀请制，可在列表中逐个复制邀请链接发送</span>
+        </div>
+        <div class="upload-area" onclick="document.getElementById('mm-excel-input').click()">
+          <div class="upload-icon">+</div>
+          <div class="upload-text">点击上传商家 Excel 文件</div>
+          <div class="upload-hint">支持 .xlsx / .xls 格式，必填字段：公司名称 / 联系人 / 手机号</div>
+        </div>
+        <input type="file" id="mm-excel-input" accept=".xlsx,.xls" style="display:none" onchange="handleMerchantExcelUpload(event)">
+        <div id="mm-import-result" style="margin-top:12px"></div>
+      </div></div>
     </div>
 
     <!-- 筛选 -->
@@ -4691,12 +5196,46 @@ function renderMmRow(m, isSuper) {
   const sales = m.sales_owner_name
     ? `<span style="color:#16a34a;font-weight:600">${escapeHtml(m.sales_owner_name)}</span>`
     : '<span style="color:#cbd5e1">未分配</span>';
-  const statusBadge = isDeleted
-    ? '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已删除</span>'
-    : '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">正常</span>';
+  // 邀请状态徽标
+  let statusBadge;
+  if (isDeleted) {
+    statusBadge = '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已删除</span>';
+  } else if (m.invite_status === 'pending') {
+    statusBadge = '<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">待激活</span>';
+  } else if (m.invite_status === 'disabled') {
+    statusBadge = '<span style="background:#e5e7eb;color:#6b7280;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已停用</span>';
+  } else {
+    statusBadge = '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已激活</span>';
+  }
   const industryTag = m.industry
     ? `<span style="background:#e0f2fe;color:#0284c7;padding:2px 8px;border-radius:4px;font-size:11px">${escapeHtml(m.industry)}</span>`
     : '<span style="color:#cbd5e1">未分类</span>';
+
+  // 操作按钮（按 invite_status 分情况）
+  let actions = '';
+  if (isDeleted) {
+    actions = isSuper ? `<button class="btn btn-xs btn-success" onclick="restoreMerchant('${m.id}')">恢复</button>` : '';
+  } else if (m.invite_status === 'pending') {
+    actions = `
+      <button class="btn btn-xs btn-primary" onclick="copyMerchantInviteLink('${m.id}')">复制邀请链接</button>
+      <button class="btn btn-xs btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
+      <button class="btn btn-xs btn-danger-outline" onclick="deleteMerchant('${m.id}','${escapeHtml(m.company || m.name || '').replace(/'/g, '&apos;')}')">删除</button>
+    `;
+  } else if (m.invite_status === 'disabled') {
+    actions = `
+      <button class="btn btn-xs btn-success" onclick="toggleMerchantEnabled('${m.id}', 'active')">启用</button>
+      <button class="btn btn-xs btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
+      <button class="btn btn-xs btn-danger-outline" onclick="deleteMerchant('${m.id}','${escapeHtml(m.company || m.name || '').replace(/'/g, '&apos;')}')">删除</button>
+    `;
+  } else {
+    // active
+    actions = `
+      <button class="btn btn-xs btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
+      <button class="btn btn-xs btn-outline" onclick="resetMerchantPassword('${m.id}','${escapeHtml(m.company || '').replace(/'/g, '&apos;')}')">重置密码</button>
+      <button class="btn btn-xs btn-outline" onclick="toggleMerchantEnabled('${m.id}', 'disabled')">停用</button>
+      <button class="btn btn-xs btn-danger-outline" onclick="deleteMerchant('${m.id}','${escapeHtml(m.company || m.name || '').replace(/'/g, '&apos;')}')">删除</button>
+    `;
+  }
 
   return `
     <div class="im-row mm-row${isDeleted ? ' mm-row-deleted' : ''}">
@@ -4711,16 +5250,7 @@ function renderMmRow(m, isSuper) {
       <div class="im-cell th-right" style="font-weight:600">${m.demand_count || 0}</div>
       <div class="im-cell">${statusBadge}</div>
       <div class="im-cell" style="font-size:12px;color:#94a3b8">${formatDate(m.created_at)}</div>
-      <div class="im-cell th-right im-actions">
-        ${isDeleted
-          ? (isSuper ? `<button class="btn btn-xs btn-success" onclick="restoreMerchant('${m.id}')">恢复</button>` : '')
-          : `
-            <button class="btn btn-xs btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
-            <button class="btn btn-xs btn-outline" onclick="resetMerchantPassword('${m.id}','${escapeHtml(m.company || '').replace(/'/g, '&apos;')}')">重置密码</button>
-            <button class="btn btn-xs btn-danger-outline" onclick="deleteMerchant('${m.id}','${escapeHtml(m.company || m.name || '').replace(/'/g, '&apos;')}')">删除</button>
-          `
-        }
-      </div>
+      <div class="im-cell th-right im-actions">${actions}</div>
     </div>`;
 }
 
@@ -4755,9 +5285,70 @@ function exportMerchants() {
   showToast('正在下载，请稍候...');
 }
 
+// 批量导入商家：切换上传区显示
+function showMmBatchUpload() {
+  const area = document.getElementById('mm-upload-area');
+  if (!area) return;
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+}
+
+// 商家 Excel 批量上传处理
+async function handleMerchantExcelUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('invited_by', currentUser.id);
+  // 销售普管：默认归属自己
+  const isSalesAdmin = currentUser.role === 'admin' && !currentUser.is_super && currentUser.admin_role === '销售';
+  if (isSalesAdmin) formData.append('default_sales_owner_id', currentUser.id);
+
+  const resultEl = document.getElementById('mm-import-result');
+  resultEl.innerHTML = '<div style="padding:10px;color:#64748b;font-size:13px">正在上传并解析，请稍候...</div>';
+
+  try {
+    const res = await fetch('/api/merchants/excel/import', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (!data.success) {
+      resultEl.innerHTML = `<div style="padding:12px;background:#fee2e2;color:#b91c1c;border-radius:6px;font-size:13px">${data.error || '导入失败'}</div>`;
+      return;
+    }
+    const r = data.data;
+    const errList = (r.errors || []).slice(0, 20);
+    resultEl.innerHTML = `
+      <div style="padding:12px 14px;background:#ecfdf5;border-radius:8px;border-left:3px solid #10b981;font-size:13px;color:#15803d;margin-bottom:10px">
+        <strong>导入完成</strong><br>
+        共 ${r.total} 条｜成功 <strong style="color:#059669">${r.inserted}</strong>｜跳过 ${r.skipped}｜失败 ${r.failed}
+      </div>
+      ${errList.length > 0 ? `
+        <div style="padding:10px 12px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e;max-height:180px;overflow-y:auto">
+          <strong>异常明细（前 ${errList.length} 条）：</strong>
+          <ul style="margin:6px 0 0 16px;padding:0">${errList.map(e => `<li>${escapeHtml(e)}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+      ${r.inserted > 0 ? `
+        <div style="margin-top:10px;padding:10px 12px;background:#eff6ff;border-radius:6px;font-size:12px;color:#1e40af;line-height:1.6">
+          <strong>下一步：</strong>在下方列表中找到「待激活」的商家，点"复制邀请链接"发送给对方。<br>
+          批量场景建议用"筛选 → 状态=待激活"快速定位。
+        </div>
+      ` : ''}
+    `;
+    // 清空 file input（方便再次上传同文件）
+    e.target.value = '';
+    // 刷新列表
+    renderMerchantManage();
+  } catch (err) {
+    resultEl.innerHTML = `<div style="padding:12px;background:#fee2e2;color:#b91c1c;border-radius:6px;font-size:13px">网络错误：${err.message}</div>`;
+  }
+}
+
 async function showAddMerchant() {
   const salesList = window._salesList || [];
-  openModal('添加商家', `
+  const isSalesAdmin = currentUser.role === 'admin' && !currentUser.is_super && currentUser.admin_role === '销售';
+  openModal('邀请商家', `
     <div class="form-group"><label>公司名称 *</label><input type="text" id="m-company" placeholder="如：知行图书出版社" required></div>
     <div class="form-group"><label>联系人姓名 *</label><input type="text" id="m-name" placeholder="如：张经理" required></div>
     <div class="form-group"><label>手机号 *</label><input type="text" id="m-phone" placeholder="手机号码" required></div>
@@ -4769,6 +5360,11 @@ async function showAddMerchant() {
       </select>
     </div>
     <div class="form-group"><label>描述</label><textarea id="m-desc" rows="2" placeholder="商家简介"></textarea></div>
+    ${isSalesAdmin ? `
+      <div class="info-box" style="padding:10px 12px;background:#ecfdf5;border-radius:6px;font-size:12px;color:#15803d">
+         邀请后将自动归属到你（${currentUser.name}）名下
+      </div>
+    ` : `
     <div class="form-group">
       <label>归属销售（非必填）</label>
       <select id="m-sales-owner">
@@ -4777,16 +5373,18 @@ async function showAddMerchant() {
       </select>
       <p style="font-size:11px;color:var(--gray-400);margin-top:4px">设置后，对应销售登录可看到此商家信息</p>
     </div>
+    `}
     <div class="info-box" style="padding:10px 12px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e;margin-top:8px">
-       初始登录密码为 <strong>123456</strong>，可让商家登录后自行修改或随时使用"重置密码"功能
+      添加后系统会生成专属邀请链接，将链接发给商家，对方打开链接设置密码即可激活账号
     </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">取消</button>
-    <button class="btn btn-primary" onclick="confirmAddMerchant()">确认添加</button>
+    <button class="btn btn-primary" onclick="confirmAddMerchant()">确认邀请</button>
   `);
 }
 
 async function confirmAddMerchant() {
+  const isSalesAdmin = currentUser.role === 'admin' && !currentUser.is_super && currentUser.admin_role === '销售';
   const data = {
     name: document.getElementById('m-name').value.trim(),
     company: document.getElementById('m-company').value.trim(),
@@ -4794,14 +5392,99 @@ async function confirmAddMerchant() {
     email: document.getElementById('m-email').value.trim(),
     industry: document.getElementById('m-industry').value,
     description: document.getElementById('m-desc').value.trim(),
-    sales_owner_id: document.getElementById('m-sales-owner').value
+    // 销售普管 → 自动归属自己；超管 → 允许选择
+    sales_owner_id: isSalesAdmin ? currentUser.id : (document.getElementById('m-sales-owner') ? document.getElementById('m-sales-owner').value : ''),
+    invite_mode: 1,
+    invited_by: currentUser.id
   };
   if (!data.name || !data.company || !data.phone) {
     showToast('联系人、公司名称、手机号为必填', 'error'); return;
   }
   const res = await fetchAPI('/merchants', { method: 'POST', body: JSON.stringify(data) });
-  if (res.success) { showToast(res.message || '商家添加成功'); closeModal(); renderMerchantManage(); }
-  else { showToast(res.error || '添加失败', 'error'); }
+  if (res.success) {
+    closeModal();
+    renderMerchantManage();
+    // 显示邀请链接弹窗
+    if (res.invite_code) {
+      const loginHint = `登录账号是手机号 <strong>${data.phone}</strong>，密码由对方激活时自己设置`;
+      showInviteLinkModal(res.invite_code, data.company, loginHint);
+    } else {
+      showToast('商家已添加');
+    }
+  } else {
+    showToast(res.error || '邀请失败', 'error');
+  }
+}
+
+// 通用：显示邀请链接模态框 + 一键复制
+// 可选参数 loginHint：登录提示（如"登录账号是手机号 138xxxx8888"）
+function showInviteLinkModal(code, targetName, loginHint) {
+  const link = window.location.origin + '/?activate=' + code;
+  openModal('邀请链接已生成', `
+    <div style="padding:12px 14px;background:#ecfdf5;border-radius:8px;border-left:3px solid #10b981;margin-bottom:14px;font-size:13px;color:#15803d">
+       已为 <strong>${escapeHtml(targetName || '')}</strong> 生成专属邀请链接，复制并发送给对方即可
+    </div>
+    <div style="background:#f1f5f9;padding:12px;border-radius:8px;word-break:break-all;font-family:monospace;font-size:12px;color:#0f172a;user-select:all;cursor:text" id="invite-link-text">${link}</div>
+    ${loginHint ? `
+    <div style="margin-top:10px;padding:10px 12px;background:#eff6ff;border-radius:8px;border-left:3px solid #3b82f6;font-size:12px;color:#1e40af">
+      <strong>告诉对方：</strong>${loginHint}
+    </div>` : ''}
+    <div style="margin-top:12px;font-size:12px;color:#64748b;line-height:1.6">
+      <strong>使用说明：</strong><br>
+      1. 点击下方"复制链接"按钮将链接拷贝到剪贴板<br>
+      2. 通过微信/邮件/短信发送给被邀请人<br>
+      3. 对方打开链接，确认身份后设置密码即可完成激活
+    </div>
+  `, `
+    <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+    <button class="btn btn-primary" onclick="copyToClipboard('${link.replace(/'/g, '&apos;')}');closeModal();">复制链接</button>
+  `);
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(
+      () => showToast('邀请链接已复制到剪贴板'),
+      () => fallbackCopy(text)
+    );
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('邀请链接已复制到剪贴板');
+  } catch (e) {
+    showToast('复制失败，请手动选择链接复制', 'error');
+  }
+  document.body.removeChild(ta);
+}
+
+// 复制指定商家的邀请链接
+async function copyMerchantInviteLink(id) {
+  const res = await fetchAPI(`/merchants/${id}/invite-code`);
+  if (!res.success) { showToast(res.error || '获取邀请链接失败', 'error'); return; }
+  const loginHint = res.data.phone ? `登录账号是手机号 <strong>${res.data.phone}</strong>，密码由对方激活时自己设置` : '';
+  showInviteLinkModal(res.data.code, res.data.company, loginHint);
+}
+
+// 启用/停用商家账号
+async function toggleMerchantEnabled(id, targetStatus) {
+  const tip = targetStatus === 'active' ? '启用' : '停用';
+  if (!confirm(`确定${tip}该商家账号？${targetStatus === 'disabled' ? '\n停用后该商家将无法登录' : ''}`)) return;
+  const res = await fetchAPI(`/merchants/${id}/invite-status`, {
+    method: 'PUT',
+    body: JSON.stringify({ invite_status: targetStatus })
+  });
+  if (res.success) { showToast(res.message || '操作成功'); renderMerchantManage(); }
+  else { showToast(res.error || '操作失败', 'error'); }
 }
 
 async function editMerchant(id) {

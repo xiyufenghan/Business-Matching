@@ -32,6 +32,21 @@ function initDatabase() {
       db.exec("ALTER TABLE merchants ADD COLUMN status TEXT DEFAULT 'active'");
       db.prepare("UPDATE merchants SET status = 'active' WHERE status IS NULL").run();
     }
+    // 邀请制字段
+    if (!cols.includes('invite_code')) {
+      db.exec("ALTER TABLE merchants ADD COLUMN invite_code TEXT");
+    }
+    if (!cols.includes('invite_status')) {
+      db.exec("ALTER TABLE merchants ADD COLUMN invite_status TEXT DEFAULT 'active'");
+      // 存量数据默认置为 active，避免现有登录行为中断
+      db.prepare("UPDATE merchants SET invite_status = 'active' WHERE invite_status IS NULL").run();
+    }
+    if (!cols.includes('activated_at')) {
+      db.exec("ALTER TABLE merchants ADD COLUMN activated_at DATETIME");
+    }
+    if (!cols.includes('invited_by')) {
+      db.exec("ALTER TABLE merchants ADD COLUMN invited_by TEXT");
+    }
   } catch (e) { /* ignore */ }
 
   // 达人表
@@ -61,6 +76,24 @@ function initDatabase() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 兼容已有库：补齐 influencers 邀请制字段
+  try {
+    const infCols = db.prepare('PRAGMA table_info(influencers)').all().map(c => c.name);
+    if (!infCols.includes('invite_code')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN invite_code TEXT");
+    }
+    if (!infCols.includes('invite_status')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN invite_status TEXT DEFAULT 'active'");
+      db.prepare("UPDATE influencers SET invite_status = 'active' WHERE invite_status IS NULL").run();
+    }
+    if (!infCols.includes('activated_at')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN activated_at DATETIME");
+    }
+    if (!infCols.includes('invited_by')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN invited_by TEXT");
+    }
+  } catch (e) { /* ignore */ }
 
   // 图书需求表
   db.exec(`
@@ -229,6 +262,8 @@ function initDatabase() {
   `);
 
   // 撮合管理表
+  // source_type: 手动创建 / 邀约转化 / 申请转化 — 标记撮合来源
+  // cooperation_id: 关联到孵化此撮合的 cooperation 记录（如有）
   db.exec(`
     CREATE TABLE IF NOT EXISTS matchmaking (
       id TEXT PRIMARY KEY,
@@ -237,12 +272,26 @@ function initDatabase() {
       demand_id TEXT,
       demand_type TEXT,
       source TEXT DEFAULT '手动创建',
+      source_type TEXT DEFAULT '手动创建',
+      cooperation_id TEXT,
       stage TEXT DEFAULT '需求发布',
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 兼容已有库：补齐 matchmaking 单向衔接字段
+  try {
+    const mmCols = db.prepare('PRAGMA table_info(matchmaking)').all().map(c => c.name);
+    if (!mmCols.includes('source_type')) {
+      db.exec("ALTER TABLE matchmaking ADD COLUMN source_type TEXT DEFAULT '手动创建'");
+      db.prepare("UPDATE matchmaking SET source_type = '手动创建' WHERE source_type IS NULL").run();
+    }
+    if (!mmCols.includes('cooperation_id')) {
+      db.exec('ALTER TABLE matchmaking ADD COLUMN cooperation_id TEXT');
+    }
+  } catch (e) { /* ignore */ }
 
   // 撮合历史记录表
   db.exec(`
