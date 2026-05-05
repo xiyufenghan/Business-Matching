@@ -14,3 +14,5 @@ decode.py
 *-login-html-correct.txt
 *.zip
 *.db-journal
+*.db-shm
+*.db-wal

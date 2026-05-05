@@ -1,4 +1,4 @@
-// 商达撮合系统 - 前端逻辑（浅蓝色主题 + 合作管理 + 个人中心 + 合作邀约）
+// 商达撮合系统 - 前端逻辑
 const API_BASE = '/api';
 let currentUser = null;
 let navigationHistory = [];
@@ -45,7 +45,7 @@ function showToast(message, type = 'success') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-  toast.innerHTML = `<span>${type === 'error' ? '❌' : '✅'}</span><span>${message}</span>`;
+  toast.innerHTML = `<span>${type === 'error' ? '!' : 'OK'}</span><span>${message}</span>`;
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
@@ -59,18 +59,18 @@ function openModal(title, bodyHTML, footerHTML = '') {
 function closeModal() { document.getElementById('modal-overlay').classList.remove('active'); }
 
 function openImagePreview(imageUrl) {
-  openModal('图片预览', `<div style="text-align:center"><img src="${imageUrl}" style="max-width:100%;max-height:70vh;border-radius:8px;object-fit:contain"></div>`, `<button class="btn btn-outline" onclick="closeModal()">✖ 关闭</button>`);
+  openModal('图片预览', `<div style="text-align:center"><img src="${imageUrl}" style="max-width:100%;max-height:70vh;border-radius:8px;object-fit:contain"></div>`, `<button class="btn btn-outline" onclick="closeModal()">关闭</button>`);
 }
 
-function formatNumber(num) { if (num >= 10000) return (num / 10000).toFixed(1) + '万'; return (num || 0).toString(); }
+function formatNumber(num) { if (num>= 10000) return (num / 10000).toFixed(1) + '万'; return (num || 0).toString(); }
 
 // 百分比字段规范化显示：兼容数据库中两种存储格式（整数百分数如25，和小数比率如0.25）
-// 规则：数值 > 1 按百分数直接显示（25 -> "25%"）；0 < 数值 ≤ 1 视为比率乘100（0.25 -> "25%"）；0/null/空显示 0%
+// 规则：数值> 1 按百分数直接显示（25 -> "25%"）；0 < 数值 ≤ 1 视为比率乘100（0.25 -> "25%"）；0/null/空显示 0%
 function formatPercent(v) {
   if (v === null || v === undefined || v === '') return '0%';
   const n = Number(v);
   if (isNaN(n) || n === 0) return '0%';
-  const pct = n > 1 ? n : n * 100;
+  const pct = n> 1 ? n : n * 100;
   // 保留最多2位小数，去掉多余0
   return parseFloat(pct.toFixed(2)) + '%';
 }
@@ -105,7 +105,7 @@ function renderPagination(pagination, onPageChange) {
         </select>
         <button class="btn btn-sm btn-outline" ${page <= 1 ? 'disabled' : ''} onclick="${onPageChange}(${page - 1})">上一页</button>
         <span class="page-num">${page}</span>
-        <button class="btn btn-sm btn-outline" ${page >= totalPages ? 'disabled' : ''} onclick="${onPageChange}(${page + 1})">下一页</button>
+        <button class="btn btn-sm btn-outline" ${page>= totalPages ? 'disabled' : ''} onclick="${onPageChange}(${page + 1})">下一页</button>
       </div>
     </div>`;
 }
@@ -115,7 +115,7 @@ function renderBackButton() {
   if (navigationHistory.length <= 1) return '';
   return `<button class="btn btn-outline btn-sm back-btn" onclick="goBack()">← 返回</button>`;
 }
-function goBack() { if (navigationHistory.length > 1) { navigationHistory.pop(); const prev = navigationHistory[navigationHistory.length - 1]; navigateTo(prev, true); } }
+function goBack() { if (navigationHistory.length> 1) { navigationHistory.pop(); const prev = navigationHistory[navigationHistory.length - 1]; navigateTo(prev, true); } }
 
 // ============ 侧边栏控制 ============
 function toggleSidebar() {
@@ -130,109 +130,42 @@ function closeSidebar() {
 // ============ 登录与权限 ============
 async function handleLogin(event) {
   event.preventDefault();
-  const role = document.getElementById('login-role').value;
-  let username = '';
-  
-  if (role === 'influencer') {
-    const selectVal = document.getElementById('login-influencer-select').value;
-    username = selectVal || '';
-  } else if (role === 'merchant') {
-    const selectVal = document.getElementById('login-merchant-select').value;
-    username = selectVal || document.getElementById('login-username').value;
-  } else if (role === 'admin') {
-    const adminSelect = document.getElementById('login-admin-select');
-    if (adminSelect && adminSelect.style.display !== 'none') {
-      username = adminSelect.value || document.getElementById('login-username').value;
-    } else {
-      username = document.getElementById('login-username').value;
-    }
-  } else {
-    username = document.getElementById('login-username').value;
-  }
-  
+  const username = document.getElementById('login-username').value.trim();
   const password = document.getElementById('login-password').value;
-  if (!username) { showToast('请输入或选择账号', 'error'); return; }
+  const errorEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+
+  if (!username) { showLoginError('请输入账号'); return; }
+  if (!password) { showLoginError('请输入密码'); return; }
+
+  errorEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = '登录中...';
 
   const res = await fetchAPI('/login', {
     method: 'POST',
-    body: JSON.stringify({ username, password, role })
+    body: JSON.stringify({ username, password })
   });
-  
+
+  btn.disabled = false;
+  btn.textContent = '登 形';
+
   if (res.success) {
     currentUser = res.data;
+    errorEl.style.display = 'none';
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app-container').style.display = 'flex';
     initApp();
-    showToast(`欢迎回来，${currentUser.name}！`);
+    showToast('欢迎回来，' + currentUser.name);
   } else {
-    showToast(res.error || '登录失败', 'error');
+    showLoginError(res.error || '登录失败，请检查账号密码');
   }
 }
 
-function onLoginRoleChange() {
-  const role = document.getElementById('login-role').value;
-  const usernameGroup = document.getElementById('login-username-group');
-  const infGroup = document.getElementById('login-influencer-select-group');
-  const merGroup = document.getElementById('login-merchant-select-group');
-  const adminGroup = document.getElementById('login-admin-select-group');
-  const usernameInput = document.getElementById('login-username');
-  
-  usernameGroup.style.display = 'none';
-  infGroup.style.display = 'none';
-  merGroup.style.display = 'none';
-  if (adminGroup) adminGroup.style.display = 'none';
-  usernameInput.removeAttribute('required');
-  
-  if (role === 'admin') {
-    // 管理员也用下拉选择
-    if (adminGroup) {
-      adminGroup.style.display = 'block';
-      loadAdminList();
-    } else {
-      usernameGroup.style.display = 'block';
-      usernameInput.setAttribute('required', 'required');
-    }
-  } else if (role === 'merchant') {
-    merGroup.style.display = 'block';
-    loadMerchantList();
-  } else if (role === 'influencer') {
-    infGroup.style.display = 'block';
-    loadInfluencerList();
-  }
-}
-
-async function loadAdminList() {
-  const res = await fetchAPI('/login/admin-list');
-  const select = document.getElementById('login-admin-select');
-  if (!select) return;
-  if (res.success && res.data.length > 0) {
-    select.innerHTML = '<option value="">请选择管理员账号</option>' + res.data.map(a => {
-      const roleTag = a.is_super ? '超管' : (a.admin_role || '其他');
-      return `<option value="${a.username}">${a.name} (${roleTag})</option>`;
-    }).join('');
-  } else {
-    select.innerHTML = '<option value="">暂无可选管理员</option>';
-  }
-}
-
-async function loadInfluencerList() {
-  const res = await fetchAPI('/login/influencer-list');
-  const select = document.getElementById('login-influencer-select');
-  if (res.success && res.data.length > 0) {
-    select.innerHTML = '<option value="">请选择达人账号</option>' + res.data.map(i => `<option value="${i.video_account_name}">${i.video_account_name}</option>`).join('');
-  } else {
-    select.innerHTML = '<option value="">暂无可选达人</option>';
-  }
-}
-
-async function loadMerchantList() {
-  const res = await fetchAPI('/login/merchant-list');
-  const select = document.getElementById('login-merchant-select');
-  if (res.success && res.data.length > 0) {
-    select.innerHTML = '<option value="">请选择商家账号</option>' + res.data.map(m => `<option value="${m.name}">${m.name} (${m.company})</option>`).join('');
-  } else {
-    select.innerHTML = '<option value="">暂无可选商家</option>';
-  }
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.style.display = 'block';
 }
 
 function logout() {
@@ -240,11 +173,11 @@ function logout() {
   navigationHistory = [];
   document.getElementById('app-container').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
-  // 清空登录表单输入，避免残留
-  const pwd = document.getElementById('login-password'); if (pwd) pwd.value = '';
-  const usr = document.getElementById('login-username'); if (usr) usr.value = '';
-  // 重新加载对应角色的账号列表，确保管理员在管理模块修改过账号/角色/姓名后，登录下拉框立即显示最新数据
-  onLoginRoleChange();
+  const pwd = document.getElementById('login-password'); if (pwd) { pwd.value = ''; }
+  const usr = document.getElementById('login-username'); if (usr) { usr.value = ''; }
+  const errorEl = document.getElementById('login-error'); if (errorEl) errorEl.style.display = 'none';
+  // 聚焦账号输入框
+  setTimeout(() => { document.getElementById('login-username')?.focus(); }, 100);
 }
 
 // ============ 应用初始化 ============
@@ -269,11 +202,11 @@ function updateUserInfo() {
     if (currentUser.is_super) {
       roleLabel = '超级管理员';
     } else {
-      roleLabel = currentUser.admin_role ? `管理员（${currentUser.admin_role}）` : '管理员';
+      roleLabel = currentUser.admin_role ? '管理员（' + currentUser.admin_role + '）' : '管理员';
     }
   }
   const info = document.getElementById('user-info');
-  info.innerHTML = `<div>👤 ${currentUser.name}</div><div style="margin-top:2px;opacity:0.7">${roleLabel}</div>`;
+  info.innerHTML = '<div>' + currentUser.name + '</div><div style="margin-top:2px;opacity:0.7">' + roleLabel + '</div>';
   const mobileBadge = document.getElementById('mobile-user-badge');
   if (mobileBadge) mobileBadge.textContent = currentUser.name;
 }
@@ -293,43 +226,41 @@ function renderNavMenu() {
   
   if (currentUser.role === 'admin') {
     if (currentUser.is_super) {
-      // 超级管理员：可看到所有模块
       items = [
-        { id: 'dashboard', icon: '📊', label: '数据看板' },
-        { id: 'merchant-demands', icon: '🏪', label: '商家需求大厅' },
-        { id: 'influencer-demands', icon: '🎯', label: '达人需求大厅' },
-        { id: 'influencer-plaza', icon: '⭐', label: '达人广场' },
-        { id: 'publish', icon: '📝', label: '发布需求' },
-        { id: 'matchmaking', icon: '🔗', label: '合作管理' },
-        { id: 'merchant-manage', icon: '🏢', label: '商家管理' },
-        { id: 'admin-manage', icon: '🛡️', label: '管理员管理' },
+        { id: 'dashboard', icon: 'chart', label: '数据看板' },
+        { id: 'merchant-demands', icon: 'store', label: '商家需求大厅' },
+        { id: 'influencer-demands', icon: 'target', label: '达人需求大厅' },
+        { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
+        { id: 'publish', icon: 'edit', label: '发布需求' },
+        { id: 'matchmaking', icon: 'link', label: '合作管理' },
+        { id: 'merchant-manage', icon: 'building', label: '商家管理' },
+        { id: 'admin-manage', icon: 'shield', label: '管理员管理' },
       ];
     } else {
-      // 非超管管理员：仅看自己操作的数据，无管理员管理模块
       items = [
-        { id: 'dashboard', icon: '📊', label: '数据看板' },
-        { id: 'merchant-demands', icon: '🏪', label: '商家需求大厅' },
-        { id: 'influencer-demands', icon: '🎯', label: '达人需求大厅' },
-        { id: 'influencer-plaza', icon: '⭐', label: '达人广场' },
-        { id: 'publish', icon: '📝', label: '发布需求' },
-        { id: 'matchmaking', icon: '🔗', label: '合作管理' },
-        { id: 'merchant-manage', icon: '🏢', label: '商家管理' },
+        { id: 'dashboard', icon: 'chart', label: '数据看板' },
+        { id: 'merchant-demands', icon: 'store', label: '商家需求大厅' },
+        { id: 'influencer-demands', icon: 'target', label: '达人需求大厅' },
+        { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
+        { id: 'publish', icon: 'edit', label: '发布需求' },
+        { id: 'matchmaking', icon: 'link', label: '合作管理' },
+        { id: 'merchant-manage', icon: 'building', label: '商家管理' },
       ];
     }
   } else if (currentUser.role === 'merchant') {
     items = [
-      { id: 'merchant-demands', icon: '🏪', label: '我的需求' },
-      { id: 'influencer-demands', icon: '🎯', label: '达人需求大厅' },
-      { id: 'influencer-plaza', icon: '⭐', label: '达人广场' },
-      { id: 'publish', icon: '📝', label: '发布需求' },
-      { id: 'profile', icon: '👤', label: '个人中心', badge: notificationCount },
+      { id: 'merchant-demands', icon: 'store', label: '我的需求' },
+      { id: 'influencer-demands', icon: 'target', label: '达人需求大厅' },
+      { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
+      { id: 'publish', icon: 'edit', label: '发布需求' },
+      { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
     ];
   } else {
     items = [
-      { id: 'merchant-demands', icon: '🏪', label: '商家需求大厅' },
-      { id: 'influencer-demands', icon: '🎯', label: '我的需求' },
-      { id: 'publish', icon: '📝', label: '发布需求' },
-      { id: 'profile', icon: '👤', label: '个人中心', badge: notificationCount },
+      { id: 'merchant-demands', icon: 'store', label: '商家需求大厅' },
+      { id: 'influencer-demands', icon: 'target', label: '我的需求' },
+      { id: 'publish', icon: 'edit', label: '发布需求' },
+      { id: 'profile', icon: 'user', label: '个人中心', badge: notificationCount },
     ];
   }
   
@@ -337,9 +268,10 @@ function renderNavMenu() {
     <div class="nav-item ${navigationHistory[navigationHistory.length-1] === item.id ? 'active' : ''}" onclick="navigateTo('${item.id}')">
       <span class="icon">${item.icon}</span>
       <span>${item.label}</span>
-      ${item.badge > 0 ? `<span class="badge-dot">${item.badge}</span>` : ''}
+      ${item.badge> 0 ? '<span class="badge-dot">' + item.badge + '</span>' : ''}
     </div>
   `).join('');
+}
 }
 
 function navigateTo(page, isBack = false) {
@@ -371,7 +303,7 @@ function navigateTo(page, isBack = false) {
 // ============ 数据看板 ============
 async function renderDashboard() {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   const opFilter = getOperatorFilter();
   const statsUrl = '/stats' + (opFilter ? '?' + opFilter.substring(1) : '');
   const res = await fetchAPI(statsUrl);
@@ -380,16 +312,16 @@ async function renderDashboard() {
   
   container.innerHTML = `
     ${renderBackButton()}
-    <div class="page-header"><h2>📊 数据看板</h2></div>
+    <div class="page-header"><h2>数据看板</h2></div>
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-value">${d.totalInfluencers}</div><div class="stat-label">达人总数</div></div>
-      <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-value">${d.merchantDemandCount}</div><div class="stat-label">商家需求数</div></div>
-      <div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-value">${d.influencerDemandCount}</div><div class="stat-label">达人需求数</div></div>
-      <div class="stat-card"><div class="stat-icon">🏪</div><div class="stat-value">${d.demandMerchantCount}</div><div class="stat-label">需求商家数</div></div>
-      <div class="stat-card"><div class="stat-icon">🌟</div><div class="stat-value">${d.demandInfluencerCount}</div><div class="stat-label">需求达人数</div></div>
-      <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value">${d.totalOrders}</div><div class="stat-label">总接单数</div></div>
-      <div class="stat-card"><div class="stat-icon">📈</div><div class="stat-value">${d.totalOrderRate}%</div><div class="stat-label">总接单率</div></div>
-      <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-value">${d.totalDemands}</div><div class="stat-label">总需求数</div></div>
+      <div class="stat-card"><div class="stat-icon">N</div><div class="stat-value">${d.totalInfluencers}</div><div class="stat-label">达人总数</div></div>
+      <div class="stat-card"><div class="stat-icon">D</div><div class="stat-value">${d.merchantDemandCount}</div><div class="stat-label">商家需求数</div></div>
+      <div class="stat-card"><div class="stat-icon"><div><div class="stat-value">${d.influencerDemandCount}</div><div class="stat-label">达人需求数</div></div>
+      <div class="stat-card"><div class="stat-icon"><div><div class="stat-value">${d.demandMerchantCount}</div><div class="stat-label">需求商家数</div></div>
+      <div class="stat-card"><div class="stat-icon">I</div><div class="stat-value">${d.demandInfluencerCount}</div><div class="stat-label">需求达人数</div></div>
+      <div class="stat-card"><div class="stat-icon">V</div><div class="stat-value">${d.totalOrders}</div><div class="stat-label">总接单数</div></div>
+      <div class="stat-card"><div class="stat-icon">%</div><div class="stat-value">${d.totalOrderRate}%</div><div class="stat-label">总接单率</div></div>
+      <div class="stat-card"><div class="stat-icon"><div><div class="stat-value">${d.totalDemands}</div><div class="stat-label">总需求数</div></div>
     </div>
     
     <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
@@ -400,23 +332,23 @@ async function renderDashboard() {
     
     <div class="dashboard-charts">
       <div class="card">
-        <div class="card-header"><h3>📊 达人等级分布</h3></div>
+        <div class="card-header"><h3> 达人等级分布</h3></div>
         <div class="card-body">
           ${d.influencerLevelStats.map(l => `
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
               <span class="level-badge" style="background:${getLevelColor(l.level)}">${l.level}</span>
               <div style="flex:1;background:var(--primary-100);border-radius:6px;height:24px;overflow:hidden;">
-                <div style="background:${getLevelColor(l.level)};height:100%;width:${d.totalInfluencers > 0 ? (l.count/d.totalInfluencers*100) : 0}%;border-radius:6px;display:flex;align-items:center;padding-left:8px;">
+                <div style="background:${getLevelColor(l.level)};height:100%;width:${d.totalInfluencers> 0 ? (l.count/d.totalInfluencers*100) : 0}%;border-radius:6px;display:flex;align-items:center;padding-left:8px;">
                   <span style="color:white;font-size:11px;font-weight:600">${l.count}人</span>
                 </div>
               </div>
-              <span style="font-size:12px;color:var(--gray-500)">${d.totalInfluencers > 0 ? (l.count/d.totalInfluencers*100).toFixed(1) : 0}%</span>
+              <span style="font-size:12px;color:var(--gray-500)">${d.totalInfluencers> 0 ? (l.count/d.totalInfluencers*100).toFixed(1) : 0}%</span>
             </div>
           `).join('')}
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>📋 需求类目分布</h3></div>
+        <div class="card-header"><h3> 需求类目分布</h3></div>
         <div class="card-body">
           ${d.categoryStats.slice(0, 8).map(c => `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:6px 10px;background:var(--primary-light);border-radius:6px;">
@@ -432,7 +364,7 @@ async function renderDashboard() {
 // ============ 商家需求大厅 ============
 async function renderMerchantDemands(page = 1, pageSize = 20, keyword = '') {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
   let url = `/demands?page=${page}&pageSize=${pageSize}`;
   if (currentUser.role === 'merchant') url += `&merchant_id=${currentUser.id}`;
@@ -449,24 +381,24 @@ async function renderMerchantDemands(page = 1, pageSize = 20, keyword = '') {
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
-      <h2>🏪 ${title}</h2>
+      <h2>${title}</h2>
       <div class="page-header-actions">
-        ${currentUser.role !== 'influencer' ? '<button class="btn btn-sm btn-danger" onclick="clearAllMerchantDemands()">🗑 一键清空</button>' : ''}
+        ${currentUser.role !== 'influencer' ? '<button class="btn btn-sm btn-danger" onclick="clearAllMerchantDemands()">一键清空</button>' : ''}
       </div>
     </div>
     <div class="search-filter-bar">
       <input type="text" id="merchant-demand-search" placeholder="搜索需求（名称/类目/商家）..." value="${keyword}" onkeypress="if(event.key==='Enter')searchMerchantDemands()">
-      <button class="btn btn-primary btn-sm" onclick="searchMerchantDemands()">🔍 搜索</button>
+      <button class="btn btn-primary btn-sm" onclick="searchMerchantDemands()">搜索</button>
     </div>
     <div class="demand-grid" id="merchant-demand-list">
-      ${res.data.length === 0 ? '<div class="empty-state"><div class="icon">📭</div><p>暂无需求</p></div>' : 
+      ${res.data.length === 0 ? '<div class="empty-state"><div class="icon">-</div><p>暂无需求</p></div>' : 
         res.data.map(d => renderMerchantDemandCard(d, isInfluencer)).join('')}
     </div>
     ${renderPagination(res.pagination, 'pageMerchantDemands')}`;
 }
 
 function renderMerchantDemandCard(d, isInfluencer) {
-  const typeLabel = d.demand_type === 'book' ? '📚 图书' : '🎓 课程';
+  const typeLabel = d.demand_type === 'book' ? '图书' : '课程';
   // 仅管理员可见归属销售字段（商家、达人登录均不外显）
   const showSales = currentUser.role === 'admin';
   const salesField = showSales ? `
@@ -516,11 +448,11 @@ function renderMerchantDemandCard(d, isInfluencer) {
       </div>
       ${detailHtml}
       <div class="demand-footer">
-        <span class="merchant-info">🏪 ${d.merchant_company || ''} · ${formatDate(d.created_at)}</span>
+        <span class="merchant-info">${d.merchant_company || ''} · ${formatDate(d.created_at)}</span>
         <div style="display:flex;gap:6px;">
-          ${isInfluencer ? `<button class="btn btn-sm btn-apply" onclick="applyCooperation('${d.id}','${d.merchant_id}')">🛒 我要带货</button>` : ''}
-          ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-sm btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">✏️ 编辑</button>` : ''}
-          ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-sm btn-danger" onclick="deleteMerchantDemand('${d.id}')">🗑 删除</button>` : ''}
+          ${isInfluencer ? `<button class="btn btn-sm btn-apply" onclick="applyCooperation('${d.id}','${d.merchant_id}')">我要带货</button>` : ''}
+          ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-sm btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">编辑</button>` : ''}
+          ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-sm btn-danger" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -577,8 +509,8 @@ async function editMerchantDemand(refId, demandType) {
       </div>
       <p style="font-size:12px;color:var(--gray-400);margin-top:6px">提示：佣金可填整数（如 25 表示 25%）或小数（如 0.25 表示 25%），系统会自动识别。</p>
     `;
-    openModal('✏️ 编辑图书需求', body, `
-      <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
+    openModal('编辑图书需求', body, `
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
       <button class="btn btn-primary" onclick="saveMerchantDemandEdit('${refId}','book')">保 存</button>
     `);
   } else {
@@ -593,8 +525,8 @@ async function editMerchantDemand(refId, demandType) {
         <div class="form-group" style="grid-column:1/-1"><label>课程介绍</label><textarea id="edm-course-intro" rows="3">${escapeHtml(row.course_introduction || '')}</textarea></div>
       </div>
     `;
-    openModal('✏️ 编辑课程需求', body, `
-      <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
+    openModal('编辑课程需求', body, `
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
       <button class="btn btn-primary" onclick="saveMerchantDemandEdit('${refId}','course')">保 存</button>
     `);
   }
@@ -658,7 +590,7 @@ async function applyCooperation(demandId, merchantId) {
 // ============ 达人需求大厅 ============
 async function renderInfluencerDemands(page = 1, pageSize = 20, keyword = '') {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
   let url = `/demands/influencer-demands?page=${page}&pageSize=${pageSize}`;
   if (currentUser.role === 'influencer') url += `&influencer_id=${currentUser.id}`;
@@ -675,17 +607,17 @@ async function renderInfluencerDemands(page = 1, pageSize = 20, keyword = '') {
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
-      <h2>🎯 ${title}</h2>
+      <h2>${title}</h2>
       <div class="page-header-actions">
-        ${currentUser.role !== 'merchant' ? '<button class="btn btn-sm btn-danger" onclick="clearAllInfluencerDemands()">🗑 一键清空</button>' : ''}
+        ${currentUser.role !== 'merchant' ? '<button class="btn btn-sm btn-danger" onclick="clearAllInfluencerDemands()">一键清空</button>' : ''}
       </div>
     </div>
     <div class="search-filter-bar">
       <input type="text" id="inf-demand-search" placeholder="搜索达人需求..." value="${keyword}" onkeypress="if(event.key==='Enter')searchInfluencerDemands()">
-      <button class="btn btn-primary btn-sm" onclick="searchInfluencerDemands()">🔍 搜索</button>
+      <button class="btn btn-primary btn-sm" onclick="searchInfluencerDemands()">搜索</button>
     </div>
     <div class="demand-grid" id="inf-demand-list">
-      ${res.data.length === 0 ? '<div class="empty-state"><div class="icon">📭</div><p>暂无达人需求</p></div>' :
+      ${res.data.length === 0 ? '<div class="empty-state"><div class="icon">-</div><p>暂无达人需求</p></div>' :
         res.data.map(d => renderInfluencerDemandCard(d, isMerchant)).join('')}
     </div>
     ${renderPagination(res.pagination, 'pageInfluencerDemands')}`;
@@ -704,17 +636,17 @@ function renderInfluencerDemandCard(d, isMerchant) {
         <div class="detail-field"><div class="detail-label">粉丝数</div><div class="detail-value">${formatNumber(d.fans_count || d.inf_fans_count)}</div></div>
         ${d.book_name ? `<div class="detail-field"><div class="detail-label">图书名称</div><div class="detail-value">${d.book_name}</div></div>` : ''}
         ${d.book_category ? `<div class="detail-field"><div class="detail-label">图书分类</div><div class="detail-value">${d.book_category}</div></div>` : ''}
-        ${d.book_price_max > 0 ? `<div class="detail-field"><div class="detail-label">图书售价范围</div><div class="detail-value">¥${d.book_price_min}-${d.book_price_max}</div></div>` : ''}
-        ${d.course_price_max > 0 ? `<div class="detail-field"><div class="detail-label">课程价格范围</div><div class="detail-value">¥${d.course_price_min}-${d.course_price_max}</div></div>` : ''}
+        ${d.book_price_max> 0 ? `<div class="detail-field"><div class="detail-label">图书售价范围</div><div class="detail-value">¥${d.book_price_min}-${d.book_price_max}</div></div>` : ''}
+        ${d.course_price_max> 0 ? `<div class="detail-field"><div class="detail-label">课程价格范围</div><div class="detail-value">¥${d.course_price_min}-${d.course_price_max}</div></div>` : ''}
         ${d.subject_category ? `<div class="detail-field"><div class="detail-label">学科分类</div><div class="detail-value">${d.subject_category}</div></div>` : ''}
         ${d.description ? `<div class="detail-field full-width"><div class="detail-label">需求描述</div><div class="detail-value">${d.description}</div></div>` : ''}
       </div>
       <div class="demand-footer">
-        <span class="merchant-info">📅 ${formatDate(d.created_at)}</span>
+        <span class="merchant-info"> ${formatDate(d.created_at)}</span>
         <div style="display:flex;gap:6px;">
-          ${isMerchant ? `<button class="btn btn-sm btn-invite" onclick="inviteInfluencer('${d.influencer_id}','${d.id}')">🤝 邀请合作</button>` : ''}
-          ${currentUser.role === 'admin' || currentUser.role === 'influencer' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencerDemand('${d.id}')">✏️ 编辑</button>` : ''}
-          ${currentUser.role === 'admin' || currentUser.role === 'influencer' ? `<button class="btn btn-sm btn-danger" onclick="deleteInfluencerDemand('${d.id}')">🗑 删除</button>` : ''}
+          ${isMerchant ? `<button class="btn btn-sm btn-invite" onclick="inviteInfluencer('${d.influencer_id}','${d.id}')">~ 邀请合作</button>` : ''}
+          ${currentUser.role === 'admin' || currentUser.role === 'influencer' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencerDemand('${d.id}')">编辑</button>` : ''}
+          ${currentUser.role === 'admin' || currentUser.role === 'influencer' ? `<button class="btn btn-sm btn-danger" onclick="deleteInfluencerDemand('${d.id}')">删除</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -760,8 +692,8 @@ async function editInfluencerDemand(id) {
       <div class="form-group" style="grid-column:1/-1"><label>需求描述</label><textarea id="eid-description" rows="3">${escapeHtml(d.description || '')}</textarea></div>
     </div>
   `;
-  openModal('✏️ 编辑达人需求', body, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
+  openModal('编辑达人需求', body, `
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
     <button class="btn btn-primary" onclick="saveInfluencerDemandEdit('${id}')">保 存</button>
   `);
 }
@@ -800,7 +732,7 @@ async function inviteInfluencer(influencerId, demandId) {
 // ============ 达人广场 ============
 async function renderInfluencerPlaza(page = 1, pageSize = 20, keyword = '') {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
   const [levelRes, infRes, salesRes] = await Promise.all([
     fetchAPI('/stats/influencer-levels'),
@@ -815,7 +747,7 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20, keyword = '') {
   
   container.innerHTML = `
     ${renderBackButton()}
-    <div class="page-header"><h2>⭐ 达人广场</h2></div>
+    <div class="page-header"><h2>达人广场</h2></div>
     <div class="level-stats-bar">
       <div class="level-stat-item"><span class="level-stat-label">总计</span><span class="level-stat-value">${levelData.total}</span></div>
       ${levelData.levelStats.map(l => `
@@ -827,20 +759,20 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20, keyword = '') {
     </div>
     <div class="search-filter-bar">
       <input type="text" id="inf-plaza-search" placeholder="搜索达人（名称/分类/地区）..." value="${keyword}" onkeypress="if(event.key==='Enter')searchInfluencerPlaza()">
-      <button class="btn btn-primary btn-sm" onclick="searchInfluencerPlaza()">🔍 搜索</button>
+      <button class="btn btn-primary btn-sm" onclick="searchInfluencerPlaza()">搜索</button>
       ${currentUser.role === 'admin' ? `
-        <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">➕ 添加达人</button>
-        <button class="btn btn-sm btn-warning" onclick="showInfluencerExcelUpload()">📤 批量上传</button>
-        <button class="btn btn-sm btn-danger" onclick="clearAllInfluencers()">🗑 一键清空</button>
+        <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">添加达人</button>
+        <button class="btn btn-sm btn-warning" onclick="showInfluencerExcelUpload()">批量上传</button>
+        <button class="btn btn-sm btn-danger" onclick="clearAllInfluencers()">一键清空</button>
       ` : ''}
     </div>
     <div id="influencer-upload-area" style="display:none;margin-bottom:16px">
-      <div class="card"><div class="card-header"><h3>📤 批量上传达人</h3></div><div class="card-body">
+      <div class="card"><div class="card-header"><h3>批量上传达人</h3></div><div class="card-body">
         <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">📥 下载达人导入模板</a>
+          <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">下载导入模板</a>
         </div>
         <div class="upload-area" onclick="document.getElementById('influencer-excel-input').click()">
-          <div class="upload-icon">📁</div>
+          <div class="upload-icon"></div>
           <div class="upload-text">点击上传达人Excel文件</div>
           <div class="upload-hint">支持.xlsx格式，请按模板格式填写达人信息</div>
         </div>
@@ -849,7 +781,7 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20, keyword = '') {
       </div></div>
     </div>
     <div class="demand-grid">
-      ${(!infRes.success || infRes.data.length === 0) ? '<div class="empty-state"><div class="icon">👥</div><p>暂无达人</p></div>' :
+      ${(!infRes.success || infRes.data.length === 0) ? '<div class="empty-state"><div class="icon">N</div><p>暂无达人</p></div>' :
         infRes.data.map(inf => renderInfluencerCard(inf, isMerchant)).join('')}
     </div>
     ${infRes.success ? renderPagination(infRes.pagination, 'pageInfluencerPlaza') : ''}`;
@@ -889,8 +821,8 @@ function renderInfluencerCard(inf, isMerchant) {
       <div class="demand-footer">
         <span class="merchant-info">${inf.has_mcn === '是' ? `MCN: ${inf.mcn_name}` : '独立达人'} · ${inf.region || ''}</span>
         <div style="display:flex;gap:6px;">
-          ${isMerchant ? `<button class="btn btn-sm btn-invite" onclick="inviteInfluencer('${inf.id}','')">🤝 邀请合作</button>` : ''}
-          ${currentUser.role === 'admin' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencer('${inf.id}')">✏️ 编辑</button>` : ''}
+          ${isMerchant ? `<button class="btn btn-sm btn-invite" onclick="inviteInfluencer('${inf.id}','')">~ 邀请合作</button>` : ''}
+          ${currentUser.role === 'admin' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -947,8 +879,8 @@ async function editInfluencer(id) {
       </div>
     </div>
   `;
-  openModal('✏️ 编辑达人信息', body, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
+  openModal('编辑达人信息', body, `
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
     <button class="btn btn-primary" onclick="saveInfluencerEdit('${id}')">保 存</button>
   `);
 }
@@ -990,7 +922,7 @@ async function handleInfluencerExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   const resultDiv = document.getElementById('influencer-import-result');
-  resultDiv.innerHTML = '<p>⏳ 正在导入达人数据...</p>';
+  resultDiv.innerHTML = '<p> 正在导入达人数据...</p>';
   
   const formData = new FormData();
   formData.append('file', file);
@@ -1003,17 +935,17 @@ async function handleInfluencerExcelUpload(e) {
     const data = await res.json();
     if (data.success) {
       resultDiv.innerHTML = `<div class="import-result-box success">
-        ✅ ${data.message}
-        ${data.data.errors && data.data.errors.length > 0 ? `<div class="result-errors">${data.data.errors.slice(0, 5).join('<br>')}</div>` : ''}
+        V ${data.message}
+        ${data.data.errors && data.data.errors.length> 0 ? `<div class="result-errors">${data.data.errors.slice(0, 5).join('<br>')}</div>` : ''}
       </div>`;
       showToast(`达人导入成功！成功${data.data.success}条`);
       setTimeout(() => renderInfluencerPlaza(), 1500);
     } else {
-      resultDiv.innerHTML = `<div class="import-result-box error">❌ 导入失败：${data.error}</div>`;
+      resultDiv.innerHTML = `<div class="import-result-box error">导入失败：${data.error}</div>`;
       showToast(data.error || '导入失败', 'error');
     }
   } catch (err) {
-    resultDiv.innerHTML = `<div class="import-result-box error">❌ 上传失败：${err.message}</div>`;
+    resultDiv.innerHTML = `<div class="import-result-box error">上传失败：${err.message}</div>`;
     showToast('上传失败: ' + err.message, 'error');
   }
   e.target.value = '';
@@ -1028,7 +960,7 @@ async function showAddInfluencerModal() {
   const modal = document.getElementById('modal-overlay');
   modal.innerHTML = `
     <div class="modal">
-      <div class="modal-header"><h3>➕ 添加达人</h3><button class="modal-close" onclick="closeModal()">×</button></div>
+      <div class="modal-header"><h3>添加达人</h3><button class="modal-close" onclick="closeModal()">×</button></div>
       <div class="modal-body">
         <form onsubmit="submitAddInfluencer(event)">
           <div class="form-row">
@@ -1072,7 +1004,7 @@ async function showAddInfluencerModal() {
             <p style="font-size:11px;color:var(--gray-400);margin-top:4px">设置后，对应销售登录可看到此达人信息</p>
           </div>
           <div class="form-group"><label>公众号账号名称</label><input id="add-inf-official" placeholder="公众号名称"></div>
-          <button type="submit" class="btn btn-primary btn-block">✅ 确认添加</button>
+          <button type="submit" class="btn btn-primary btn-block">V 确认添加</button>
         </form>
       </div>
     </div>`;
@@ -1125,16 +1057,16 @@ function renderPublish() {
     tabs = `<button class="tab-btn active" onclick="showPublishTab('influencer-demand')">达人需求发布</button>`;
   } else {
     tabs = `
-      <button class="tab-btn active" onclick="showPublishTab('book')">📚 图书需求</button>
-      <button class="tab-btn" onclick="showPublishTab('course')">🎓 课程需求</button>
-      ${currentUser.role === 'admin' ? '<button class="tab-btn" onclick="showPublishTab(\'influencer-demand\')">🎯 达人需求</button>' : ''}
-      <button class="tab-btn" onclick="showPublishTab('excel')">📤 Excel导入</button>
+      <button class="tab-btn active" onclick="showPublishTab('book')">图书需求</button>
+      <button class="tab-btn" onclick="showPublishTab('course')">课程需求</button>
+      ${currentUser.role === 'admin' ? '<button class="tab-btn" onclick="showPublishTab(\'influencer-demand\')">达人需求</button>' : ''}
+      <button class="tab-btn" onclick="showPublishTab('excel')">Excel导入</button>
     `;
   }
   
   container.innerHTML = `
     ${renderBackButton()}
-    <div class="page-header"><h2>📝 发布需求</h2></div>
+    <div class="page-header"><h2>发布需求</h2></div>
     <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">${tabs}</div>
     <div id="publish-content"></div>`;
   
@@ -1160,7 +1092,7 @@ function showPublishTab(tab) {
 function renderBookForm() {
   const merchantId = currentUser.role === 'merchant' ? currentUser.id : '';
   return `
-    <div class="card"><div class="card-header"><h3>📚 发布图书需求</h3></div><div class="card-body">
+    <div class="card"><div class="card-header"><h3>发布图书需求</h3></div><div class="card-body">
       <form onsubmit="submitBookDemand(event)">
         <div class="form-row">
           <div class="form-group"><label>图书商家 *</label><input id="pub-book-merchant" required placeholder="出版社/图书商家名称"></div>
@@ -1186,7 +1118,7 @@ function renderBookForm() {
         <div class="form-group"><label>微信小店商品链接</label><input id="pub-book-link" placeholder="https://"></div>
         <div class="form-group"><label>图书图片URL</label><input id="pub-book-image" placeholder="图片链接（可选）"></div>
         <input type="hidden" id="pub-book-merchant-id" value="${merchantId}">
-            <button type="submit" class="btn btn-primary btn-block">📚 发布图书需求</button>
+            <button type="submit" class="btn btn-primary btn-block">发布图书需求</button>
       </form>
     </div></div>`;
 }
@@ -1194,7 +1126,7 @@ function renderBookForm() {
 function renderCourseForm() {
   const merchantId = currentUser.role === 'merchant' ? currentUser.id : '';
   return `
-    <div class="card"><div class="card-header"><h3>🎓 发布课程需求</h3></div><div class="card-body">
+    <div class="card"><div class="card-header"><h3>发布课程需求</h3></div><div class="card-body">
       <form onsubmit="submitCourseDemand(event)">
         <div class="form-row">
           <div class="form-group"><label>课程名称 *</label><input id="pub-course-name" required placeholder="课程名称"></div>
@@ -1208,14 +1140,14 @@ function renderCourseForm() {
         <div class="form-group"><label>课程链接</label><input id="pub-course-link" placeholder="https://"></div>
         <div class="form-group"><label>课程图片URL</label><input id="pub-course-image" placeholder="图片链接（可选）"></div>
         <input type="hidden" id="pub-course-merchant-id" value="${merchantId}">
-            <button type="submit" class="btn btn-primary btn-block">🎓 发布课程需求</button>
+            <button type="submit" class="btn btn-primary btn-block">发布课程需求</button>
       </form>
     </div></div>`;
 }
 
 function renderInfluencerDemandForm() {
   return `
-    <div class="card"><div class="card-header"><h3>🎯 发布达人需求</h3></div><div class="card-body">
+    <div class="card"><div class="card-header"><h3>发布达人需求</h3></div><div class="card-body">
       <form onsubmit="submitInfluencerDemand(event)">
         <div class="form-row">
           <div class="form-group"><label>视频号账号名称</label><input id="pub-inf-account" value="${currentUser.role === 'influencer' ? currentUser.name : ''}" placeholder="达人视频号名称"></div>
@@ -1235,18 +1167,18 @@ function renderInfluencerDemandForm() {
         </div>
         <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" placeholder="500000" value="${currentUser.fans_count || ''}"></div>
         <div class="form-group"><label>需求描述</label><textarea id="pub-inf-desc" rows="3" placeholder="描述您的需求"></textarea></div>
-            <button type="submit" class="btn btn-primary btn-block">🌟 发布达人需求</button>
+            <button type="submit" class="btn btn-primary btn-block">I 发布达人需求</button>
       </form>
     </div></div>`;
 }
 
 function renderExcelImport() {
   return `
-    <div class="card"><div class="card-header"><h3>📤 Excel批量导入需求</h3></div><div class="card-body">
+    <div class="card"><div class="card-header"><h3> Excel批量导入需求</h3></div><div class="card-body">
       <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
-        <a href="/api/excel/template/book" class="btn btn-outline btn-sm">📥 下载图书需求模板</a>
-        <a href="/api/excel/template/course" class="btn btn-outline btn-sm">📥 下载课程需求模板</a>
-        <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">📥 下载达人模板</a>
+        <a href="/api/excel/template/book" class="btn btn-outline btn-sm">下载图书需求模板</a>
+        <a href="/api/excel/template/course" class="btn btn-outline btn-sm"> 下载课程需求模板</a>
+        <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm"> 下载达人模板</a>
       </div>
       <div class="form-group">
         <label>选择导入类型 *</label>
@@ -1257,7 +1189,7 @@ function renderExcelImport() {
         </select>
       </div>
       <div class="upload-area" onclick="document.getElementById('excel-file-input').click()">
-        <div class="upload-icon">📁</div>
+        <div class="upload-icon"></div>
         <div class="upload-text">点击上传Excel文件</div>
         <div class="upload-hint">支持.xlsx格式，请先选择导入类型再上传对应模板数据</div>
       </div>
@@ -1335,7 +1267,7 @@ async function handleExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
   const resultDiv = document.getElementById('excel-import-result');
-  resultDiv.innerHTML = '<p>⏳ 正在导入...</p>';
+  resultDiv.innerHTML = '<p> 正在导入...</p>';
   
   const importType = document.getElementById('excel-import-type').value;
   const formData = new FormData();
@@ -1363,18 +1295,18 @@ async function handleExcelUpload(e) {
     if (data.success) {
       const count = data.data?.success || data.data?.count || 0;
       const failed = data.data?.failed || 0;
-      let html = `<div class="import-result-box success">✅ ${data.message || '导入成功！共导入 ' + count + ' 条记录'}</div>`;
-      if (data.data?.errors && data.data.errors.length > 0) {
+      let html = `<div class="import-result-box success">V ${data.message || '导入成功！共导入 ' + count + ' 条记录'}</div>`;
+      if (data.data?.errors && data.data.errors.length> 0) {
         html += `<div class="result-errors" style="margin-top:8px;font-size:12px;color:#991b1b">${data.data.errors.slice(0, 5).join('<br>')}</div>`;
       }
       resultDiv.innerHTML = html;
-      showToast(`导入成功！成功${count}条${failed > 0 ? '，失败' + failed + '条' : ''}`);
+      showToast(`导入成功！成功${count}条${failed> 0 ? '，失败' + failed + '条' : ''}`);
     } else {
-      resultDiv.innerHTML = `<div class="import-result-box error">❌ 导入失败：${data.error}</div>`;
+      resultDiv.innerHTML = `<div class="import-result-box error">导入失败：${data.error}</div>`;
       showToast(data.error || '导入失败', 'error');
     }
   } catch (err) {
-    resultDiv.innerHTML = `<div class="import-result-box error">❌ 上传失败：${err.message}</div>`;
+    resultDiv.innerHTML = `<div class="import-result-box error">上传失败：${err.message}</div>`;
     showToast('上传失败: ' + err.message, 'error');
   }
   e.target.value = '';
@@ -1383,7 +1315,7 @@ async function handleExcelUpload(e) {
 // ============ 合作管理（管理员） ============
 async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = '') {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
   const [statsRes, listRes] = await Promise.all([
     fetchAPI('/cooperation/matchmaking/stats' + (getOperatorFilter() ? '?' + getOperatorFilter().substring(1) : '')),
@@ -1408,7 +1340,7 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
-      <h2>🔗 合作管理</h2>
+      <h2>合作管理</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="font-size:13px;color:var(--gray-500)">共 ${totalCount} 条记录</span>
         <button class="btn btn-primary" onclick="showCreateMatchmaking()">+ 新建合作</button>
@@ -1416,15 +1348,15 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
     </div>
     <div class="search-filter-bar">
       <input type="text" id="mm-search" placeholder="搜索撮合记录..." value="${keyword}" onkeypress="if(event.key==='Enter')searchMatchmaking()">
-      <button class="btn btn-primary btn-sm" onclick="searchMatchmaking()">🔍 搜索</button>
-      ${stage ? `<button class="btn btn-outline btn-sm" onclick="filterMatchmakingByStage('')">查看全部</button>` : `<span style="font-size:12px;color:var(--gray-400);margin-left:8px">👉 点击环节标题可单独查看该环节</span>`}
+      <button class="btn btn-primary btn-sm" onclick="searchMatchmaking()">搜索</button>
+      ${stage ? `<button class="btn btn-outline btn-sm" onclick="filterMatchmakingByStage('')">查看全部</button>` : `<span style="font-size:12px;color:var(--gray-400);margin-left:8px"> 点击环节标题可单独查看该环节</span>`}
     </div>
     <div class="matchmaking-kanban">
       ${stages.map((s, idx) => {
         const stageItems = stage ? (s === stage ? groupedData[s] : []) : groupedData[s];
         const isFiltered = stage && s !== stage;
         const isActive = stage && s === stage;
-        const stageIcon = ['📋', '🤝', '📦', '🚀'][idx];
+        const stageIcon = ['', '~', 'D', '^'][idx];
         const stageColor = ['#3b82f6', '#f59e0b', '#6366f1', '#10b981'][idx];
         const stageBgLight = ['#eff6ff', '#fffbeb', '#eef2ff', '#ecfdf5'][idx];
         
@@ -1457,29 +1389,29 @@ function renderKanbanMatchmakingCard(mm, stageColor) {
   // 升级佣金大于原佣金时触发红色五角星标签
   const _cr = mm.commission_rate != null && mm.commission_rate !== '' ? parseFloat(mm.commission_rate) : null;
   const _ucr = mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? parseFloat(mm.upgrade_commission_rate) : null;
-  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr > _cr;
+  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr> _cr;
   
   return `
     <div class="kanban-card" data-id="${mm.id}" style="border-top:3px solid ${stageColor}">
       <div class="kanban-card-header">
         <div class="kanban-card-parties">
-          ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)} > 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
-          <div class="kanban-party kanban-merchant" title="${mm.merchant_company || mm.merchant_name || ''}">🏪 ${mm.merchant_company || mm.merchant_name || '未知商家'}</div>
+          ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)}> 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
+          <div class="kanban-party kanban-merchant" title="${mm.merchant_company || mm.merchant_name || ''}">${mm.merchant_company || mm.merchant_name || '未知商家'}</div>
           <div class="kanban-arrow-down">⬇</div>
-          <div class="kanban-party kanban-influencer" title="${mm.video_account_name || ''}">🌟 ${mm.video_account_name || '未知达人'}</div>
+          <div class="kanban-party kanban-influencer" title="${mm.video_account_name || ''}">I ${mm.video_account_name || '未知达人'}</div>
         </div>
       </div>
       ${mm.product_name ? `
       <div class="kanban-card-product">
-        <div class="kanban-product-name" title="${mm.product_name}">🛍 ${mm.product_name}</div>
+        <div class="kanban-product-name" title="${mm.product_name}"> ${mm.product_name}</div>
         ${mm.stage === '开始合作' && mm.order_count != null && mm.order_count !== '' ? `
         <div class="kanban-product-meta">
-          <span>📦 ${mm.order_count}单</span>
+          <span>D ${mm.order_count}单</span>
         </div>` : ''}
       </div>` : (mm.stage === '开始合作' && mm.order_count != null && mm.order_count !== '' ? `
       <div class="kanban-card-product">
         <div class="kanban-product-meta">
-          <span>📦 ${mm.order_count}单</span>
+          <span>D ${mm.order_count}单</span>
         </div>
       </div>` : '')}
       ${(mm.commission_rate != null || mm.upgrade_commission_rate != null || mm.cooperation_mode) ? `
@@ -1494,9 +1426,9 @@ function renderKanbanMatchmakingCard(mm, stageColor) {
       </div>
       <div class="kanban-card-actions">
         <button class="btn-tiny btn-tiny-view" onclick="viewMatchmakingDetail('${mm.id}')">详情</button>
-        <button class="btn-tiny btn-tiny-edit" onclick="editMatchmakingDetail('${mm.id}')">✏️ 编辑</button>
+        <button class="btn-tiny btn-tiny-edit" onclick="editMatchmakingDetail('${mm.id}')">编辑</button>
         <button class="btn-tiny btn-tiny-move" onclick="editMatchmakingStage('${mm.id}','${mm.stage}')">流转</button>
-        ${currentUser.role === 'admin' ? `<button class="btn-tiny btn-tiny-del" onclick="deleteMatchmaking('${mm.id}')">🗑 删除</button>` : ''}
+        ${currentUser.role === 'admin' ? `<button class="btn-tiny btn-tiny-del" onclick="deleteMatchmaking('${mm.id}')">删除</button>` : ''}
       </div>
     </div>`;
 }
@@ -1507,7 +1439,7 @@ function renderVerticalMatchmakingCard(mm, stageColor) {
   // 升级佣金大于原佣金时触发红色五角星标签
   const _cr = mm.commission_rate != null && mm.commission_rate !== '' ? parseFloat(mm.commission_rate) : null;
   const _ucr = mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? parseFloat(mm.upgrade_commission_rate) : null;
-  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr > _cr;
+  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr> _cr;
   
   return `
     <div class="matchmaking-vcard" data-id="${mm.id}">
@@ -1519,10 +1451,10 @@ function renderVerticalMatchmakingCard(mm, stageColor) {
       <div class="matchmaking-vcard-content">
         <div class="vcard-header">
           <div class="vcard-parties">
-            ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)} > 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
-            <span class="vcard-merchant">🏪 ${mm.merchant_company || mm.merchant_name || '未知商家'}</span>
+            ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)}> 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
+            <span class="vcard-merchant">${mm.merchant_company || mm.merchant_name || '未知商家'}</span>
             <span class="vcard-arrow">⟷</span>
-            <span class="vcard-influencer">🌟 ${mm.video_account_name || '未知达人'}</span>
+            <span class="vcard-influencer">I ${mm.video_account_name || '未知达人'}</span>
           </div>
           <div class="vcard-meta">
             <span class="vcard-date">${formatDate(mm.created_at)}</span>
@@ -1532,24 +1464,24 @@ function renderVerticalMatchmakingCard(mm, stageColor) {
         <div class="vcard-details">
           <div class="vcard-detail-item"><span class="detail-label">关联需求</span><span class="detail-value">${mm.demand_title || '无'}</span></div>
           <div class="vcard-detail-item"><span class="detail-label">来源</span><span class="detail-value">${mm.source || '-'}</span></div>
-          ${mm.product_name ? `<div class="vcard-detail-item"><span class="detail-label">🛍 商品名称</span><span class="detail-value">${mm.product_name}</span></div>` : ''}
-          ${mm.influencer_account ? `<div class="vcard-detail-item"><span class="detail-label">📱 达人账号</span><span class="detail-value">${mm.influencer_account}</span></div>` : ''}
-          ${mm.product_price != null && mm.product_price !== '' ? `<div class="vcard-detail-item"><span class="detail-label">💰 商品价格</span><span class="detail-value">¥${mm.product_price}</span></div>` : ''}
-          ${mm.order_count != null && mm.order_count !== '' ? `<div class="vcard-detail-item"><span class="detail-label">📦 订单量</span><span class="detail-value">${mm.order_count}</span></div>` : ''}
-          ${mm.cooperation_mode ? `<div class="vcard-detail-item"><span class="detail-label">🤝 合作模式</span><span class="detail-value">${mm.cooperation_mode}</span></div>` : ''}
-          ${mm.commission_rate != null && mm.commission_rate !== '' ? `<div class="vcard-detail-item"><span class="detail-label">📊 佣金率</span><span class="detail-value">${formatPercent(mm.commission_rate)}</span></div>` : ''}
-          ${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? `<div class="vcard-detail-item"><span class="detail-label">${hasUpgrade ? '⭐ 升级佣金' : '📊 升级佣金'}</span><span class="detail-value" style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${formatPercent(mm.upgrade_commission_rate)}</span></div>` : ''}
-          ${mm.gmv != null && mm.gmv !== '' ? `<div class="vcard-detail-item"><span class="detail-label">📈 GMV</span><span class="detail-value">¥${mm.gmv}</span></div>` : ''}
+          ${mm.product_name ? `<div class="vcard-detail-item"><span class="detail-label"> 商品名称</span><span class="detail-value">${mm.product_name}</span></div>` : ''}
+          ${mm.influencer_account ? `<div class="vcard-detail-item"><span class="detail-label">达人账号</span><span class="detail-value">${mm.influencer_account}</span></div>` : ''}
+          ${mm.product_price != null && mm.product_price !== '' ? `<div class="vcard-detail-item"><span class="detail-label">$ 商品价格</span><span class="detail-value">¥${mm.product_price}</span></div>` : ''}
+          ${mm.order_count != null && mm.order_count !== '' ? `<div class="vcard-detail-item"><span class="detail-label">D 订单量</span><span class="detail-value">${mm.order_count}</span></div>` : ''}
+          ${mm.cooperation_mode ? `<div class="vcard-detail-item"><span class="detail-label">~ 合作模式</span><span class="detail-value">${mm.cooperation_mode}</span></div>` : ''}
+          ${mm.commission_rate != null && mm.commission_rate !== '' ? `<div class="vcard-detail-item"><span class="detail-label"> 佣金率</span><span class="detail-value">${formatPercent(mm.commission_rate)}</span></div>` : ''}
+          ${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? `<div class="vcard-detail-item"><span class="detail-label">${hasUpgrade ? '⭐ 升级佣金' : ' 升级佣金'}</span><span class="detail-value" style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${formatPercent(mm.upgrade_commission_rate)}</span></div>` : ''}
+          ${mm.gmv != null && mm.gmv !== '' ? `<div class="vcard-detail-item"><span class="detail-label">% GMV</span><span class="detail-value">¥${mm.gmv}</span></div>` : ''}
           ${mm.matchmaking_time ? `<div class="vcard-detail-item"><span class="detail-label">⏰ 撮合时间</span><span class="detail-value">${formatDate(mm.matchmaking_time)}</span></div>` : ''}
           <div class="vcard-detail-item"><span class="detail-label">备注</span><span class="detail-value">${mm.notes || '-'}</span></div>
           ${mm.sample_info ? `<div class="vcard-detail-item"><span class="detail-label">样品信息</span><span class="detail-value">${mm.sample_info}</span></div>` : ''}
           ${mm.cooperation_details ? `<div class="vcard-detail-item"><span class="detail-label">合作详情</span><span class="detail-value">${mm.cooperation_details}</span></div>` : ''}
         </div>
         <div class="vcard-actions">
-          <button class="btn btn-sm btn-outline" onclick="viewMatchmakingDetail('${mm.id}')">📋 详情</button>
-          <button class="btn btn-sm btn-primary" onclick="editMatchmakingDetail('${mm.id}')">✏️ 编辑</button>
+          <button class="btn btn-sm btn-outline" onclick="viewMatchmakingDetail('${mm.id}')"> 详情</button>
+          <button class="btn btn-sm btn-primary" onclick="editMatchmakingDetail('${mm.id}')">编辑</button>
           <button class="btn btn-sm btn-warning" onclick="editMatchmakingStage('${mm.id}','${mm.stage}')">⏭ 流转</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteMatchmaking('${mm.id}')">🗑</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteMatchmaking('${mm.id}')"></button>
         </div>
       </div>
     </div>`;
@@ -1566,37 +1498,37 @@ async function viewMatchmakingDetail(id) {
   const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
   const _cr = mm.commission_rate != null && mm.commission_rate !== '' ? parseFloat(mm.commission_rate) : null;
   const _ucr = mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? parseFloat(mm.upgrade_commission_rate) : null;
-  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr > _cr;
+  const hasUpgrade = _ucr != null && _cr != null && !isNaN(_ucr) && !isNaN(_cr) && _ucr> _cr;
   
   openModal('撮合详情', `
     <div style="margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)} > 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
+        ${hasUpgrade ? `<span class="upgrade-star" title="升级佣金 ${formatPercent(mm.upgrade_commission_rate)}> 原佣金 ${formatPercent(mm.commission_rate)}">★</span>` : ''}
         ${getStageBadge(mm.stage)}
         <strong>${mm.merchant_company || mm.merchant_name || ''}</strong> ⟷ <strong style="color:var(--primary-600)">${mm.video_account_name || ''}</strong>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;background:var(--primary-light);padding:12px;border-radius:8px">
         <div><span style="color:var(--gray-400)">需求：</span>${mm.demand_title || '-'}</div>
         <div><span style="color:var(--gray-400)">来源：</span>${mm.source || '-'}</div>
-        <div><span style="color:var(--gray-400)">🏪 商家归属销售：</span>${mm.merchant_sales_owner_name ? `<span style="color:var(--primary-700);font-weight:600">${mm.merchant_sales_owner_name}</span><span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#dcfce7;color:#166534;border-radius:10px;font-size:11px">销售</span>` : '<span style="color:var(--gray-400)">未分配</span>'}</div>
-        <div><span style="color:var(--gray-400)">🌟 达人归属销售：</span>${mm.influencer_sales_owner_name ? `<span style="color:var(--primary-700);font-weight:600">${mm.influencer_sales_owner_name}</span><span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#dcfce7;color:#166534;border-radius:10px;font-size:11px">销售</span>` : (mm.inf_sales_owner_text ? mm.inf_sales_owner_text : '<span style="color:var(--gray-400)">未分配</span>')}</div>
+        <div><span style="color:var(--gray-400)">商家归属销售：</span>${mm.merchant_sales_owner_name ? `<span style="color:var(--primary-700);font-weight:600">${mm.merchant_sales_owner_name}</span><span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#dcfce7;color:#166534;border-radius:10px;font-size:11px">销售</span>` : '<span style="color:var(--gray-400)">未分配</span>'}</div>
+        <div><span style="color:var(--gray-400)">I 达人归属销售：</span>${mm.influencer_sales_owner_name ? `<span style="color:var(--primary-700);font-weight:600">${mm.influencer_sales_owner_name}</span><span style="display:inline-block;margin-left:6px;padding:1px 6px;background:#dcfce7;color:#166534;border-radius:10px;font-size:11px">销售</span>` : (mm.inf_sales_owner_text ? mm.inf_sales_owner_text : '<span style="color:var(--gray-400)">未分配</span>')}</div>
         <div><span style="color:var(--gray-400)">达人等级：</span>${mm.inf_level || '-'}</div>
         <div><span style="color:var(--gray-400)">达人粉丝：</span>${formatNumber(mm.inf_fans)}</div>
-        <div><span style="color:var(--gray-400)">🛍 商品名称：</span>${mm.product_name || '-'}</div>
-        <div><span style="color:var(--gray-400)">📱 达人账号：</span>${mm.influencer_account || '-'}</div>
-        <div><span style="color:var(--gray-400)">💰 商品价格：</span>${mm.product_price != null && mm.product_price !== '' ? '¥' + mm.product_price : '-'}</div>
-        <div><span style="color:var(--gray-400)">📦 订单量：</span>${mm.order_count != null && mm.order_count !== '' ? mm.order_count : '-'}</div>
-        <div><span style="color:var(--gray-400)">🤝 合作模式：</span>${mm.cooperation_mode || '-'}</div>
-        <div><span style="color:var(--gray-400)">📊 佣金率：</span>${mm.commission_rate != null && mm.commission_rate !== '' ? formatPercent(mm.commission_rate) : '-'}</div>
-        <div><span style="color:var(--gray-400)">${hasUpgrade ? '⭐ 升级佣金' : '📊 升级佣金'}：</span><span style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? formatPercent(mm.upgrade_commission_rate) : '-'}</span></div>
-        <div><span style="color:var(--gray-400)">📈 GMV：</span>${mm.gmv != null && mm.gmv !== '' ? '¥' + mm.gmv : '-'}<span style="color:var(--gray-400);font-size:11px;margin-left:6px">（价格×订单量自动计算）</span></div>
+        <div><span style="color:var(--gray-400)"> 商品名称：</span>${mm.product_name || '-'}</div>
+        <div><span style="color:var(--gray-400)">达人账号：</span>${mm.influencer_account || '-'}</div>
+        <div><span style="color:var(--gray-400)">$ 商品价格：</span>${mm.product_price != null && mm.product_price !== '' ? '¥' + mm.product_price : '-'}</div>
+        <div><span style="color:var(--gray-400)">D 订单量：</span>${mm.order_count != null && mm.order_count !== '' ? mm.order_count : '-'}</div>
+        <div><span style="color:var(--gray-400)">~ 合作模式：</span>${mm.cooperation_mode || '-'}</div>
+        <div><span style="color:var(--gray-400)"> 佣金率：</span>${mm.commission_rate != null && mm.commission_rate !== '' ? formatPercent(mm.commission_rate) : '-'}</div>
+        <div><span style="color:var(--gray-400)">${hasUpgrade ? '⭐ 升级佣金' : ' 升级佣金'}：</span><span style="${hasUpgrade ? 'color:#dc2626;font-weight:700' : ''}">${mm.upgrade_commission_rate != null && mm.upgrade_commission_rate !== '' ? formatPercent(mm.upgrade_commission_rate) : '-'}</span></div>
+        <div><span style="color:var(--gray-400)">% GMV：</span>${mm.gmv != null && mm.gmv !== '' ? '¥' + mm.gmv : '-'}<span style="color:var(--gray-400);font-size:11px;margin-left:6px">（价格×订单量自动计算）</span></div>
         <div><span style="color:var(--gray-400)">⏰ 撮合时间：</span>${mm.matchmaking_time ? formatDate(mm.matchmaking_time) : '-'}</div>
         <div><span style="color:var(--gray-400)">备注：</span>${mm.notes || '-'}</div>
         <div><span style="color:var(--gray-400)">样品信息：</span>${mm.sample_info || '-'}</div>
         <div style="grid-column:span 2"><span style="color:var(--gray-400)">合作详情：</span>${mm.cooperation_details || '-'}</div>
       </div>
     </div>
-    <h4 style="font-size:14px;color:var(--primary-700);margin-bottom:10px">📝 流转历史</h4>
+    <h4 style="font-size:14px;color:var(--primary-700);margin-bottom:10px">流转历史</h4>
     <div style="border-left:3px solid var(--primary-300);padding-left:16px">
       ${(mm.history || []).map(h => `
         <div style="margin-bottom:12px;position:relative">
@@ -1607,7 +1539,7 @@ async function viewMatchmakingDetail(id) {
         </div>
       `).join('')}
     </div>
-  `, '<button class="btn btn-outline" onclick="closeModal()">✖ 关闭</button>');
+  `, '<button class="btn btn-outline" onclick="closeModal()">关闭</button>');
 }
 
 // 编辑撮合详情
@@ -1617,7 +1549,7 @@ async function editMatchmakingDetail(id) {
   const mm = res.data;
   const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
   
-  openModal('✏️ 编辑撮合详情', `
+  openModal('编辑撮合详情', `
     <div class="form-group">
       <label>当前环节</label>
       <select id="edit-mm-stage">
@@ -1633,12 +1565,12 @@ async function editMatchmakingDetail(id) {
         <option value="达人接单" ${mm.source === '达人接单' ? 'selected' : ''}>达人接单</option>
       </select>
     </div>
-    <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)">🛍 商品信息</h4>
+    <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)"> 商品信息</h4>
     <div class="form-grid-2">
       ${renderSuggestInput({ id:'edit-mm-product-name', label:'商品名称', value: mm.product_name || '', placeholder:'如：小学数学思维训练', type:'product' })}
       ${renderSuggestInput({ id:'edit-mm-influencer-account', label:'达人账号', value: mm.influencer_account || '', placeholder:'如：@小雨老师', type:'influencer' })}
       <div class="form-group"><label>商品价格(元)</label><input type="number" step="0.01" id="edit-mm-product-price" value="${mm.product_price != null ? mm.product_price : ''}" placeholder="如：99.80" oninput="recalcGmv('edit-mm')"></div>
-      <div class="form-group"><label>📦 订单量</label><input type="number" step="1" min="0" id="edit-mm-order-count" value="${mm.order_count != null ? mm.order_count : ''}" placeholder="如：120" oninput="recalcGmv('edit-mm')"></div>
+      <div class="form-group"><label>D 订单量</label><input type="number" step="1" min="0" id="edit-mm-order-count" value="${mm.order_count != null ? mm.order_count : ''}" placeholder="如：120" oninput="recalcGmv('edit-mm')"></div>
       <div class="form-group"><label>合作模式</label>
         <select id="edit-mm-cooperation-mode">
           <option value="">-- 请选择 --</option>
@@ -1652,27 +1584,27 @@ async function editMatchmakingDetail(id) {
         <label>撮合时间</label>
         <input type="datetime-local" id="edit-mm-matchmaking-time" value="${mm.matchmaking_time ? formatDateTimeLocal(mm.matchmaking_time) : ''}">
       </div>
-      <div id="edit-mm-upgrade-preview" class="upgrade-preview" style="grid-column:1/-1;display:${(mm.upgrade_commission_rate != null && mm.commission_rate != null && parseFloat(mm.upgrade_commission_rate) > parseFloat(mm.commission_rate)) ? 'flex' : 'none'}">
+      <div id="edit-mm-upgrade-preview" class="upgrade-preview" style="grid-column:1/-1;display:${(mm.upgrade_commission_rate != null && mm.commission_rate != null && parseFloat(mm.upgrade_commission_rate)> parseFloat(mm.commission_rate)) ? 'flex' : 'none'}">
         <span class="upgrade-star">★</span>
         <span>升级佣金高于原佣金，该撮合将显示红色五角星标签</span>
       </div>
     </div>
-    <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)">📝 其他信息</h4>
+    <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)">其他信息</h4>
     <div class="form-group">
       <label>备注说明</label>
       <textarea id="edit-mm-notes" rows="2" placeholder="撮合备注...">${mm.notes || ''}</textarea>
     </div>
     <div class="form-group">
-      <label>📦 样品信息（快递单号、收货地址等）</label>
+      <label>D 样品信息（快递单号、收货地址等）</label>
       <textarea id="edit-mm-sample" rows="2" placeholder="如：顺丰SF1234567890，寄送地址xxx">${mm.sample_info || ''}</textarea>
     </div>
     <div class="form-group">
-      <label>🤝 合作详情（合作方式、佣金比例、合作周期等）</label>
+      <label>~ 合作详情（合作方式、佣金比例、合作周期等）</label>
       <textarea id="edit-mm-cooperation" rows="3" placeholder="如：纯佣合作，佣金25%，合作周期1个月">${mm.cooperation_details || ''}</textarea>
     </div>
   `, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
-    <button class="btn btn-primary" onclick="confirmEditMatchmaking('${id}')">💾 保存修改</button>
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="confirmEditMatchmaking('${id}')">保存修改</button>
   `);
 }
 
@@ -1754,7 +1686,7 @@ async function openSuggestDropdown(inputId, type) {
         : item.source === '图书需求' ? '#2563eb'
         : item.source === '课程需求' ? '#ec4899' : '#6b7280';
       const meta = type === 'influencer'
-        ? `<span class="suggest-meta">${item.level ? '⭐' + item.level + ' · ' : ''}${item.fans ? '👥' + (item.fans >= 10000 ? (item.fans/10000).toFixed(1) + 'w' : item.fans) : ''}${item.region ? ' · ' + item.region : ''}</span>`
+        ? `<span class="suggest-meta">${item.level ? '⭐' + item.level + ' · ' : ''}${item.fans ? 'N' + (item.fans>= 10000 ? (item.fans/10000).toFixed(1) + 'w' : item.fans) : ''}${item.region ? ' · ' + item.region : ''}</span>`
         : '';
       const safeName = (item.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
       return `<div class="suggest-item" onmousedown="pickSuggest('${inputId}','${safeName}')">
@@ -1830,7 +1762,7 @@ function recalcGmv(prefix) {
   }
 }
 
-// 升级佣金 > 佣金时，实时提示红星
+// 升级佣金> 佣金时，实时提示红星
 function checkUpgradeStar(prefix) {
   const crEl = document.getElementById(`${prefix}-commission-rate`);
   const ucrEl = document.getElementById(`${prefix}-upgrade-commission-rate`);
@@ -1838,7 +1770,7 @@ function checkUpgradeStar(prefix) {
   if (!crEl || !ucrEl || !preview) return;
   const cr = parseFloat(crEl.value);
   const ucr = parseFloat(ucrEl.value);
-  if (!isNaN(cr) && !isNaN(ucr) && ucr > cr) {
+  if (!isNaN(cr) && !isNaN(ucr) && ucr> cr) {
     preview.style.display = 'flex';
   } else {
     preview.style.display = 'none';
@@ -1862,7 +1794,7 @@ async function editMatchmakingStage(id, currentStage) {
       <textarea id="mm-stage-notes" rows="3" placeholder="填写流转说明..."></textarea>
     </div>
   `, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
     <button class="btn btn-primary" onclick="confirmStageChange('${id}')">确认流转</button>
   `);
 }
@@ -1923,12 +1855,12 @@ async function showCreateMatchmaking() {
         <option value="开始合作">开始合作</option>
       </select>
     </div>
-    <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)">🛍 商品信息（选填）</h4>
+    <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)"> 商品信息（选填）</h4>
     <div class="form-grid-2">
       ${renderSuggestInput({ id:'mm-product-name', label:'商品名称', value:'', placeholder:'如：小学数学思维训练', type:'product' })}
       ${renderSuggestInput({ id:'mm-influencer-account', label:'达人账号', value:'', placeholder:'如：@小雨老师', type:'influencer' })}
       <div class="form-group"><label>商品价格(元)</label><input type="number" step="0.01" id="mm-product-price" placeholder="如：99.80" oninput="recalcGmv('mm')"></div>
-      <div class="form-group"><label>📦 订单量</label><input type="number" step="1" min="0" id="mm-order-count" placeholder="如：120" oninput="recalcGmv('mm')"></div>
+      <div class="form-group"><label>D 订单量</label><input type="number" step="1" min="0" id="mm-order-count" placeholder="如：120" oninput="recalcGmv('mm')"></div>
       <div class="form-group"><label>合作模式</label>
         <select id="mm-cooperation-mode">
           <option value="">-- 请选择 --</option>
@@ -1952,7 +1884,7 @@ async function showCreateMatchmaking() {
       <textarea id="mm-notes" rows="2" placeholder="备注说明"></textarea>
     </div>
   `, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
     <button class="btn btn-primary" onclick="confirmCreateMatchmaking()">创建</button>
   `);
 }
@@ -1990,7 +1922,7 @@ async function confirmCreateMatchmaking() {
 // ============ 个人中心 ============
 async function renderProfile() {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
   if (currentUser.role === 'merchant') {
     await renderMerchantProfile();
@@ -2013,10 +1945,10 @@ async function renderMerchantProfile() {
   
   container.innerHTML = `
     ${renderBackButton()}
-    <div class="page-header"><h2>👤 个人中心</h2></div>
+    <div class="page-header"><h2> 个人中心</h2></div>
     <div class="profile-card">
       <div class="profile-header">
-        <div class="profile-avatar">🏪</div>
+        <div class="profile-avatar"><div>
         <div class="profile-info">
           <h3>${currentUser.name}</h3>
           <p>${currentUser.company || ''} · 商家</p>
@@ -2029,8 +1961,8 @@ async function renderMerchantProfile() {
       </div>
     </div>
     
-    ${pendingReceived.length > 0 ? `
-      <div class="section-title">🔔 收到的带货申请 <span class="count-badge">${pendingReceived.length}</span></div>
+    ${pendingReceived.length> 0 ? `
+      <div class="section-title">收到的带货申请 <span class="count-badge">${pendingReceived.length}</span></div>
       ${pendingReceived.map(c => `
         <div class="coop-card">
           <div class="coop-card-header">
@@ -2041,20 +1973,20 @@ async function renderMerchantProfile() {
             ${getStatusBadge(c.status)}
           </div>
           <div class="coop-card-body">
-            <p>📝 留言：${c.message || '无'}</p>
-            <p>🏷 品类：${c.video_category_track || '-'} · 粉丝：${formatNumber(c.fans_count)}</p>
-            <p>📅 时间：${formatDate(c.created_at)}</p>
+            <p> 留言：${c.message || '无'}</p>
+            <p> 品类：${c.video_category_track || '-'} · 粉丝：${formatNumber(c.fans_count)}</p>
+            <p> 时间：${formatDate(c.created_at)}</p>
           </div>
           <div class="coop-card-footer">
             <button class="btn btn-sm btn-outline" onclick="viewInfluencerDetail('${c.influencer_id}')">查看详情</button>
-            <button class="btn btn-sm btn-success" onclick="confirmCooperation('${c.id}')">✅ 同意合作</button>
+            <button class="btn btn-sm btn-success" onclick="confirmCooperation('${c.id}')">V 同意合作</button>
             <button class="btn btn-sm btn-danger" onclick="rejectCooperation('${c.id}')">拒绝</button>
           </div>
         </div>
       `).join('')}
     ` : ''}
     
-    <div class="section-title" style="margin-top:20px">📤 发起的邀约 <span class="count-badge">${sentList.length}</span></div>
+    <div class="section-title" style="margin-top:20px"> 发起的邀约 <span class="count-badge">${sentList.length}</span></div>
     ${sentList.length === 0 ? '<p style="color:var(--gray-400);font-size:13px;padding:12px">暂无发起的邀约</p>' :
       sentList.map(c => `
         <div class="coop-card">
@@ -2066,12 +1998,12 @@ async function renderMerchantProfile() {
             ${getStatusBadge(c.status)}
           </div>
           <div class="coop-card-body">
-            <p>📝 ${c.message || '无留言'} · ${formatDate(c.created_at)}</p>
+            <p> ${c.message || '无留言'} · ${formatDate(c.created_at)}</p>
           </div>
         </div>
       `).join('')}
     
-    <div class="section-title" style="margin-top:20px">✅ 已确认合作 <span class="count-badge">${confirmedList.length}</span></div>
+    <div class="section-title" style="margin-top:20px">V 已确认合作 <span class="count-badge">${confirmedList.length}</span></div>
     ${confirmedList.length === 0 ? '<p style="color:var(--gray-400);font-size:13px;padding:12px">暂无确认的合作</p>' :
       confirmedList.map(c => `
         <div class="coop-card" style="border-left:3px solid var(--success)">
@@ -2083,7 +2015,7 @@ async function renderMerchantProfile() {
             <span class="badge badge-confirmed">已合作</span>
           </div>
           <div class="coop-card-body">
-            <p>📝 ${c.message || ''} · ${formatDate(c.updated_at)}</p>
+            <p> ${c.message || ''} · ${formatDate(c.updated_at)}</p>
           </div>
         </div>
       `).join('')}
@@ -2104,7 +2036,7 @@ async function renderInfluencerProfile() {
   
   container.innerHTML = `
     ${renderBackButton()}
-    <div class="page-header"><h2>👤 个人中心</h2></div>
+    <div class="page-header"><h2> 个人中心</h2></div>
     <div class="profile-card">
       <div class="profile-header">
         <div class="profile-avatar">⭐</div>
@@ -2120,61 +2052,61 @@ async function renderInfluencerProfile() {
       </div>
     </div>
     
-    ${pendingReceived.length > 0 ? `
-      <div class="section-title">🔔 收到的邀请合作 <span class="count-badge">${pendingReceived.length}</span></div>
+    ${pendingReceived.length> 0 ? `
+      <div class="section-title">收到的邀请合作 <span class="count-badge">${pendingReceived.length}</span></div>
       ${pendingReceived.map(c => `
         <div class="coop-card">
           <div class="coop-card-header">
             <div style="display:flex;align-items:center;gap:8px">
-              <span>🏪</span>
+              <span><span>
               <strong>${c.merchant_company || c.merchant_name || '未知商家'}</strong>
             </div>
             ${getStatusBadge(c.status)}
           </div>
           <div class="coop-card-body">
-            <p>📝 留言：${c.message || '无'}</p>
-            ${c.demand_title ? `<p>📦 需求：${c.demand_title}</p>` : ''}
-            <p>📅 时间：${formatDate(c.created_at)}</p>
+            <p> 留言：${c.message || '无'}</p>
+            ${c.demand_title ? `<p>D 需求：${c.demand_title}</p>` : ''}
+            <p> 时间：${formatDate(c.created_at)}</p>
           </div>
           <div class="coop-card-footer">
             ${c.demand_id ? `<button class="btn btn-sm btn-outline" onclick="viewDemandDetail('${c.demand_id}')">查看需求</button>` : ''}
-            <button class="btn btn-sm btn-success" onclick="confirmCooperation('${c.id}')">✅ 确认合作</button>
+            <button class="btn btn-sm btn-success" onclick="confirmCooperation('${c.id}')">V 确认合作</button>
             <button class="btn btn-sm btn-danger" onclick="rejectCooperation('${c.id}')">拒绝</button>
           </div>
         </div>
       `).join('')}
     ` : ''}
     
-    <div class="section-title" style="margin-top:20px">📤 发起的带货申请 <span class="count-badge">${sentList.length}</span></div>
+    <div class="section-title" style="margin-top:20px"> 发起的带货申请 <span class="count-badge">${sentList.length}</span></div>
     ${sentList.length === 0 ? '<p style="color:var(--gray-400);font-size:13px;padding:12px">暂无发起的申请</p>' :
       sentList.map(c => `
         <div class="coop-card">
           <div class="coop-card-header">
             <div style="display:flex;align-items:center;gap:8px">
-              <span>🏪</span>
+              <span><span>
               <strong>${c.merchant_company || c.merchant_name || '未知商家'}</strong>
             </div>
             ${getStatusBadge(c.status)}
           </div>
           <div class="coop-card-body">
-            <p>📝 ${c.message || '无留言'} · ${formatDate(c.created_at)}</p>
+            <p> ${c.message || '无留言'} · ${formatDate(c.created_at)}</p>
           </div>
         </div>
       `).join('')}
     
-    <div class="section-title" style="margin-top:20px">✅ 已确认合作 <span class="count-badge">${confirmedList.length}</span></div>
+    <div class="section-title" style="margin-top:20px">V 已确认合作 <span class="count-badge">${confirmedList.length}</span></div>
     ${confirmedList.length === 0 ? '<p style="color:var(--gray-400);font-size:13px;padding:12px">暂无确认的合作</p>' :
       confirmedList.map(c => `
         <div class="coop-card" style="border-left:3px solid var(--success)">
           <div class="coop-card-header">
             <div style="display:flex;align-items:center;gap:8px">
-              <span>🏪</span>
+              <span><span>
               <strong>${c.merchant_company || c.merchant_name || '未知商家'}</strong>
             </div>
             <span class="badge badge-confirmed">已合作</span>
           </div>
           <div class="coop-card-body">
-            <p>📝 ${c.message || ''} · ${formatDate(c.updated_at)}</p>
+            <p> ${c.message || ''} · ${formatDate(c.updated_at)}</p>
           </div>
         </div>
       `).join('')}
@@ -2222,7 +2154,7 @@ async function viewInfluencerDetail(influencerId) {
       <div><span style="color:var(--gray-400)">MCN</span><br>${inf.has_mcn === '是' ? inf.mcn_name : '无'}</div>
       <div><span style="color:var(--gray-400)">互选平台</span><br>${inf.has_joined_mutual_select || '-'}</div>
     </div>
-  `, '<button class="btn btn-outline" onclick="closeModal()">✖ 关闭</button>');
+  `, '<button class="btn btn-outline" onclick="closeModal()">关闭</button>');
 }
 
 // 查看需求详情
@@ -2257,19 +2189,19 @@ async function viewDemandDetail(demandId) {
   openModal('需求详情', `
     <div style="margin-bottom:12px">
       <h4>${d.title || '未命名需求'}</h4>
-      <p style="font-size:12px;color:var(--gray-500)">${d.demand_type === 'book' ? '📚 图书需求' : '🎓 课程需求'} · ${formatDate(d.created_at)}</p>
+      <p style="font-size:12px;color:var(--gray-500)">${d.demand_type === 'book' ? '图书需求' : '课程需求'} · ${formatDate(d.created_at)}</p>
     </div>
     <div style="background:var(--primary-light);padding:14px;border-radius:8px;margin-bottom:12px">
       ${detailContent || `<p style="font-size:13px;color:var(--gray-600)">${d.description || '暂无详情'}</p>`}
     </div>
-    <p style="font-size:12px;color:var(--gray-400)">🏪 商家：${d.merchant_company || d.merchant_name || '-'}</p>
-  `, '<button class="btn btn-outline" onclick="closeModal()">✖ 关闭</button>');
+    <p style="font-size:12px;color:var(--gray-400)">商家：${d.merchant_company || d.merchant_name || '-'}</p>
+  `, '<button class="btn btn-outline" onclick="closeModal()">关闭</button>');
 }
 
 // ============ 商家管理（管理员可见） ============
 async function renderMerchantManage() {
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
   // 获取商家列表（销售角色只看归属自己的+无归属的）
   let url = '/merchants';
@@ -2288,18 +2220,18 @@ async function renderMerchantManage() {
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
-      <h2>🏢 商家管理</h2>
+      <h2>商家管理</h2>
       <button class="btn btn-primary" onclick="showAddMerchant()">+ 添加商家</button>
     </div>
     <div class="info-box" style="margin-bottom:20px;padding:12px 16px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:10px;border-left:4px solid var(--primary-500)">
-      <p style="font-size:13px;color:var(--gray-600);margin:0">💡 商家可通过下拉选择方式登录系统。归属销售字段为非必填，设置后对应销售登录可看到归属自己的商家数据。</p>
+      <p style="font-size:13px;color:var(--gray-600);margin:0"> 商家可通过下拉选择方式登录系统。归属销售字段为非必填，设置后对应销售登录可看到归属自己的商家数据。</p>
     </div>
     <div class="admin-list">
-      ${merchants.length === 0 ? '<div class="empty-state"><div class="icon">📭</div><p>暂无商家数据</p></div>' : merchants.map(m => `
+      ${merchants.length === 0 ? '<div class="empty-state"><div class="icon">-</div><p>暂无商家数据</p></div>' : merchants.map(m => `
         <div class="admin-card">
           <div class="admin-card-header">
             <div style="display:flex;align-items:center;gap:10px">
-              <div class="admin-avatar">🏪</div>
+              <div class="admin-avatar"><div>
               <div>
                 <div class="admin-name">${m.name}</div>
                 <div class="admin-username">${m.company}</div>
@@ -2315,8 +2247,8 @@ async function renderMerchantManage() {
             <div class="admin-info-item"><span class="info-label">创建时间</span><span>${formatDate(m.created_at)}</span></div>
           </div>
           <div class="admin-card-actions">
-            <button class="btn btn-sm btn-outline" onclick="editMerchant('${m.id}')">✏️ 编辑</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteMerchant('${m.id}','${m.name}')">🗑 删除</button>
+            <button class="btn btn-sm btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteMerchant('${m.id}','${m.name}')">删除</button>
           </div>
         </div>
       `).join('')}
@@ -2328,7 +2260,7 @@ async function renderMerchantManage() {
 
 async function showAddMerchant() {
   const salesList = window._salesList || [];
-  openModal('➕ 添加商家', `
+  openModal('添加商家', `
     <div class="form-group"><label>联系人姓名 *</label><input type="text" id="m-name" placeholder="如：张经理" required></div>
     <div class="form-group"><label>公司名称 *</label><input type="text" id="m-company" placeholder="如：知行图书出版社" required></div>
     <div class="form-group"><label>手机号 *</label><input type="text" id="m-phone" placeholder="手机号码" required></div>
@@ -2344,8 +2276,8 @@ async function showAddMerchant() {
       <p style="font-size:11px;color:var(--gray-400);margin-top:4px">设置后，对应销售登录可看到此商家信息</p>
     </div>
   `, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
-    <button class="btn btn-primary" onclick="confirmAddMerchant()">✅ 确认添加</button>
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="confirmAddMerchant()">V 确认添加</button>
   `);
 }
 
@@ -2374,7 +2306,7 @@ async function editMerchant(id) {
   const m = res.data;
   const salesList = window._salesList || [];
   
-  openModal('✏️ 编辑商家', `
+  openModal('编辑商家', `
     <div class="form-group"><label>联系人姓名 *</label><input type="text" id="em-name" value="${m.name}" required></div>
     <div class="form-group"><label>公司名称 *</label><input type="text" id="em-company" value="${m.company}" required></div>
     <div class="form-group"><label>手机号 *</label><input type="text" id="em-phone" value="${m.phone}" required></div>
@@ -2389,8 +2321,8 @@ async function editMerchant(id) {
       </select>
     </div>
   `, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
-    <button class="btn btn-primary" onclick="confirmEditMerchant('${id}')">💾 保存</button>
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="confirmEditMerchant('${id}')">保存</button>
   `);
 }
 
@@ -2423,11 +2355,11 @@ async function deleteMerchant(id, name) {
 // ============ 管理员管理（仅超管可见） ============
 async function renderAdminManage() {
   if (!currentUser.is_super) {
-    document.getElementById('page-container').innerHTML = '<div class="empty-state"><div class="icon">🚫</div><p>权限不足，仅超级管理员可访问此模块</p></div>';
+    document.getElementById('page-container').innerHTML = '<div class="empty-state"><div class="icon">-</div><p>权限不足，仅超级管理员可访问此模块</p></div>';
     return;
   }
   const container = document.getElementById('page-container');
-  container.innerHTML = '<div class="empty-state"><div class="icon">⏳</div><p>加载中...</p></div>';
+  container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
   
   const res = await fetchAPI('/admins');
   if (!res.success) { container.innerHTML = '<div class="empty-state"><p>加载失败</p></div>'; return; }
@@ -2436,18 +2368,18 @@ async function renderAdminManage() {
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
-      <h2>🛡️ 管理员管理</h2>
+      <h2>管理员管理</h2>
       <button class="btn btn-primary" onclick="showAddAdmin()">+ 添加管理员</button>
     </div>
     <div class="info-box" style="margin-bottom:20px;padding:12px 16px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:10px;border-left:4px solid var(--primary-500)">
-      <p style="font-size:13px;color:var(--gray-600);margin:0">💡 <strong>权限说明：</strong>超级管理员可查看所有数据和管理管理员；普通管理员角色为"销售"时，仅可查看归属自己及无归属的商家/达人/需求/撮合数据；角色为"运营"或"其他"时，仅可查看自己操作的数据。</p>
+      <p style="font-size:13px;color:var(--gray-600);margin:0"> <strong>权限说明：</strong>超级管理员可查看所有数据和管理管理员；普通管理员角色为"销售"时，仅可查看归属自己及无归属的商家/达人/需求/撮合数据；角色为"运营"或"其他"时，仅可查看自己操作的数据。</p>
     </div>
     <div class="admin-list">
       ${admins.map(a => `
         <div class="admin-card ${a.is_super ? 'super' : ''}">
           <div class="admin-card-header">
             <div style="display:flex;align-items:center;gap:10px">
-              <div class="admin-avatar ${a.is_super ? 'super' : ''}">${a.is_super ? '👑' : '🛡️'}</div>
+              <div class="admin-avatar ${a.is_super ? 'super' : ''}">${a.is_super ? '' : ''}</div>
               <div>
                 <div class="admin-name">${a.name}</div>
                 <div class="admin-username">@${a.username}</div>
@@ -2466,9 +2398,9 @@ async function renderAdminManage() {
             <div class="admin-info-item"><span class="info-label">创建时间</span><span>${formatDate(a.created_at)}</span></div>
           </div>
           <div class="admin-card-actions">
-            <button class="btn btn-sm btn-outline" onclick="editAdmin('${a.id}')">✏️ 编辑</button>
-            <button class="btn btn-sm btn-warning" onclick="resetAdminPassword('${a.id}','${a.name}')">🔑 重置密码</button>
-            ${!a.is_super ? `<button class="btn btn-sm btn-danger" onclick="deleteAdmin('${a.id}','${a.name}')">🗑 删除</button>` : ''}
+            <button class="btn btn-sm btn-outline" onclick="editAdmin('${a.id}')">编辑</button>
+            <button class="btn btn-sm btn-warning" onclick="resetAdminPassword('${a.id}','${a.name}')">重置密码</button>
+            ${!a.is_super ? `<button class="btn btn-sm btn-danger" onclick="deleteAdmin('${a.id}','${a.name}')">删除</button>` : ''}
           </div>
         </div>
       `).join('')}
@@ -2476,7 +2408,7 @@ async function renderAdminManage() {
 }
 
 function showAddAdmin() {
-  openModal('➕ 添加管理员', `
+  openModal('添加管理员', `
     <div class="form-group">
       <label>用户名 *（用于登录）</label>
       <input type="text" id="admin-username" placeholder="请输入登录用户名" required>
@@ -2518,8 +2450,8 @@ function showAddAdmin() {
       <textarea id="admin-desc" rows="2" placeholder="如：负责图书品类运营"></textarea>
     </div>
   `, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
-    <button class="btn btn-primary" onclick="confirmAddAdmin()">✅ 确认添加</button>
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="confirmAddAdmin()">V 确认添加</button>
   `);
 }
 
@@ -2555,7 +2487,7 @@ async function editAdmin(id) {
   const admin = listRes.data.find(a => a.id === id);
   if (!admin) { showToast('未找到管理员', 'error'); return; }
   
-  openModal('✏️ 编辑管理员', `
+  openModal('编辑管理员', `
     <div class="form-group">
       <label>用户名（登录用）</label>
       <input type="text" id="edit-admin-username" value="${admin.username}" ${admin.is_super ? 'readonly style="opacity:0.6"' : ''}>
@@ -2593,8 +2525,8 @@ async function editAdmin(id) {
       <textarea id="edit-admin-desc" rows="2">${admin.description || ''}</textarea>
     </div>
   `, `
-    <button class="btn btn-outline" onclick="closeModal()">✖ 取消</button>
-    <button class="btn btn-primary" onclick="confirmEditAdmin('${id}')">💾 保存</button>
+    <button class="btn btn-outline" onclick="closeModal()">取消</button>
+    <button class="btn btn-primary" onclick="confirmEditAdmin('${id}')">保存</button>
   `);
 }
 

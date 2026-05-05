@@ -27,89 +27,43 @@ app.use((req, res, next) => {
   next();
 });
 
-// 登录接口
+// 登录接口：统一账号密码，后端自动识别用户类型
 app.post('/api/login', (req, res) => {
-  const { username, password, role } = req.body;
+  const { username, password } = req.body;
   
-  if (role === 'admin') {
-    // 从admins表验证管理员身份
-    const admin = db.prepare('SELECT * FROM admins WHERE username = ? AND password = ?').get(username, password);
-    if (admin) {
-      return res.json({ success: true, data: { 
-        id: admin.id, 
-        name: admin.name, 
-        role: 'admin', 
-        is_super: admin.is_super === 1,
-        admin_role: admin.admin_role || '其他',
-        username: admin.username,
-        phone: admin.phone,
-        email: admin.email,
-        description: admin.description
-      }});
-    }
-  } else if (role === 'merchant') {
-    // 先精确匹配
-    let merchant = db.prepare('SELECT * FROM merchants WHERE (name = ? OR company = ?) AND password = ?').get(username, username, password);
-    // 尝试只用name/company匹配
-    if (!merchant) {
-      merchant = db.prepare('SELECT * FROM merchants WHERE name = ? OR company = ?').get(username, username);
-    }
-    if (merchant) {
-      return res.json({ success: true, data: { id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry, description: merchant.description } });
-    }
-  } else if (role === 'influencer') {
-    let inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ? AND password = ?').get(username, password);
-    if (!inf) {
-      inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ?').get(username);
-    }
-    if (!inf) {
-      inf = db.prepare("SELECT * FROM influencers WHERE video_account_name LIKE ?").get(`%${username}%`);
-    }
-    if (inf) {
-      return res.json({ success: true, data: { id: inf.id, name: inf.video_account_name, role: 'influencer', ...inf } });
-    }
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: '请输入账号和密码' });
   }
-  
-  res.status(401).json({ success: false, error: '用户名或密码错误' });
-});
 
-// 获取可登录的达人列表
-app.get('/api/login/influencer-list', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  try {
-    const list = db.prepare("SELECT id, video_account_name FROM influencers WHERE video_account_name NOT IN ('无','暂无','新号','还没有','暂时没有','') AND video_account_name IS NOT NULL ORDER BY created_at DESC LIMIT 50").all();
-    res.json({ success: true, data: list });
-  } catch (err) {
-    res.json({ success: true, data: [] });
+  // 1. 优先匹配管理员
+  const admin = db.prepare('SELECT * FROM admins WHERE username = ? AND password = ?').get(username, password);
+  if (admin) {
+    return res.json({ success: true, data: { 
+      id: admin.id, 
+      name: admin.name, 
+      role: 'admin', 
+      is_super: admin.is_super === 1,
+      admin_role: admin.admin_role || '其他',
+      username: admin.username,
+    }});
   }
-});
 
-// 获取可登录的商家列表
-app.get('/api/login/merchant-list', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  try {
-    const list = db.prepare("SELECT id, name, company FROM merchants ORDER BY created_at DESC LIMIT 50").all();
-    res.json({ success: true, data: list });
-  } catch (err) {
-    res.json({ success: true, data: [] });
+  // 2. 匹配商家（按 name 或 company 匹配）
+  let merchant = db.prepare('SELECT * FROM merchants WHERE (name = ? OR company = ?) AND password = ?').get(username, username, password);
+  if (!merchant) {
+    merchant = db.prepare('SELECT * FROM merchants WHERE name = ? OR company = ?').get(username, username);
   }
-});
+  if (merchant && merchant.password === password) {
+    return res.json({ success: true, data: { id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry }});
+  }
 
-// 获取管理员列表（供登录选择用）—— 实时读取最新 username/name
-app.get('/api/login/admin-list', (req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  try {
-    const list = db.prepare("SELECT id, username, name, is_super, admin_role, updated_at FROM admins ORDER BY is_super DESC, created_at ASC").all();
-    res.json({ success: true, data: list });
-  } catch (err) {
-    res.json({ success: true, data: [] });
+  // 3. 匹配达人（按 video_account_name）
+  const inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ? AND password = ?').get(username, password);
+  if (inf) {
+    return res.json({ success: true, data: { id: inf.id, name: inf.video_account_name, role: 'influencer', ...inf }});
   }
+
+  res.status(401).json({ success: false, error: '账号或密码错误' });
 });
 
 // 路由

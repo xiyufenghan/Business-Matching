@@ -84,8 +84,18 @@ body {
 }
 
 .login-header { text-align: center; margin-bottom: 28px; }
-.login-header h1 { font-size: 26px; margin-bottom: 6px; background: linear-gradient(135deg, var(--primary-700), var(--primary-500)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.login-logo { display:flex; justify-content:center; margin-bottom:16px; }
+.login-header h1 { font-size: 24px; margin-bottom: 6px; color: var(--gray-900); font-weight:700; }
 .login-header p { color: var(--gray-500); font-size: 13px; }
+.login-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: var(--danger);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-top: 4px;
+  font-size: 13px;
+}
 
 .login-hints {
   margin-top: 24px;
@@ -214,7 +224,17 @@ body {
   color: white; 
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
-.nav-item .icon { font-size: 16px; }
+.nav-item .icon {
+  font-size: 0;
+  width: 4px;
+  border-radius: 2px;
+  background: transparent;
+  transition: all 0.25s;
+}
+.nav-item.active .icon,
+.nav-item:hover .icon {
+  background: var(--primary);
+}
 
 .badge-dot {
   position: absolute;
