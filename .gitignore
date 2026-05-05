@@ -1,18 +1,16 @@
 *.db
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-.env
+node_modules/
+npm-debug.log
+*.log
 .DS_Store
 .vscode/
 .idea/
 *.swp
-*.log
 
 # 临时传输文件
 c*.b64
 decode.py
-*main-py.txt
-*login-html-correct.txt
+*-main-py.txt
+*-login-html-correct.txt
+*.zip
+*.db-journal
