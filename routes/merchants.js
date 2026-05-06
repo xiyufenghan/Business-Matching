@@ -513,7 +513,6 @@ router.get('/:id/invite-code', (req, res) => {
     // 若没有 invite_code（历史数据），补生成
     let code = m.invite_code;
     if (!code) {
-      const { v4: uuidv4 } = require('uuid');
       code = uuidv4();
       req.db.prepare('UPDATE merchants SET invite_code = ? WHERE id = ?').run(code, req.params.id);
     }

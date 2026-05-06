@@ -38,6 +38,10 @@ app.post('/api/login', (req, res) => {
   // 1. 优先匹配管理员
   const admin = db.prepare('SELECT * FROM admins WHERE username = ? AND password = ?').get(username, password);
   if (admin) {
+    // 记录最后登录时间
+    if (admin.status !== 'disabled') {
+      db.prepare("UPDATE admins SET last_login_at = datetime('now') WHERE id = ?").run(admin.id);
+    }
     return res.json({ success: true, data: { 
       id: admin.id, 
       name: admin.name, 
@@ -72,7 +76,7 @@ app.post('/api/login', (req, res) => {
     if (inf.invite_status === 'disabled') {
       return res.status(403).json({ success: false, error: '账号已停用，请联系管理员' });
     }
-    return res.json({ success: true, data: { id: inf.id, name: inf.video_account_name, role: 'influencer', ...inf }});
+    return res.json({ success: true, data: { id: inf.id, name: inf.video_account_name, role: 'influencer', video_account_name: inf.video_account_name, level: inf.level, fans_count: inf.fans_count, invite_status: inf.invite_status }});
   }
 
   res.status(401).json({ success: false, error: '账号或密码错误' });

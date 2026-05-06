@@ -33,22 +33,22 @@ const upload = multer({
 // 达人 Excel 字段映射（每个数据库字段允许多种 Excel 表头别名）
 const INFLUENCER_FIELD_ALIASES = {
   level: ['达人等级', '等级'],
-  video_account_name: ['视频号账号名称', '视频号', '账号名称', '达人名称'],
-  video_category_track: ['视频号带货品类赛道', '带货品类', '品类赛道'],
-  monthly_short_video_sales: ['现视频号品类销售额（月）短视频（万）', '现视频号品类销售额（月）\n短视频（万）', '短视频月销', '短视频销售额'],
-  monthly_live_sales: ['现视频号品类销售额（月）直播（万）', '现视频号品类销售额（月）\n直播（万）', '直播月销', '直播销售额'],
-  fans_count: ['视频号粉丝数量', '粉丝数', '粉丝数量'],
-  cooperation_type: ['可接受的合作类型', '合作类型'],
-  book_willingness: ['视频号图书品类带货意愿', '图书品类', '图书带货意愿'],
-  course_willingness: ['视频号少儿课程品类带货意愿', '课程品类', '少儿课程带货意愿'],
-  short_video_frequency: ['最近3个月、日常短视频更新频率', '最近3个月短视频更新频率', '短视频更新频率', '短视频频率'],
-  live_frequency: ['最近3个月、日常直播频率', '最近3个月直播频率', '直播频率'],
-  has_mcn: ['是否有MCN'],
-  mcn_name: ['MCN名称'],
-  region: ['地区'],
-  has_joined_mutual_select: ['是否已入驻互选', '是否入驻互选'],
+  video_account_name: ['账号名称', '视频号', '账号名称', '达人名称', '视频号账号名称'],
+  video_category_track: ['内容赛道', '带货品类', '品类赛道', '视频号带货品类赛道'],
+  monthly_short_video_sales: ['短视频月销（万）', '短视频月销', '短视频销售额', '现视频号品类销售额（月）短视频（万）'],
+  monthly_live_sales: ['直播月销（万）', '直播月销', '直播销售额', '现视频号品类销售额（月）直播（万）'],
+  fans_count: ['粉丝数', '粉丝量', '视频号粉丝数量'],
+  cooperation_type: ['合作类型', '可接受的合作类型'],
+  book_willingness: ['图书带货意愿', '图书品类', '视频号图书品类带货意愿'],
+  course_willingness: ['课程带货意愿', '课程品类', '视频号少儿课程品类带货意愿'],
+  short_video_frequency: ['短视频频率', '短视频更新频率', '最近3个月、日常短视频更新频率'],
+  live_frequency: ['直播频率', '直播更新频率', '最近3个月、日常直播频率'],
+  has_mcn: ['是否签约MCN', '是否有MCN'],
+  mcn_name: ['MCN机构名称', 'MCN名称'],
+  region: ['所在地区', '地区'],
+  has_joined_mutual_select: ['是否入驻互选', '是否已入驻互选'],
   sales_owner: ['归属销售'],
-  official_account_name: ['公众号账号名称', '公众号名称'],
+  official_account_name: ['公众号名称', '公众号账号名称'],
 };
 
 // 把行对象 row 按 alias 列表映射到 db 字段
@@ -75,11 +75,12 @@ function mapRowByAliases(row) {
 }
 
 const INFLUENCER_FIELDS_ORDER = [
-  '达人等级', '视频号账号名称', '视频号带货品类赛道',
-  '现视频号品类销售额（月）短视频（万）', '现视频号品类销售额（月）直播（万）',
-  '视频号粉丝数量', '可接受的合作类型', '视频号图书品类带货意愿',
-  '视频号少儿课程品类带货意愿', '最近3个月、日常短视频更新频率', '最近3个月、日常直播频率',
-  '是否有MCN', 'MCN名称', '地区', '是否已入驻互选', '归属销售', '公众号账号名称'
+  '达人等级', '账号名称', '内容赛道',
+  '短视频月销（万）', '直播月销（万）',
+  '粉丝数', '合作类型', '图书带货意愿', '课程带货意愿',
+  '短视频频率', '直播频率',
+  '是否签约MCN', 'MCN机构名称', '所在地区',
+  '是否入驻互选', '归属销售', '公众号名称'
 ];
 
 // ========== Excel模板下载 (必须放在 /:id 之前) ==========
@@ -98,23 +99,23 @@ router.get('/excel/template', (req, res) => {
     
     const noteData = [
       ['字段', '说明', '是否必填'],
-      ['达人等级', 'S/A/B/C等级', '否'],
-      ['视频号账号名称', '视频号昵称', '是'],
-      ['视频号带货品类赛道', '多值，逗号分隔，如：图书,课程', '否'],
-      ['现视频号品类销售额（月）短视频（万）', '数值，单位万元', '否'],
-      ['现视频号品类销售额（月）直播（万）', '数值，单位万元', '否'],
-      ['视频号粉丝数量', '数值', '否'],
-      ['可接受的合作类型', '多值，如：纯佣,投流,坑位费', '否'],
-      ['视频号图书品类带货意愿', '高/中/低', '否'],
-      ['视频号少儿课程品类带货意愿', '高/中/低', '否'],
-      ['最近3个月短视频更新频率', '如：每周3-5条', '否'],
-      ['最近3个月直播频率', '如：每周1-2场', '否'],
-      ['是否有MCN', '是/否', '否'],
-      ['MCN名称', 'MCN机构名称', '否'],
-      ['地区', '所在地区', '否'],
-      ['是否已入驻互选', '是/否', '否'],
-      ['归属销售', '负责销售人员', '否'],
-      ['公众号账号名称', '关联公众号名称', '否']
+      ['达人等级', 'S/A/B/C/D等级', '否'],
+      ['账号名称', '视频号昵称（唯一标识）', '是'],
+      ['内容赛道', '多值，逗号分隔，如：图书,课程', '否'],
+      ['短视频月销（万）', '数值，单位万元', '否'],
+      ['直播月销（万）', '数值，单位万元', '否'],
+      ['粉丝数', '数值', '否'],
+      ['合作类型', '多值，如：纯佣,投流,坑位费', '否'],
+      ['图书带货意愿', '高/中/低', '否'],
+      ['课程带货意愿', '高/中/低', '否'],
+      ['短视频频率', '如：每周3-5条', '否'],
+      ['直播频率', '如：每周1-2场', '否'],
+      ['是否签约MCN', '是/否', '否'],
+      ['MCN机构名称', 'MCN机构全称', '否'],
+      ['所在地区', '如：北京 / 广州 / 上海', '否'],
+      ['是否入驻互选', '是/否', '否'],
+      ['归属销售', '负责销售人员（系统自动关联）', '否'],
+      ['公众号名称', '关联公众号名称', '否']
     ];
     const noteWs = XLSX.utils.aoa_to_sheet(noteData);
     noteWs['!cols'] = [{ wch: 35 }, { wch: 40 }, { wch: 10 }];
@@ -261,8 +262,10 @@ router.get('/', (req, res) => {
       level, fans_min, fans_max, sales_min, sales_max,
       region_province, book_category, course_category,
       has_mcn, mutual_select, cooperation_type, filter_sales_id,
-      sortField, sortOrder
+      sortField, sortOrder, status
     } = req.query;
+    // 软删除过滤：默认隐藏已删除，status=deleted 时仅显示已删除
+    const includeDeleted = status === 'deleted' || status === 'all';
     let sql = `SELECT i.*, a.name as sales_owner_name, a.username as sales_owner_username,
                  (COALESCE(i.monthly_short_video_sales, 0) + COALESCE(i.monthly_live_sales, 0)) as total_sales
                FROM influencers i 
@@ -271,6 +274,14 @@ router.get('/', (req, res) => {
     let countSql = 'SELECT COUNT(*) as total FROM influencers i WHERE 1=1';
     const params = [];
     const countParams = [];
+
+    if (!includeDeleted) {
+      sql += " AND (i.status IS NULL OR i.status != 'deleted')";
+      countSql += " AND (i.status IS NULL OR i.status != 'deleted')";
+    } else if (status === 'deleted') {
+      sql += " AND i.status = 'deleted'";
+      countSql += " AND i.status = 'deleted'";
+    }
 
     // 销售/运营权限过滤
     if (sales_owner_id) {
@@ -840,23 +851,30 @@ router.post('/batch-delete', (req, res) => {
   }
 });
 
-// ========== 一键删除所有达人 ==========
-router.delete('/all/clear', (req, res) => {
+// ========== 删除达人（软删除） ==========
+router.delete('/:id', (req, res) => {
   try {
-    req.db.prepare('DELETE FROM orders').run();
-    req.db.prepare('DELETE FROM influencer_demands').run();
-    req.db.prepare('DELETE FROM influencers').run();
-    res.json({ success: true, message: '所有达人已清空' });
+    const existing = req.db.prepare('SELECT * FROM influencers WHERE id = ?').get(req.params.id);
+    if (!existing) return res.status(404).json({ success: false, error: '达人不存在' });
+    // 检查关联数据
+    const orderCount = req.db.prepare('SELECT COUNT(*) as c FROM orders WHERE influencer_id = ?').get(req.params.id).c;
+    const coopCount = req.db.prepare('SELECT COUNT(*) as c FROM cooperation WHERE influencer_id = ?').get(req.params.id).c;
+    const mmCount = req.db.prepare('SELECT COUNT(*) as c FROM matchmaking WHERE influencer_id = ?').get(req.params.id).c;
+    if (orderCount > 0 || coopCount > 0 || mmCount > 0) {
+      return res.status(400).json({ success: false, error: `该达人存在关联数据（${orderCount}条接单 / ${coopCount}条合作 / ${mmCount}条撮合），无法删除`, data: { requireForce: true, orderCount, coopCount, mmCount } });
+    }
+    req.db.prepare("UPDATE influencers SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+    res.json({ success: true, message: '达人已删除（软删除，可恢复）' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ========== 删除达人 ==========
-router.delete('/:id', (req, res) => {
+// ========== 恢复软删除的达人 ==========
+router.put('/:id/restore', (req, res) => {
   try {
-    req.db.prepare('DELETE FROM influencers WHERE id = ?').run(req.params.id);
-    res.json({ success: true, message: '删除成功' });
+    req.db.prepare("UPDATE influencers SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
+    res.json({ success: true, message: '达人已恢复' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

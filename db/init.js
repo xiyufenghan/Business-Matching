@@ -77,7 +77,7 @@ function initDatabase() {
     )
   `);
 
-  // 兼容已有库：补齐 influencers 邀请制字段
+    // 兼容已有库：补齐 influencers 邀请制字段
   try {
     const infCols = db.prepare('PRAGMA table_info(influencers)').all().map(c => c.name);
     if (!infCols.includes('invite_code')) {
@@ -92,6 +92,14 @@ function initDatabase() {
     }
     if (!infCols.includes('invited_by')) {
       db.exec("ALTER TABLE influencers ADD COLUMN invited_by TEXT");
+    }
+    // 软删除状态字段
+    if (!infCols.includes('status')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN status TEXT DEFAULT 'active'");
+      db.prepare("UPDATE influencers SET status = 'active' WHERE status IS NULL").run();
+    }
+    if (!infCols.includes('operator_id')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN operator_id TEXT");
     }
   } catch (e) { /* ignore */ }
 
@@ -150,6 +158,22 @@ function initDatabase() {
     }
     if (!cdCols.includes('ad_commission')) {
       db.exec('ALTER TABLE course_demands ADD COLUMN ad_commission REAL DEFAULT 0');
+    }
+  } catch (e) { /* ignore */ }
+
+  // 兼容已有库：补齐 demands 的 operator_id 字段
+  try {
+    const demCols = db.prepare('PRAGMA table_info(demands)').all().map(c => c.name);
+    if (!demCols.includes('operator_id')) {
+      db.exec("ALTER TABLE demands ADD COLUMN operator_id TEXT");
+    }
+  } catch (e) { /* ignore */ }
+
+  // 兼容已有库：补齐 influencer_demands 的 operator_id 字段
+  try {
+    const idCols = db.prepare('PRAGMA table_info(influencer_demands)').all().map(c => c.name);
+    if (!idCols.includes('operator_id')) {
+      db.exec("ALTER TABLE influencer_demands ADD COLUMN operator_id TEXT");
     }
   } catch (e) { /* ignore */ }
 
@@ -291,7 +315,19 @@ function initDatabase() {
     if (!mmCols.includes('cooperation_id')) {
       db.exec('ALTER TABLE matchmaking ADD COLUMN cooperation_id TEXT');
     }
-  } catch (e) { /* ignore */ }
+    // 补齐 cooperation.js 中使用的扩展字段
+  } catch (e2) { /* ignore */ }
+
+  // 兼容已有库：补齐 matchmaking 扩展字段（独立块）
+  try {
+    const mmCols2 = db.prepare('PRAGMA table_info(matchmaking)').all().map(c => c.name);
+    const extraMmCols = ['product_name','influencer_account','product_price','cooperation_mode','commission_rate','gmv','matchmaking_time','order_count','upgrade_commission_rate','operator_id','sample_info','cooperation_details'];
+    for (const col of extraMmCols) {
+      if (!mmCols2.includes(col)) {
+        db.exec(`ALTER TABLE matchmaking ADD COLUMN ${col} TEXT`);
+      }
+    }
+  } catch (e3) { /* ignore */ }
 
   // 撮合历史记录表
   db.exec(`
@@ -321,6 +357,17 @@ function initDatabase() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 兼容已有库：补齐 admins 的 status 字段（停用/启用）+ last_login_at 字段
+  try {
+    const admCols = db.prepare('PRAGMA table_info(admins)').all().map(c => c.name);
+    if (!admCols.includes('status')) {
+      db.exec("ALTER TABLE admins ADD COLUMN status TEXT DEFAULT 'active'");
+    }
+    if (!admCols.includes('last_login_at')) {
+      db.exec("ALTER TABLE admins ADD COLUMN last_login_at DATETIME");
+    }
+  } catch (e) { /* ignore */ }
 
   // 插入示例数据
   const merchantCount = db.prepare('SELECT COUNT(*) as count FROM merchants').get();

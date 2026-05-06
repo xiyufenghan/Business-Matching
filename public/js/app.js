@@ -45,7 +45,12 @@ function showToast(message, type = 'success') {
   const container = document.getElementById('toast-container');
   const toast = document.createElement('div');
   toast.className = `toast ${type === 'error' ? 'error' : ''}`;
-  toast.innerHTML = `<span>${type === 'error' ? '!' : 'OK'}</span><span>${message}</span>`;
+  const iconSpan = document.createElement('span');
+  iconSpan.textContent = type === 'error' ? '!' : '\u2713';
+  const msgSpan = document.createElement('span');
+  msgSpan.textContent = message;
+  toast.appendChild(iconSpan);
+  toast.appendChild(msgSpan);
   container.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
@@ -364,7 +369,7 @@ function renderNavMenu() {
         { id: 'system', label: '系统管理', items: [
           { id: 'merchant-manage', icon: 'building', label: '商家管理' },
           { id: 'influencer-manage', icon: 'star', label: '达人管理' },
-          { id: 'admin-manage', icon: 'shield', label: '管理员管理' },
+          { id: 'admin-manage', icon: 'shield', label: '账号管理' },
         ]},
       ];
     } else {
@@ -2866,13 +2871,13 @@ async function saveInfluencerEdit(id) {
   else { showToast(res.error || '更新失败', 'error'); }
 }
 
-// 显示/隐藏达人批量上传区域
+// 显示/隐藏达人批量导入区域
 function showInfluencerExcelUpload() {
   const area = document.getElementById('influencer-upload-area');
   if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
 }
 
-// 达人Excel批量上传
+// 达人Excel批量导入
 async function handleInfluencerExcelUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -4779,7 +4784,7 @@ async function viewDemandDetail(demandId) {
 }
 
 // ============ 达人管理（仅超级管理员可见） ============
-let imFilters = { keyword: '', level: '', has_mcn: '' };
+let imFilters = { keyword: '', level: '', has_mcn: '', status: '' };
 let imPage = 1;
 const im_PAGE_SIZE = 30;
 
@@ -4804,6 +4809,7 @@ async function renderInfluencerManage() {
   if (imFilters.keyword) url += `&keyword=${encodeURIComponent(imFilters.keyword)}`;
   if (imFilters.level) url += `&level=${encodeURIComponent(imFilters.level)}`;
   if (imFilters.has_mcn) url += `&has_mcn=${encodeURIComponent(imFilters.has_mcn)}`;
+  if (imFilters.status) url += `&status=${encodeURIComponent(imFilters.status)}`;
   // 销售普管只看归属自己的达人
   if (!isSuper) url += `&sales_owner_id=${encodeURIComponent(currentUser.id)}`;
 
@@ -4840,9 +4846,9 @@ async function renderInfluencerManage() {
     <div class="md-toolbar">
       <div class="md-toolbar-left">
         <button class="btn btn-sm btn-success" onclick="showAddInfluencerModal()">+ 邀请达人</button>
-        <button class="btn btn-sm btn-primary" onclick="showImBatchUpload()">批量上传</button>
+        <button class="btn btn-sm btn-primary" onclick="showImBatchUpload()">批量导入</button>
         <button class="btn btn-sm btn-outline" onclick="exportInfluencers()">导出CSV</button>
-        <button class="btn btn-sm btn-danger-outline" onclick="clearAllInfluencersFromManage()" style="margin-left:auto">清空所有达人</button>
+        ${isSuper ? `<button class="btn btn-sm ${imFilters.status==='deleted'?'btn-primary':'btn-outline'}" onclick="toggleImDeletedView()">${imFilters.status==='deleted'?'返回正常列表':'查看已删除'}</button>` : ''}
       </div>
     </div>
 
@@ -4874,9 +4880,9 @@ async function renderInfluencerManage() {
       </div>
     </div>
 
-    <!-- 批量上传区（隐藏） -->
+    <!-- 批量导入区（隐藏） -->
     <div id="im-upload-area" style="display:none;margin-top:12px">
-      <div class="card"><div class="card-header"><h3>批量上传达人</h3></div><div class="card-body">
+      <div class="card"><div class="card-header"><h3>批量导入达人</h3></div><div class="card-body">
         <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <a href="/api/influencers/excel/template" class="btn btn-outline btn-sm">下载导入模板</a>
           <span style="font-size:12px;color:#94a3b8">支持"X万"格式（如 50万），同名达人自动更新</span>
@@ -5019,7 +5025,16 @@ function applyImFilter() {
   renderInfluencerManage();
 }
 function resetImFilter() {
-  imFilters = { keyword: '', level: '', has_mcn: '' };
+  imFilters = { keyword: '', level: '', has_mcn: '', status: imFilters.status };
+  imPage = 1;
+  renderInfluencerManage();
+}
+function pageInfluencerManage(page) {
+  imPage = page;
+  renderInfluencerManage();
+}
+function toggleImDeletedView() {
+  imFilters.status = imFilters.status === 'deleted' ? '' : 'deleted';
   imPage = 1;
   renderInfluencerManage();
 }
@@ -5041,18 +5056,20 @@ function exportInfluencers() {
   window.open(url, '_blank');
   showToast('正在下载，请稍候...');
 }
-async function clearAllInfluencersFromManage() {
-  if (!confirm('⚠ 危险操作：将清空全部达人数据，且不可恢复。确定继续？')) return;
-  if (!confirm('请再次确认：你即将永久删除所有达人记录！')) return;
-  await fetchAPI('/influencers/all/clear', { method: 'DELETE' });
-  showToast('已清空');
-  renderInfluencerManage();
-}
 async function deleteInfluencerFromManage(id, name) {
-  if (!confirm(`确定删除达人「${name}」？此操作不可恢复。`)) return;
+  if (!confirm(`确定删除达人「${name}」？\n\n（软删除：将标记为已删除状态，可在"查看已删除"中恢复）`)) return;
   const res = await fetchAPI(`/influencers/${id}`, { method: 'DELETE' });
-  if (res.success) { showToast('已删除'); renderInfluencerManage(); }
-  else { showToast(res.error || '删除失败', 'error'); }
+  if (res.success) { showToast(res.message || '已删除'); renderInfluencerManage(); return; }
+  // 关联数据预检失败 → 询问是否强制删除
+  if (res.data && res.data.requireForce) {
+    if (confirm(`${res.error}\n\n是否强制删除？关联数据将变为孤儿数据。`)) {
+      const forceRes = await fetchAPI(`/influencers/${id}/force-delete`, { method: 'DELETE' });
+      if (forceRes.success) { showToast('已强制删除'); renderInfluencerManage(); }
+      else { showToast(forceRes.error || '删除失败', 'error'); }
+    }
+  } else {
+    showToast(res.error || '删除失败', 'error');
+  }
 }
 
 // ============ 商家管理（管理员可见，仿达人管理样式） ============
@@ -5569,7 +5586,22 @@ async function resetMerchantPassword(id, name) {
   else showToast(res.error || '重置失败', 'error');
 }
 
-// ============ 管理员管理（仅超管可见） ============
+// ============ 账号管理（仅超管可见） ============
+let amFilters = { role: '', status: '', keyword: '' };
+
+// 角色颜色映射
+function getRoleStyle(role) {
+  const map = { '销售': 'background:#dcfce7;color:#16a34a', '运营': 'background:#fef3c7;color:#d97706', '管理员': 'background:#ede9fe;color:#7c3aed' };
+  return map[role] || 'background:#f1f5f9;color:#64748b';
+}
+// 手机号脱敏
+function maskPhone(p) {
+  if (!p) return '-';
+  const s = String(p);
+  if (s.length === 11) return s.slice(0,3) + '****' + s.slice(-4);
+  return s;
+}
+
 async function renderAdminManage() {
   if (!currentUser.is_super) {
     document.getElementById('page-container').innerHTML = '<div class="empty-state"><div class="icon">-</div><p>权限不足，仅超级管理员可访问此模块</p></div>';
@@ -5577,124 +5609,204 @@ async function renderAdminManage() {
   }
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><div class="icon"></div><p>加载中...</p></div>';
-  
-  const res = await fetchAPI('/admins');
-  if (!res.success) { container.innerHTML = '<div class="empty-state"><p>加载失败</p></div>'; return; }
-  const admins = res.data;
-  
+
+  // 并行拉取：列表 + 统计
+  let listUrl = '/admins';
+  if (amFilters.role) listUrl += `&role=${encodeURIComponent(amFilters.role)}`;
+  if (amFilters.status) listUrl += `&status=${encodeURIComponent(amFilters.status)}`;
+  if (amFilters.keyword) listUrl += `&keyword=${encodeURIComponent(amFilters.keyword)}`;
+
+  const [listRes, statsRes] = await Promise.all([fetchAPI(listUrl), fetchAPI('/admins/stats')]);
+  if (!listRes.success) { container.innerHTML = '<div class="empty-state"><p>加载失败</p></div>'; return; }
+
+  const admins = listRes.data;
+  const stats = statsRes.success ? statsRes.data : { total: 0, active: 0, roles: [], perEmployee: [] };
+  const roleMap = {};
+  (stats.roles || []).forEach(r => { roleMap[r.admin_role] = r.c; });
+
   container.innerHTML = `
     ${renderBackButton()}
     <div class="page-header">
-      <h2>管理员管理</h2>
-      <button class="btn btn-primary" onclick="showAddAdmin()">+ 添加管理员</button>
+      <h2>账号管理</h2>
+      <button class="btn btn-primary" onclick="showAddAdmin()">+ 添加账号</button>
     </div>
-    <div class="info-box" style="margin-bottom:20px;padding:12px 16px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:10px;border-left:4px solid var(--primary-500)">
-      <p style="font-size:13px;color:var(--gray-600);margin:0"> <strong>权限说明：</strong>超级管理员可查看所有数据和管理管理员；普通管理员角色为"销售"时，仅可查看归属自己及无归属的商家/达人/需求/撮合数据；角色为"运营"或"其他"时，仅可查看自己操作的数据。</p>
+
+    <!-- Hero 统计 -->
+    <div class="em-hero">
+      ${renderImHeroCard('员工总数', stats.total, '#3b82f6')}
+      ${renderImHeroCard('在职', stats.active || stats.total, '#16a34a')}
+      ${renderImHeroCard('销售', roleMap['销售'] || 0, '#22c55e')}
+      ${renderImHeroCard('运营', roleMap['运营'] || 0, '#eab308')}
+      ${renderImHeroCard('管理员', roleMap['管理员'] || 0, '#8b5cf6')}
+      ${renderImHeroCard('已停用', (stats.total || 0) - (stats.active || stats.total), '#94a3b8')}
     </div>
-    <div class="admin-list">
-      ${admins.map(a => `
-        <div class="admin-card ${a.is_super ? 'super' : ''}">
-          <div class="admin-card-header">
-            <div style="display:flex;align-items:center;gap:10px">
-              <div class="admin-avatar ${a.is_super ? 'super' : ''}">${a.is_super ? '' : ''}</div>
-              <div>
-                <div class="admin-name">${a.name}</div>
-                <div class="admin-username">@${a.username}</div>
-              </div>
-            </div>
-            <div style="display:flex;gap:6px;align-items:center">
-              ${!a.is_super && a.admin_role ? `<span class="badge" style="background:${a.admin_role === '销售' ? '#dcfce7;color:#16a34a' : a.admin_role === '运营' ? '#fef3c7;color:#d97706' : '#f1f5f9;color:#64748b'}">${a.admin_role}</span>` : ''}
-              <span class="badge ${a.is_super ? 'badge-super' : 'badge-normal'}">${a.is_super ? '超级管理员' : '普通管理员'}</span>
-            </div>
-          </div>
-          <div class="admin-card-body">
-            ${!a.is_super ? `<div class="admin-info-item"><span class="info-label">角色</span><span>${a.admin_role || '其他'}</span></div>` : ''}
-            <div class="admin-info-item"><span class="info-label">手机</span><span>${a.phone || '-'}</span></div>
-            <div class="admin-info-item"><span class="info-label">邮箱</span><span>${a.email || '-'}</span></div>
-            <div class="admin-info-item"><span class="info-label">说明</span><span>${a.description || '-'}</span></div>
-            <div class="admin-info-item"><span class="info-label">创建时间</span><span>${formatDate(a.created_at)}</span></div>
-          </div>
-          <div class="admin-card-actions">
-            <button class="btn btn-sm btn-outline" onclick="editAdmin('${a.id}')">编辑</button>
-            <button class="btn btn-sm btn-warning" onclick="resetAdminPassword('${a.id}','${a.name}')">重置密码</button>
-            ${!a.is_super ? `<button class="btn btn-sm btn-danger" onclick="deleteAdmin('${a.id}','${a.name}')">删除</button>` : ''}
-          </div>
-        </div>
-      `).join('')}
-    </div>`;
+
+    <!-- 工具栏 -->
+    <div class="md-toolbar">
+      <div class="md-toolbar-left">
+        <input type="text" id="am-keyword" placeholder="搜索姓名 / 账号 / 手机号..."
+          value="${escapeHtml(amFilters.keyword || '')}"
+          onkeypress="if(event.key==='Enter'){applyAmFilter()}"
+          style="flex:1;min-width:180px;padding:6px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:13px">
+        <select id="am-role-filter" onchange="onAmFilterChange('role',this.value);applyAmFilter()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--gray-300);font-size:13px">
+          <option value="" ${!amFilters.role?'selected':''}>全部角色</option>
+          <option value="销售" ${amFilters.role==='销售'?'selected':''}>销售</option>
+          <option value="运营" ${amFilters.role==='运营'?'selected':''}>运营</option>
+          <option value="管理员" ${amFilters.role==='管理员'?'selected':''}>管理员</option>
+        </select>
+        <select id="am-status-filter" onchange="onAmFilterChange('status',this.value);applyAmFilter()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--gray-300);font-size:13px">
+          <option value="" ${!amFilters.status?'selected':''}>全部状态</option>
+          <option value="active" ${amFilters.status==='active'?'selected':''}>在职</option>
+          <option value="disabled" ${amFilters.status==='disabled'?'selected':''}>已停用</option>
+        </select>
+        ${(amFilters.role || amFilters.status || amFilters.keyword) ? '<button class="btn btn-sm btn-outline" onclick="resetAmFilter()">重置</button>' : ''}
+      </div>
+    </div>
+
+    <!-- 表格 -->
+    <div class="em-table-wrap" style="margin-top:14px;background:white;border-radius:12px;border:1px solid var(--gray-200);overflow:auto">
+      <table class="em-table">
+        <thead>
+          <tr>
+            <th style="width:48px">序号</th>
+            <th>姓名</th>
+            <th>登录账号</th>
+            <th>角色</th>
+            <th>手机号</th>
+            <th>邮箱</th>
+            <th>状态</th>
+            <th>最近登录</th>
+            <th style="text-align:center">商家</th>
+            <th style="text-align:center">达人</th>
+            <th style="min-width:220px;text-align:right;padding-right:16px">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${admins.length === 0 ? `<tr><td colspan="11" style="text-align:center;padding:32px;color:var(--gray-400)">暂无数据</td></tr>` :
+          admins.map((a, i) => {
+            const roleLabel = a.is_super ? '管理员' : (a.admin_role || '-');
+            const roleColor = a.is_super ? '#ede9fe' : (a.admin_role === '销售' ? '#dcfce7' : a.admin_role === '运营' ? '#fef3c7' : '#f1f5f9');
+            const textColor = a.is_super ? '#7c3aed' : (a.admin_role === '销售' ? '#16a34a' : a.admin_role === '运营' ? '#d97706' : '#64748b');
+            return `
+            <tr data-id="${a.id}"${a.status === 'disabled' ? ' style="opacity:0.55"' : ''}>
+              <td style="color:var(--gray-400);font-size:12px">${i + 1}</td>
+              <td><strong>${escapeHtml(a.name)}</strong></td>
+              <td style="color:var(--gray-500);font-size:13px">@${escapeHtml(a.username)}</td>
+              <td><span class="badge" style="background:${roleColor};color:${textColor};padding:3px 10px;border-radius:10px;font-size:11px;font-weight:600">${roleLabel}</span></td>
+              <td style="font-size:13px">${maskPhone(a.phone)}</td>
+              <td style="font-size:13px;color:var(--gray-500)">${a.email || '-'}</td>
+              <td>
+                ${a.status === 'disabled'
+                  ? '<span style="background:#f1f5f9;color:#94a3b8;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">已停用</span>'
+                  : '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">在职</span>'}
+              </td>
+              <td style="font-size:12px;color:var(--gray-400)">${a.last_login_at ? formatDate(a.last_login_at) : '<span style="color:#d1d5db">从未登录</span>'}</td>
+              <td style="text-align:center;font-size:13px"><strong>${a.merchant_count || 0}</strong></td>
+              <td style="text-align:center;font-size:13px"><strong>${a.influencer_count || 0}</strong></td>
+              <td style="white-space:nowrap;padding-right:0">
+                <div class="em-action-group" style="justify-content:flex-end">
+                  <button class="em-btn em-btn-edit" onclick="editAdmin('${a.id}')">编辑</button>
+                  <button class="em-btn em-btn-pwd" onclick="resetAdminPassword('${a.id}',${JSON.stringify(a.name)})">重置密码</button>
+                  ${!a.is_super
+                    ? a.status === 'disabled'
+                      ? `<button class="em-btn em-btn-enable" onclick="toggleAdminStatus('${a.id}','active',${JSON.stringify(a.name)})">启用</button>`
+                      : `<button class="em-btn em-btn-disable" onclick="toggleAdminStatus('${a.id}','disabled',${JSON.stringify(a.name)})">停用</button>`
+                    : ''}
+                  ${!a.is_super ? `<button class="em-btn em-btn-del" onclick="deleteAdmin('${a.id}',${JSON.stringify(a.name)})">删除</button>` : ''}
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:10px;padding:10px 14px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:10px;font-size:12px;color:var(--gray-500)">
+      <strong>权限说明：</strong>销售 — 按归属关系查看商家/达人；运营 — 查看自己操作的数据；管理员（超管）— 全量数据 + 账号管理。
+    </div>
+  `;
+}
+
+function onAmFilterChange(key, val) {
+  amFilters[key] = val;
+}
+function applyAmFilter() {
+  amFilters.keyword = document.getElementById('am-keyword')?.value?.trim() || '';
+  renderAdminManage();
+}
+function resetAmFilter() {
+  amFilters = { role: '', status: '', keyword: '' };
+  renderAdminManage();
+}
+
+async function toggleAdminStatus(id, targetStatus, name) {
+  const tip = targetStatus === 'active' ? '启用' : '停用';
+  if (!confirm(`确定${tip}「${name}」？停用后该员工将无法登录。`)) return;
+  const res = await fetchAPI(`/admins/${id}`, { method: 'PUT', body: JSON.stringify({ status: targetStatus }) });
+  if (res.success) { showToast(res.message || `${tip}成功`); renderAdminManage(); }
+  else { showToast(res.error || '操作失败', 'error'); }
 }
 
 function showAddAdmin() {
-  openModal('添加管理员', `
+  openModal('添加账号', `
     <div class="form-group">
       <label>用户名 *（用于登录）</label>
-      <input type="text" id="admin-username" placeholder="请输入登录用户名" required>
+      <input type="text" id="admin-username" placeholder="如 zhangsan" required>
     </div>
     <div class="form-group">
       <label>姓名 *</label>
-      <input type="text" id="admin-name" placeholder="请输入姓名">
+      <input type="text" id="admin-name" placeholder="真实姓名">
     </div>
     <div class="form-group">
       <label>密码</label>
       <input type="text" id="admin-password" placeholder="默认：123456" value="123456">
     </div>
     <div class="form-group">
-      <label>权限级别</label>
-      <select id="admin-is-super" onchange="onAdminSuperChange()">
-        <option value="0">普通管理员（仅查看自己操作的数据）</option>
-        <option value="1">超级管理员（查看所有数据 + 管理员管理）</option>
-      </select>
-    </div>
-    <div class="form-group" id="admin-role-group">
-      <label>角色分类 *</label>
+      <label>角色 *</label>
       <select id="admin-role">
         <option value="销售">销售（按归属关系查看商家/达人数据）</option>
-        <option value="运营">运营</option>
-        <option value="其他">其他</option>
+        <option value="运营">运营（查看自己操作的数据）</option>
+        <option value="管理员">管理员（全量数据 + 账号管理）</option>
       </select>
-      <p style="font-size:11px;color:var(--gray-400);margin-top:4px">销售角色登录后只能查看归属自己的商家及达人信息</p>
     </div>
     <div class="form-group">
-      <label>手机号</label>
-      <input type="text" id="admin-phone" placeholder="选填">
+      <label>手机号 *</label>
+      <input type="text" id="admin-phone" placeholder="必填，如 13800138000" required>
     </div>
     <div class="form-group">
-      <label>邮箱</label>
-      <input type="text" id="admin-email" placeholder="选填">
+      <label>邮箱 *</label>
+      <input type="email" id="admin-email" placeholder="必填，如 name@company.com" required>
     </div>
     <div class="form-group">
       <label>职责描述</label>
-      <textarea id="admin-desc" rows="2" placeholder="如：负责图书品类运营"></textarea>
+      <textarea id="admin-desc" rows="2" placeholder="如：负责图书品类"></textarea>
     </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">取消</button>
-    <button class="btn btn-primary" onclick="confirmAddAdmin()">V 确认添加</button>
+    <button class="btn btn-primary" onclick="confirmAddAdmin()">确认添加</button>
   `);
-}
-
-function onAdminSuperChange() {
-  const isSuper = document.getElementById('admin-is-super').value === '1';
-  const roleGroup = document.getElementById('admin-role-group');
-  if (roleGroup) roleGroup.style.display = isSuper ? 'none' : 'block';
 }
 
 async function confirmAddAdmin() {
   const username = document.getElementById('admin-username').value.trim();
   const name = document.getElementById('admin-name').value.trim();
   const password = document.getElementById('admin-password').value || '123456';
-  const is_super = parseInt(document.getElementById('admin-is-super').value);
-  const admin_role = is_super ? '其他' : (document.getElementById('admin-role').value || '其他');
+  const admin_role = document.getElementById('admin-role').value || '销售';
   const phone = document.getElementById('admin-phone').value.trim();
   const email = document.getElementById('admin-email').value.trim();
   const description = document.getElementById('admin-desc').value.trim();
-  
+
   if (!username || !name) { showToast('用户名和姓名为必填', 'error'); return; }
-  
+  if (!phone) { showToast('手机号为必填', 'error'); return; }
+  if (!email) { showToast('邮箱为必填', 'error'); return; }
+
+  const is_super = admin_role === '管理员';
+
   const res = await fetchAPI('/admins', {
     method: 'POST',
     body: JSON.stringify({ username, name, password, is_super, admin_role, phone, email, description })
   });
-  if (res.success) { showToast('管理员创建成功'); closeModal(); renderAdminManage(); }
+  if (res.success) { showToast(res.message || '账号创建成功'); closeModal(); renderAdminManage(); }
   else { showToast(res.error || '创建失败', 'error'); }
 }
 
@@ -5702,9 +5814,9 @@ async function editAdmin(id) {
   const listRes = await fetchAPI('/admins');
   if (!listRes.success) return;
   const admin = listRes.data.find(a => a.id === id);
-  if (!admin) { showToast('未找到管理员', 'error'); return; }
-  
-  openModal('编辑管理员', `
+  if (!admin) { showToast('未找到该员工', 'error'); return; }
+
+  openModal(`编辑账号「${admin.name}」`, `
     <div class="form-group">
       <label>用户名（登录用）</label>
       <input type="text" id="edit-admin-username" value="${admin.username}" ${admin.is_super ? 'readonly style="opacity:0.6"' : ''}>
@@ -5714,27 +5826,27 @@ async function editAdmin(id) {
       <input type="text" id="edit-admin-name" value="${admin.name}">
     </div>
     <div class="form-group">
-      <label>权限级别</label>
-      <select id="edit-admin-is-super" ${admin.is_super ? 'disabled' : ''} onchange="onEditAdminSuperChange()">
-        <option value="0" ${!admin.is_super ? 'selected' : ''}>普通管理员</option>
-        <option value="1" ${admin.is_super ? 'selected' : ''}>超级管理员</option>
+      <label>角色</label>
+      <select id="edit-admin-role" ${admin.is_super ? 'disabled' : ''}>
+        <option value="销售" ${admin.admin_role === '销售' && !admin.is_super ? 'selected' : ''}>销售</option>
+        <option value="运营" ${admin.admin_role === '运营' && !admin.is_super ? 'selected' : ''}>运营</option>
+        <option value="管理员" ${admin.is_super || admin.admin_role === '管理员' ? 'selected' : ''}>管理员</option>
       </select>
-      ${admin.is_super ? '<p style="font-size:11px;color:var(--gray-400);margin-top:4px">超级管理员权限不可降级</p>' : ''}
+      ${admin.is_super ? '<p style="font-size:11px;color:var(--gray-400);margin-top:4px">超级管理员角色不可更改</p>' : ''}
     </div>
-    <div class="form-group" id="edit-admin-role-group" style="${admin.is_super ? 'display:none' : ''}">
-      <label>角色分类</label>
-      <select id="edit-admin-role">
-        <option value="销售" ${admin.admin_role === '销售' ? 'selected' : ''}>销售</option>
-        <option value="运营" ${admin.admin_role === '运营' ? 'selected' : ''}>运营</option>
-        <option value="其他" ${admin.admin_role === '其他' || !admin.admin_role ? 'selected' : ''}>其他</option>
+    <div class="form-group">
+      <label>状态</label>
+      <select id="edit-admin-status">
+        <option value="active" ${admin.status !== 'disabled' ? 'selected' : ''}>在职</option>
+        <option value="disabled" ${admin.status === 'disabled' ? 'selected' : ''}>已停用</option>
       </select>
     </div>
     <div class="form-group">
-      <label>手机号</label>
-      <input type="text" id="edit-admin-phone" value="${admin.phone || ''}">
+      <label>手机号 *</label>
+      <input type="text" id="edit-admin-phone" value="${admin.phone || ''}" placeholder="必填" required>
     </div>
     <div class="form-group">
-      <label>邮箱</label>
+      <label>邮箱 *</label>
       <input type="text" id="edit-admin-email" value="${admin.email || ''}">
     </div>
     <div class="form-group">
@@ -5747,29 +5859,24 @@ async function editAdmin(id) {
   `);
 }
 
-function onEditAdminSuperChange() {
-  const isSuper = document.getElementById('edit-admin-is-super').value === '1';
-  const roleGroup = document.getElementById('edit-admin-role-group');
-  if (roleGroup) roleGroup.style.display = isSuper ? 'none' : 'block';
-}
-
 async function confirmEditAdmin(id) {
   const username = document.getElementById('edit-admin-username').value.trim();
   const name = document.getElementById('edit-admin-name').value.trim();
-  const is_super = parseInt(document.getElementById('edit-admin-is-super').value);
-  const admin_role = is_super ? undefined : (document.getElementById('edit-admin-role')?.value || '其他');
+  const admin_role = document.getElementById('edit-admin-role')?.value || '销售';
+  const status = document.getElementById('edit-admin-status')?.value || 'active';
   const phone = document.getElementById('edit-admin-phone').value.trim();
   const email = document.getElementById('edit-admin-email').value.trim();
   const description = document.getElementById('edit-admin-desc').value.trim();
-  
-  const body = { username, name, is_super, phone, email, description };
-  if (admin_role !== undefined) body.admin_role = admin_role;
-  
+
+  if (!phone) { showToast('手机号为必填', 'error'); return; }
+  if (!email) { showToast('邮箱为必填', 'error'); return; }
+  const is_super = admin_role === '管理员';
+
   const res = await fetchAPI(`/admins/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(body)
+    body: JSON.stringify({ username, name, is_super, admin_role, status, phone, email, description })
   });
-  if (res.success) { showToast('管理员信息已更新'); closeModal(); renderAdminManage(); }
+  if (res.success) { showToast(res.message || '员工信息已更新'); closeModal(); renderAdminManage(); }
   else { showToast(res.error || '更新失败', 'error'); }
 }
 
@@ -5784,9 +5891,9 @@ async function resetAdminPassword(id, name) {
 }
 
 async function deleteAdmin(id, name) {
-  if (!confirm(`确定删除管理员「${name}」？删除后该管理员将无法登录系统。`)) return;
+  if (!confirm(`确定删除账号「${name}」？删除后将无法登录。`)) return;
   const res = await fetchAPI(`/admins/${id}`, { method: 'DELETE' });
-  if (res.success) { showToast('管理员已删除'); renderAdminManage(); }
+  if (res.success) { showToast(res.message || '账号已删除'); renderAdminManage(); }
   else { showToast(res.error || '删除失败', 'error'); }
 }
 
