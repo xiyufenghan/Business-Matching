@@ -3,7 +3,7 @@ const path = require('path');
 const { initDatabase } = require('./db/init');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // 初始化数据库
 const db = initDatabase();
