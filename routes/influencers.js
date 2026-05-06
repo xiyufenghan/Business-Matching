@@ -833,8 +833,11 @@ router.post('/add', (req, res) => {
   }
 });
 
-// ========== 批量删除达人 ==========
+// ========== 批量删除达人（仅超管） ==========
 router.post('/batch-delete', (req, res) => {
+  if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
+    return res.status(403).json({ success: false, error: '无权限：仅超级管理员可执行此操作' });
+  }
   try {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {

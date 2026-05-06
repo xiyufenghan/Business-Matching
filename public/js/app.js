@@ -5,26 +5,69 @@ let navigationHistory = [];
 let notificationCount = 0;
 
 // ============ 工具函数 ============
+
+// 从 localStorage 获取当前 token
+function getAuthToken() {
+  try { return localStorage.getItem('bizmatch_token') || ''; } catch(e) { return ''; }
+}
+// 保存 token 到 localStorage
+function saveAuthToken(token) {
+  try { localStorage.setItem('bizmatch_token', token); } catch(e) {}
+}
+// 清除 token（退出登录）
+function clearAuthToken() {
+  try { localStorage.removeItem('bizmatch_token'); } catch(e) {}
+}
+
 async function fetchAPI(url, options = {}) {
   try {
-    // 为所有 GET 请求默认禁用缓存，确保拿到最新数据（如管理员列表修改后立即生效）
     const method = (options.method || 'GET').toUpperCase();
+    // 构建请求头：自动携带 Authorization token
+    const headers = { 
+      'Content-Type': 'application/json', 
+      'Cache-Control': 'no-cache', 
+      'Pragma': 'no-cache' 
+    };
+    const token = getAuthToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    
+    // 注意：headers 合并放最后，确保调用方传的 headers 不会覆盖 Authorization
     const finalOptions = {
       cache: 'no-store',
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
-      ...options
+      ...options,
+      headers: { ...headers, ...(options.headers || {}) }
     };
-    // 给 GET 接口 URL 追加时间戳避免任何中间代理缓存
     let finalUrl = API_BASE + url;
     if (method === 'GET') {
       finalUrl += (finalUrl.includes('?') ? '&' : '?') + '_t=' + Date.now();
     }
     const res = await fetch(finalUrl, finalOptions);
-    return await res.json();
+    const json = await res.json();
+    // 401/403 时自动清除无效 token 并跳转登录页
+    if ((res.status === 401 || res.status === 403) && !url.startsWith('/login')) {
+      clearAuthToken();
+      currentUser = null;
+      doLogoutUI();
+      return json;
+    }
+    return json;
   } catch (err) {
     showToast('网络请求失败: ' + err.message, 'error');
     return { success: false, error: err.message };
   }
+}
+
+// 登出 UI 操作（不调接口，仅 UI 切换）
+function doLogoutUI() {
+  currentUser = null;
+  navigationHistory = [];
+  try { localStorage.removeItem('bizmatch_user'); } catch(e) {}
+  document.getElementById('app-container').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+  const pwd = document.getElementById('login-password'); if (pwd) { pwd.value = ''; }
+  const usr = document.getElementById('login-username'); if (usr) { usr.value = ''; }
+  const errorEl = document.getElementById('login-error'); if (errorEl) errorEl.style.display = 'none';
+  setTimeout(() => { document.getElementById('login-username')?.focus(); }, 100);
 }
 
 function isMobile() { return window.innerWidth <= 768; }
@@ -134,9 +177,8 @@ function closeSidebar() {
 
 // ============ 登录与权限 ============
 
-// ============ 激活页（/?activate=CODE） ============
-// 在页面加载时检测 URL 参数，若带 activate=xxx 则显示激活页
-(function initActivateCheck() {
+// ============ 激活页（/?activate=CODE） / Token 自动恢复 ============
+(function initSessionCheck() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('activate');
   const autoUser = params.get('u');
@@ -151,6 +193,16 @@ function closeSidebar() {
     });
     return;
   }
+  
+  // ====== Token 自动恢复：页面刷新后用已保存的 token 恢复登录态 ======
+  const savedToken = getAuthToken();
+  if (savedToken && !code) {
+    document.addEventListener('DOMContentLoaded', () => {
+      restoreSession(savedToken);
+    });
+    return;
+  }
+
   // 非激活场景：若 URL 带 ?u= 则自动预填登录账号输入框（来自激活跳转）
   if (autoUser) {
     document.addEventListener('DOMContentLoaded', () => {
@@ -161,6 +213,39 @@ function closeSidebar() {
     });
   }
 })();
+
+// 用已保存的 token 验证并恢复登录态
+async function restoreSession(token) {
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).then(r => r.json()).catch(() => null);
+
+    if (res && res.success && res.data) {
+      // token 有效：用最新用户信息覆盖缓存
+      currentUser = res.data;
+      try { localStorage.setItem('bizmatch_user', JSON.stringify(res.data)); } catch(e) {}
+      document.getElementById('login-page').style.display = 'none';
+      document.getElementById('app-container').style.display = 'flex';
+      initApp();
+      return;
+    }
+    // token 无效：清除并显示登录页
+    clearAuthToken();
+    try { localStorage.removeItem('bizmatch_user'); } catch(e) {}
+    showLoginPage();
+  } catch(e) {
+    // 网络异常：保留 token 不清除（防止断网时被强制登出），但显示登录页让用户手动登录
+    showLoginPage();
+  }
+}
+
+function showLoginPage() {
+  currentUser = null;
+  navigationHistory = [];
+  document.getElementById('app-container').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+}
 
 async function loadActivateInfo(code) {
   const loadingEl = document.getElementById('activate-loading');
@@ -266,9 +351,17 @@ async function handleLogin(event) {
   });
 
   btn.disabled = false;
-  btn.textContent = '登 形';
+  btn.textContent = '登 录';
 
   if (res.success) {
+    // 保存 token 到 localStorage（持久化登录状态）
+    if (res.data.token) { saveAuthToken(res.data.token); }
+    // 缓存用户基本信息（不含 token，用于页面刷新恢复显示）
+    try {
+      const userInfo = { ...res.data };
+      delete userInfo.token; // 不缓存 token 本身
+      localStorage.setItem('bizmatch_user', JSON.stringify(userInfo));
+    } catch(e) {}
     currentUser = res.data;
     errorEl.style.display = 'none';
     document.getElementById('login-page').style.display = 'none';
@@ -286,16 +379,12 @@ function showLoginError(msg) {
   el.style.display = 'block';
 }
 
-function logout() {
-  currentUser = null;
-  navigationHistory = [];
-  document.getElementById('app-container').style.display = 'none';
-  document.getElementById('login-page').style.display = 'flex';
-  const pwd = document.getElementById('login-password'); if (pwd) { pwd.value = ''; }
-  const usr = document.getElementById('login-username'); if (usr) { usr.value = ''; }
-  const errorEl = document.getElementById('login-error'); if (errorEl) errorEl.style.display = 'none';
-  // 聚焦账号输入框
-  setTimeout(() => { document.getElementById('login-username')?.focus(); }, 100);
+async function logout() {
+  // 通知服务端清除 token（静默失败不影响）
+  try { await fetchAPI('/logout', { method: 'POST' }); } catch(e) {}
+  // 清除本地状态
+  clearAuthToken();
+  doLogoutUI();
 }
 
 // ============ 应用初始化 ============
@@ -2890,7 +2979,8 @@ async function handleInfluencerExcelUpload(e) {
   try {
     const res = await fetch('/api/influencers/excel/import', {
       method: 'POST',
-      body: formData
+      body: formData,
+      headers: { 'Authorization': 'Bearer ' + getAuthToken() }
     });
     const data = await res.json();
     if (data.success) {
@@ -3769,7 +3859,8 @@ async function handleExcelUpload(e) {
   try {
     const res = await fetch(apiUrl, {
       method: 'POST',
-      body: formData
+      body: formData,
+      headers: { 'Authorization': 'Bearer ' + getAuthToken() }
     });
     const data = await res.json();
     if (data.success) {
@@ -5326,7 +5417,8 @@ async function handleMerchantExcelUpload(e) {
   try {
     const res = await fetch('/api/merchants/excel/import', {
       method: 'POST',
-      body: formData
+      body: formData,
+      headers: { 'Authorization': 'Bearer ' + getAuthToken() }
     });
     const data = await res.json();
     if (!data.success) {

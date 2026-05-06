@@ -506,8 +506,11 @@ router.post('/order', (req, res) => {
   }
 });
 
-// 批量删除商家需求
+// 批量删除商家需求（仅超管）
 router.post('/batch-delete', (req, res) => {
+  if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
+    return res.status(403).json({ success: false, error: '无权限：仅超级管理员可执行此操作' });
+  }
   try {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -521,8 +524,15 @@ router.post('/batch-delete', (req, res) => {
   }
 });
 
-// 一键删除所有商家需求
+// 一键删除所有商家需求（仅超管，merchant_id 限定时允许商家本人）
 router.delete('/all/clear', (req, res) => {
+  const { merchant_id } = req.query;
+  // 商家本人清空自己 / 超管清空全部
+  const isSelfClean = merchant_id && req.user && req.user.role === 'merchant' && req.user.id === merchant_id;
+  const isSuper = req.user && req.user.role === 'admin' && req.user.is_super;
+  if (!isSelfClean && !isSuper) {
+    return res.status(403).json({ success: false, error: '无权限：仅本人或超级管理员可执行此操作' });
+  }
   try {
     const { merchant_id } = req.query;
     if (merchant_id) {
@@ -538,6 +548,9 @@ router.delete('/all/clear', (req, res) => {
 
 // 批量删除达人货盘需求
 router.post('/influencer-demands/batch-delete', (req, res) => {
+  if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
+    return res.status(403).json({ success: false, error: '无权限：仅超级管理员可执行此操作' });
+  }
   try {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -551,8 +564,11 @@ router.post('/influencer-demands/batch-delete', (req, res) => {
   }
 });
 
-// 一键删除所有达人货盘需求
+// 一键删除所有达人货盘需求（仅超管）
 router.delete('/influencer-demands/all/clear', (req, res) => {
+  if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
+    return res.status(403).json({ success: false, error: '无权限：仅超级管理员可执行此操作' });
+  }
   try {
     const { influencer_id } = req.query;
     if (influencer_id) {

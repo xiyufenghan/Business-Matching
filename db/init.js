@@ -329,6 +329,19 @@ function initDatabase() {
     }
   } catch (e3) { /* ignore */ }
 
+  // 登录会话表（支持多设备同时在线，不互相踢出）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_type TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      client_info TEXT
+    )
+  `);
+
   // 撮合历史记录表
   db.exec(`
     CREATE TABLE IF NOT EXISTS matchmaking_history (
@@ -358,15 +371,12 @@ function initDatabase() {
     )
   `);
 
-  // 兼容已有库：补齐 admins 的 status 字段（停用/启用）+ last_login_at 字段
+  // 兼容已有库：补齐 admins 的 status / last_login_at 字段
+  // 注意：token 字段已迁移到 sessions 表，此处不再使用
   try {
     const admCols = db.prepare('PRAGMA table_info(admins)').all().map(c => c.name);
-    if (!admCols.includes('status')) {
-      db.exec("ALTER TABLE admins ADD COLUMN status TEXT DEFAULT 'active'");
-    }
-    if (!admCols.includes('last_login_at')) {
-      db.exec("ALTER TABLE admins ADD COLUMN last_login_at DATETIME");
-    }
+    if (!admCols.includes('status')) { db.exec("ALTER TABLE admins ADD COLUMN status TEXT DEFAULT 'active'"); }
+    if (!admCols.includes('last_login_at')) { db.exec("ALTER TABLE admins ADD COLUMN last_login_at DATETIME"); }
   } catch (e) { /* ignore */ }
 
   // 插入示例数据

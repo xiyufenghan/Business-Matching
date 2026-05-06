@@ -196,8 +196,11 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-// DELETE /all/clear - 一键清空
+// DELETE /all/clear - 一键清空（仅超管）
 router.delete('/all/clear', (req, res) => {
+  if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
+    return res.status(403).json({ success: false, error: '无权限：仅超级管理员可执行此操作' });
+  }
   try {
     const { merchant_id } = req.query;
     if (merchant_id) {
