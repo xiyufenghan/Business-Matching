@@ -925,4 +925,49 @@ router.put('/:id/reset-password', (req, res) => {
   }
 });
 
+// ========== 达人广场（仅 admin + merchant 可访问）==========
+router.get('/plaza', (req, res) => {
+  try {
+    const role = req.user.role;
+    if (role !== 'admin' && role !== 'merchant') {
+      return res.status(403).json({ success: false, error: '无权限' });
+    }
+    const { keyword, level, category, page, pageSize } = req.query;
+    // merchant 不返回 sales_owner / sales_owner_id
+    const isAdmin = role === 'admin';
+    const selectFields = `id, level, video_account_name, video_category_track, fans_count,
+      cooperation_type, book_willingness, course_willingness, region, has_mcn, mcn_name,
+      short_video_frequency, live_frequency, official_account_name, description
+      ${isAdmin ? ', sales_owner, sales_owner_id' : ''}`;
+
+    let sql = `SELECT ${selectFields} FROM influencers WHERE status != 'deleted' AND invite_status != 'pending'`;
+    const params = [];
+    if (keyword) {
+      sql += ' AND (video_account_name LIKE ? OR official_account_name LIKE ?)';
+      params.push(`%${keyword}%`, `%${keyword}%`);
+    }
+    if (level) { sql += ' AND level = ?'; params.push(level); }
+    if (category) { sql += ' AND video_category_track LIKE ?'; params.push(`%${category}%`); }
+
+    const currentPage = parseInt(page) || 1;
+    const size = parseInt(pageSize) || 20;
+    const offset = (currentPage - 1) * size;
+
+    let countSql = `SELECT COUNT(*) as total FROM influencers WHERE status != 'deleted' AND invite_status != 'pending'`;
+    const countParams = [];
+    if (keyword) { countSql += ' AND (video_account_name LIKE ? OR official_account_name LIKE ?)'; countParams.push(`%${keyword}%`, `%${keyword}%`); }
+    if (level) { countSql += ' AND level = ?'; countParams.push(level); }
+    if (category) { countSql += ' AND video_category_track LIKE ?'; countParams.push(`%${category}%`); }
+
+    const total = req.db.prepare(countSql).get(...countParams).total;
+    sql += ' ORDER BY fans_count DESC LIMIT ? OFFSET ?';
+    params.push(size, offset);
+
+    const data = req.db.prepare(sql).all(...params);
+    res.json({ success: true, data, pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

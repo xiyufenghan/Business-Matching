@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const { writeNotification, notifyWework } = require('./notifications');
 
 // ===== 工具：从 cooperation 孵化 matchmaking =====
 // 在 cooperation 被 confirm 时调用。同一对 (merchant, influencer) 若已存在未关闭的撮合则不重复建。
@@ -57,42 +58,78 @@ function incubateMatchmakingFromCooperation(db, coop) {
 
 // ===== 合作邀约/带货申请 =====
 
-// 发起合作邀约（商家邀请达人）
+// 发起合作邀约（商家邀请达人 — 模式B；达人在商家广场邀约 — 模式D）
 router.post('/invite', (req, res) => {
   try {
-    const { merchant_id, influencer_id, demand_id, demand_type, message } = req.body;
+    const { merchant_id, influencer_id, demand_id, demand_type, message, initiative } = req.body;
     if (!merchant_id || !influencer_id) {
       return res.status(400).json({ success: false, error: '商家ID和达人ID为必填' });
     }
+    const actualInitiative = initiative || 'merchant';
     const id = uuidv4();
     req.db.prepare(`
       INSERT INTO cooperation (id, merchant_id, influencer_id, demand_id, demand_type, initiative, status, message, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'merchant', 'pending', ?, datetime('now'), datetime('now'))
-    `).run(id, merchant_id, influencer_id, demand_id || null, demand_type || 'invite', message || '');
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, datetime('now'), datetime('now'))
+    `).run(id, merchant_id, influencer_id, demand_id || null, demand_type || 'invite', actualInitiative, message || '');
+
+    // 站内通知：通知被邀请方
+    if (actualInitiative === 'merchant') {
+      // 商家邀请达人 → 通知达人
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
+      writeNotification(req.db, 'influencer', influencer_id, 'invite',
+        `商家「${m ? m.company : '未知商家'}」向您发起了合作邀约，请查看并回复`, id);
+    } else {
+      // 达人邀约商家 → 通知商家
+      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(influencer_id);
+      writeNotification(req.db, 'merchant', merchant_id, 'invite',
+        `达人「${inf ? inf.video_account_name : '未知达人'}」向您发起了合作邀约，请查看并回复`, id);
+    }
+
     res.status(201).json({ success: true, message: '邀请已发送', data: { id } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 达人发起带货申请
+// 达人对商家需求表达意向（模式A：达人点"有意向"）
+// 商家对达人需求发起响应（模式C：商家点"响应"）
 router.post('/apply', (req, res) => {
   try {
-    const { influencer_id, merchant_id, demand_id, demand_type, message } = req.body;
+    const { influencer_id, merchant_id, demand_id, demand_type, message, initiative, influencer_demand_id } = req.body;
     if (!influencer_id || !merchant_id) {
       return res.status(400).json({ success: false, error: '达人ID和商家ID为必填' });
     }
+    const actualInitiative = initiative || 'influencer';
     // 检查是否已存在相同的申请
-    const existing = req.db.prepare('SELECT id FROM cooperation WHERE influencer_id = ? AND demand_id = ? AND initiative = ?').get(influencer_id, demand_id, 'influencer');
+    const existing = req.db.prepare('SELECT id FROM cooperation WHERE influencer_id = ? AND merchant_id = ? AND demand_id = ? AND initiative = ?').get(influencer_id, merchant_id, demand_id || null, actualInitiative);
     if (existing) {
-      return res.status(400).json({ success: false, error: '已发起过带货申请' });
+      return res.status(400).json({ success: false, error: '已发起过申请' });
     }
     const id = uuidv4();
     req.db.prepare(`
-      INSERT INTO cooperation (id, merchant_id, influencer_id, demand_id, demand_type, initiative, status, message, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'influencer', 'pending', ?, datetime('now'), datetime('now'))
-    `).run(id, merchant_id, influencer_id, demand_id || null, demand_type || 'apply', message || '');
-    res.status(201).json({ success: true, message: '带货申请已发送', data: { id } });
+      INSERT INTO cooperation (id, merchant_id, influencer_id, demand_id, demand_type, initiative, status, message, influencer_demand_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, datetime('now'), datetime('now'))
+    `).run(id, merchant_id, influencer_id, demand_id || null, demand_type || 'apply', actualInitiative, message || '', influencer_demand_id || null);
+
+    // 站内通知 + 企微推送（达人响应商家需求时触发）
+    if (actualInitiative === 'influencer') {
+      // 通知商家：达人对需求有意向
+      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(influencer_id);
+      const d = demand_id ? req.db.prepare('SELECT title FROM demands WHERE id = ?').get(demand_id) : null;
+      const infName = inf ? inf.video_account_name : '未知达人';
+      const demTitle = d ? d.title : '您的需求';
+      writeNotification(req.db, 'merchant', merchant_id, 'interest',
+        `达人「${infName}」对「${demTitle}」表达了合作意向，请及时回复`, id);
+      // 企微推送
+      notifyWework(req.db, `【商达撮合】达人「${infName}」对「${demTitle}」表达了合作意向，请销售跟进！`);
+    } else {
+      // 商家响应达人需求 → 通知达人
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
+      writeNotification(req.db, 'influencer', influencer_id, 'response',
+        `商家「${m ? m.company : '未知商家'}」对您的带货意向进行了响应，请查看`, id);
+    }
+
+    res.status(201).json({ success: true, message: '申请已发送', data: { id } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -107,7 +144,7 @@ router.put('/confirm/:id', (req, res) => {
     if (coop.status === 'confirmed') {
       return res.json({ success: true, message: '已确认过，无需重复操作' });
     }
-    req.db.prepare("UPDATE cooperation SET status = 'confirmed', updated_at = datetime('now') WHERE id = ?").run(id);
+    req.db.prepare("UPDATE cooperation SET status = 'confirmed', responded_at = datetime('now'), updated_at = datetime('now') WHERE id = ?").run(id);
     // 单向衔接：confirm 后孵化撮合
     let incubateResult = { incubated: false };
     try {
@@ -115,6 +152,28 @@ router.put('/confirm/:id', (req, res) => {
     } catch (e) {
       console.error('[cooperation/confirm] 孵化撮合失败:', e.message);
     }
+
+    // 站内通知：通知发起方已确认
+    try {
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(coop.merchant_id);
+      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(coop.influencer_id);
+      const mName = m ? m.company : '商家';
+      const infName = inf ? inf.video_account_name : '达人';
+      if (coop.initiative === 'merchant') {
+        // 商家发起 → 达人确认 → 通知商家
+        writeNotification(req.db, 'merchant', coop.merchant_id, 'confirmed',
+          `达人「${infName}」已接受您的合作邀约，撮合工单已生成！`, id);
+      } else {
+        // 达人/商家发起 → 对方确认 → 通知发起方
+        writeNotification(req.db, 'influencer', coop.influencer_id, 'confirmed',
+          `商家「${mName}」已接受您的合作申请，撮合工单已生成！`, id);
+      }
+      // 企微推送：意向达成
+      notifyWework(req.db, `【商达撮合·意向达成】商家「${mName}」× 达人「${infName}」已确认合作意向，请销售及时跟进！`);
+    } catch (e) {
+      console.error('[cooperation/confirm] 通知失败:', e.message);
+    }
+
     res.json({
       success: true,
       message: incubateResult.incubated ? '已确认合作，撮合工单已自动生成' : (incubateResult.reused ? '已确认合作，沿用既有撮合' : '已确认合作'),

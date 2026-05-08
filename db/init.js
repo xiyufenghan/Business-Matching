@@ -379,6 +379,85 @@ function initDatabase() {
     if (!admCols.includes('last_login_at')) { db.exec("ALTER TABLE admins ADD COLUMN last_login_at DATETIME"); }
   } catch (e) { /* ignore */ }
 
+  // ====== V3 新增表 ======
+
+  // 站内通知表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_type TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      related_id TEXT,
+      is_read INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 系统设置表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 初始化企微 Webhook 配置
+  try {
+    const existing = db.prepare("SELECT key FROM settings WHERE key = 'wework_webhook_url'").get();
+    if (!existing) {
+      db.prepare("INSERT INTO settings (key, value) VALUES ('wework_webhook_url', '')").run();
+    }
+  } catch (e) { /* ignore */ }
+
+  // ====== V3 补齐字段 ======
+
+  // merchants: 隐私授权 + 商家广场展示字段
+  try {
+    const mCols = db.prepare('PRAGMA table_info(merchants)').all().map(c => c.name);
+    if (!mCols.includes('privacy_consented')) db.exec('ALTER TABLE merchants ADD COLUMN privacy_consented INTEGER DEFAULT 0');
+    if (!mCols.includes('privacy_consented_at')) db.exec('ALTER TABLE merchants ADD COLUMN privacy_consented_at DATETIME');
+    if (!mCols.includes('logo')) db.exec('ALTER TABLE merchants ADD COLUMN logo TEXT');
+    if (!mCols.includes('brand_desc')) db.exec('ALTER TABLE merchants ADD COLUMN brand_desc TEXT');
+    if (!mCols.includes('website')) db.exec('ALTER TABLE merchants ADD COLUMN website TEXT');
+  } catch (e) { /* ignore */ }
+
+  // influencers: 隐私授权
+  try {
+    const infCols2 = db.prepare('PRAGMA table_info(influencers)').all().map(c => c.name);
+    if (!infCols2.includes('privacy_consented')) db.exec('ALTER TABLE influencers ADD COLUMN privacy_consented INTEGER DEFAULT 0');
+    if (!infCols2.includes('privacy_consented_at')) db.exec('ALTER TABLE influencers ADD COLUMN privacy_consented_at DATETIME');
+  } catch (e) { /* ignore */ }
+
+  // influencer_demands: 新增多选字段（JSON 数组字符串）
+  try {
+    const idCols2 = db.prepare('PRAGMA table_info(influencer_demands)').all().map(c => c.name);
+    if (!idCols2.includes('book_promote_categories')) db.exec('ALTER TABLE influencer_demands ADD COLUMN book_promote_categories TEXT');
+    if (!idCols2.includes('content_formats')) db.exec('ALTER TABLE influencer_demands ADD COLUMN content_formats TEXT');
+    if (!idCols2.includes('cooperation_types')) db.exec('ALTER TABLE influencer_demands ADD COLUMN cooperation_types TEXT');
+  } catch (e) { /* ignore */ }
+
+  // cooperation: 补 influencer_demand_id 字段（模式C/D 关联达人需求）
+  try {
+    const coopCols = db.prepare('PRAGMA table_info(cooperation)').all().map(c => c.name);
+    if (!coopCols.includes('influencer_demand_id')) db.exec('ALTER TABLE cooperation ADD COLUMN influencer_demand_id TEXT');
+    if (!coopCols.includes('responded_at')) db.exec('ALTER TABLE cooperation ADD COLUMN responded_at DATETIME');
+  } catch (e) { /* ignore */ }
+
+  // demands: 补 publisher_role 字段（标记发布者角色：merchant/admin）
+  try {
+    const demCols2 = db.prepare('PRAGMA table_info(demands)').all().map(c => c.name);
+    if (!demCols2.includes('publisher_role')) {
+      db.exec("ALTER TABLE demands ADD COLUMN publisher_role TEXT DEFAULT 'merchant'");
+      db.prepare("UPDATE demands SET publisher_role = 'merchant' WHERE publisher_role IS NULL").run();
+    }
+    if (!demCols2.includes('admin_publisher_id')) {
+      db.exec('ALTER TABLE demands ADD COLUMN admin_publisher_id TEXT');
+    }
+  } catch (e) { /* ignore */ }
+
   // 插入示例数据
   const merchantCount = db.prepare('SELECT COUNT(*) as count FROM merchants').get();
   if (merchantCount.count === 0) {
@@ -482,6 +561,60 @@ function initDatabase() {
     insertCoop.run(uuidv4(), 'm001', 'i001', 'd001', 'invite', 'merchant', 'confirmed', '邀请您合作推广趣味数学启蒙');
     insertCoop.run(uuidv4(), 'm003', 'i003', 'd003', 'invite', 'merchant', 'pending', '邀请您合作推广绘本套装');
     insertCoop.run(uuidv4(), 'm002', 'i002', 'd002', 'apply', 'influencer', 'confirmed', '我想带货编程课程');
+  }
+
+  // ====== V3 Demo 数据预置（幂等：仅在未初始化时执行） ======
+  try {
+    const adminCount = db.prepare('SELECT COUNT(*) as c FROM admins').get().c;
+    if (adminCount === 0) {
+      // 超管账号
+      db.prepare(`INSERT INTO admins (id, username, password, name, is_super, admin_role, phone, email, status)
+        VALUES (?, ?, ?, ?, 1, '超管', ?, ?, 'active')`)
+        .run('a_super', 'admin', 'admin123', '郭雷（腾讯营销）', '13800000000', 'admin@tencent.com');
+      // 销售账号
+      db.prepare(`INSERT INTO admins (id, username, password, name, is_super, admin_role, phone, email, status)
+        VALUES (?, ?, ?, ?, 0, '销售', ?, ?, 'active')`)
+        .run('a_sales1', 'sales1', '123456', '张销售', '13800000011', 'sales1@tencent.com');
+    }
+
+    // 演示达人需求（模式A 样例：达人发布的带货意向，含新字段）
+    const infDemandCount = db.prepare("SELECT COUNT(*) as c FROM influencer_demands WHERE id LIKE 'demo_%'").get().c;
+    if (infDemandCount === 0) {
+      const insDemoInfDem = db.prepare(`
+        INSERT INTO influencer_demands (id, influencer_id, video_account_name, demand_category, book_name, book_category,
+          book_price_min, book_price_max, description, fans_count, subject_category, status,
+          book_promote_categories, content_formats, cooperation_types)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)
+      `);
+      insDemoInfDem.run('demo_infd_001', 'i001', '读书小达人', '图书需求', '想带历史类畅销书', '社科历史', 30, 80,
+        '擅长深度图书解读，粉丝年龄集中在25-45岁，对历史社科类图书有强烈兴趣', 500000, '历史,社科',
+        '["文学小说","社科历史","科普百科"]', '["短视频","直播"]', '["纯佣金","商家投流+低佣金"]');
+      insDemoInfDem.run('demo_infd_002', 'i003', '亲子阅读馆', '图书需求', '寻找高品质亲子绘本', '儿童绘本', 20, 100,
+        '亲子阅读垂类账号，宝妈粉丝占比80%，擅长绘本推荐与亲子互动', 800000, '绘本,亲子',
+        '["少儿图书","童书绘本","艺术生活"]', '["短视频","公众号"]', '["纯佣金","话题素材发布"]');
+      insDemoInfDem.run('demo_infd_003', 'i005', '好书推荐官', '图书需求', '想带文学小说', '文学经典', 25, 120,
+        '文学类内容为主，粉丝粘性高，擅长图书深度解读和阅读种草', 350000, '文学',
+        '["文学小说","经管励志"]', '["短视频","直播"]', '["纯佣金"]');
+    }
+
+    // 演示 admin 代发需求（模式B 样例）
+    const adminDemandCount = db.prepare("SELECT COUNT(*) as c FROM demands WHERE publisher_role = 'admin'").get().c;
+    if (adminDemandCount === 0) {
+      const insAdminDem = db.prepare(`
+        INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, budget_min, budget_max,
+          fans_requirement, cooperation_type, description, requirements, status, deadline,
+          publisher_role, admin_publisher_id)
+        VALUES (?, ?, ?, ?, ?, '视频号', ?, ?, ?, ?, ?, ?, 'published', ?, 'admin', ?)
+      `);
+      insAdminDem.run('demo_adm_d001', 'm001', '【腾讯营销推荐】少儿科普图书合作招募', 'book', '科普读物',
+        5000, 30000, '20万以上', '纯佣金/低佣金+投流', '腾讯营销精选少儿科普图书项目，优质商家货盘，品质有保障',
+        '粉丝≥20万，亲子/科普/教育类账号优先', '2026-07-31', 'a_super');
+      insAdminDem.run('demo_adm_d002', 'm002', '【腾讯营销推荐】K12在线课程推广合作', 'course', '在线课程',
+        8000, 50000, '50万以上', '话题素材+纯佣金', '腾讯营销战略合作课程品牌，佣金高、转化好，欢迎教育类达人对接',
+        '教育类账号，有课程带货经验', '2026-08-15', 'a_super');
+    }
+  } catch (e) {
+    console.error('[DB V3 Demo Data]', e.message);
   }
 
   return db;

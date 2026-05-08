@@ -443,4 +443,104 @@ router.get('/influencer-levels', (req, res) => {
   }
 });
 
+// ============ V3 撮合追踪指标 ============
+
+// 各阶段撮合数量分布（含未响应邀约和意向达成率）
+router.get('/matchmaking-overview', (req, res) => {
+  try {
+    // 五阶段分布
+    const stages = req.db.prepare(`
+      SELECT stage, COUNT(*) as count
+      FROM matchmaking
+      WHERE stage IN ('需求发布','合作匹配','达成意向','样品寄送','开始合作')
+      GROUP BY stage
+    `).all();
+
+    // 未响应邀约：cooperation 中 pending 且超过3天未响应
+    const pendingOver3d = req.db.prepare(`
+      SELECT COUNT(*) as count FROM cooperation
+      WHERE status = 'pending'
+        AND datetime(created_at) < datetime('now', '-3 days')
+    `).get().count;
+
+    // 总邀约数 + 已确认数（用于算意向达成率）
+    const coopTotal = req.db.prepare("SELECT COUNT(*) as count FROM cooperation WHERE status IN ('pending','confirmed','rejected')").get().count;
+    const coopConfirmed = req.db.prepare("SELECT COUNT(*) as count FROM cooperation WHERE status = 'confirmed'").get().count;
+    const conversionRate = coopTotal > 0 ? +(coopConfirmed / coopTotal * 100).toFixed(1) : 0;
+
+    // 当前进行中的撮合数（不含已合作的）
+    const activeMatchmaking = req.db.prepare(`
+      SELECT COUNT(*) as count FROM matchmaking
+      WHERE stage IN ('需求发布','合作匹配','达成意向','样品寄送')
+    `).get().count;
+
+    // 已开始合作数
+    const startedCoop = req.db.prepare("SELECT COUNT(*) as count FROM matchmaking WHERE stage = '开始合作'").get().count;
+
+    res.json({
+      success: true,
+      data: {
+        stages,
+        pendingOver3d,
+        coopTotal,
+        coopConfirmed,
+        conversionRate,
+        activeMatchmaking,
+        startedCoop
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 按商家/达人维度的撮合状态明细（用于私域 push 跟进）
+// query: dimension=merchant|influencer, days=30 (默认看近 30 天)
+router.get('/matchmaking-detail', (req, res) => {
+  try {
+    const { dimension = 'merchant', days = 30 } = req.query;
+    const dateLimit = `datetime('now','-${parseInt(days) || 30} days')`;
+
+    let sql;
+    if (dimension === 'influencer') {
+      sql = `
+        SELECT inf.id, inf.video_account_name as name, inf.level,
+          SUM(CASE WHEN mm.stage = '需求发布' THEN 1 ELSE 0 END) as stage_publish,
+          SUM(CASE WHEN mm.stage = '合作匹配' THEN 1 ELSE 0 END) as stage_match,
+          SUM(CASE WHEN mm.stage = '达成意向' THEN 1 ELSE 0 END) as stage_intent,
+          SUM(CASE WHEN mm.stage = '样品寄送' THEN 1 ELSE 0 END) as stage_sample,
+          SUM(CASE WHEN mm.stage = '开始合作' THEN 1 ELSE 0 END) as stage_started,
+          COUNT(*) as total
+        FROM matchmaking mm
+        LEFT JOIN influencers inf ON mm.influencer_id = inf.id
+        WHERE datetime(mm.created_at) >= ${dateLimit}
+        GROUP BY inf.id
+        ORDER BY total DESC
+        LIMIT 50
+      `;
+    } else {
+      sql = `
+        SELECT m.id, m.company as name, m.industry,
+          SUM(CASE WHEN mm.stage = '需求发布' THEN 1 ELSE 0 END) as stage_publish,
+          SUM(CASE WHEN mm.stage = '合作匹配' THEN 1 ELSE 0 END) as stage_match,
+          SUM(CASE WHEN mm.stage = '达成意向' THEN 1 ELSE 0 END) as stage_intent,
+          SUM(CASE WHEN mm.stage = '样品寄送' THEN 1 ELSE 0 END) as stage_sample,
+          SUM(CASE WHEN mm.stage = '开始合作' THEN 1 ELSE 0 END) as stage_started,
+          COUNT(*) as total
+        FROM matchmaking mm
+        LEFT JOIN merchants m ON mm.merchant_id = m.id
+        WHERE datetime(mm.created_at) >= ${dateLimit}
+        GROUP BY m.id
+        ORDER BY total DESC
+        LIMIT 50
+      `;
+    }
+
+    const data = req.db.prepare(sql).all();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

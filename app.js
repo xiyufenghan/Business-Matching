@@ -151,7 +151,7 @@ app.post('/api/login', (req, res) => {
     }
     const token = generateToken();
     db.prepare("INSERT INTO sessions (id, user_type, user_id, token) VALUES (?, ?, ?, ?)").run(generateId(), 'merchant', merchant.id, token);
-    return res.json({ success: true, data: { token, id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry }});
+    return res.json({ success: true, data: { token, id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry, privacy_consented: merchant.privacy_consented === 1 }});
   }
 
   // 3. 匹配达人
@@ -165,7 +165,7 @@ app.post('/api/login', (req, res) => {
     }
     const token = generateToken();
     db.prepare("INSERT INTO sessions (id, user_type, user_id, token) VALUES (?, ?, ?, ?)").run(generateId(), 'influencer', inf.id, token);
-    return res.json({ success: true, data: { token, id: inf.id, name: inf.video_account_name, role: 'influencer', video_account_name: inf.video_account_name, level: inf.level, fans_count: inf.fans_count, invite_status: inf.invite_status }});
+    return res.json({ success: true, data: { token, id: inf.id, name: inf.video_account_name, role: 'influencer', video_account_name: inf.video_account_name, level: inf.level, fans_count: inf.fans_count, invite_status: inf.invite_status, privacy_consented: inf.privacy_consented === 1 }});
   }
 
   res.status(401).json({ success: false, error: '账号或密码错误' });
@@ -199,17 +199,36 @@ app.get('/api/auth/me', (req, res) => {
   if (u.role === 'merchant') {
     return res.json({ success: true, data: {
       id: u.id, name: u.name, company: u.company, role: 'merchant',
-      phone: u.phone, email: u.email, industry: u.industry
+      phone: u.phone, email: u.email, industry: u.industry,
+      privacy_consented: u.privacy_consented === 1
     }});
   }
   if (u.role === 'influencer') {
     return res.json({ success: true, data: {
       id: u.id, name: u.video_account_name, role: 'influencer',
       video_account_name: u.video_account_name, level: u.level,
-      fans_count: u.fans_count, invite_status: u.invite_status
+      fans_count: u.fans_count, invite_status: u.invite_status,
+      privacy_consented: u.privacy_consented === 1
     }});
   }
   res.status(400).json({ success: false, error: '未知用户类型' });
+});
+
+// 隐私授权接口：商家/达人首次登录确认后调用
+app.post('/api/auth/consent', (req, res) => {
+  const u = req.user;
+  if (!u || (u.role !== 'merchant' && u.role !== 'influencer')) {
+    return res.status(403).json({ success: false, error: '无权限' });
+  }
+  const table = u.role === 'merchant' ? 'merchants' : 'influencers';
+  try {
+    req.db.prepare(
+      `UPDATE ${table} SET privacy_consented = 1, privacy_consented_at = datetime('now') WHERE id = ?`
+    ).run(u.id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 });
 
 // 路由
@@ -222,6 +241,8 @@ app.use('/api/cooperation', require('./routes/cooperation'));
 app.use('/api/admins', require('./routes/admins'));
 app.use('/api/recruitments', require('./routes/recruitments'));
 app.use('/api/invitations', require('./routes/invitations'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/settings', require('./routes/settings'));
 
 // 首页
 app.get('/', (req, res) => {

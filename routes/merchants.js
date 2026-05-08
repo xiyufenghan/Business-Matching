@@ -536,4 +536,10 @@ router.put('/:id/invite-status', (req, res) => {
   }
 });
 
+// ========== 商家广场接口已废弃（V3）==========
+// 商家广场不再提供，此接口保留为 410 Gone 响应以兼容老客户端
+router.get('/plaza', (req, res) => {
+  res.status(410).json({ success: false, error: '商家广场已下线' });
+});
+
 module.exports = router;

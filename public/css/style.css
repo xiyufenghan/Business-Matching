@@ -3054,3 +3054,319 @@ a:hover, .link-text:hover { color: #1e3a8a; }
   .inf-hero { flex-direction: column; align-items: flex-start; }
   .inf-card-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ======================================================= */
+/* =============== V3 新增样式：需求广场等 =================== */
+/* ======================================================= */
+
+/* 需求广场 */
+.plaza-page { padding: 24px; }
+.plaza-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; }
+.plaza-stats { margin-bottom: 20px; }
+.plaza-stats .stat-card { display: inline-block; padding: 8px 16px; background: #f1f5f9; border-radius: 8px; }
+.plaza-stats .stat-label { font-size: 13px; color: #64748b; }
+.plaza-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.plaza-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+.plaza-card:hover {
+  border-color: #2563eb;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  transform: translateY(-2px);
+}
+.plaza-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.plaza-card-time { font-size: 12px; color: #94a3b8; }
+.plaza-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.plaza-tag-merchant { background: #dbeafe; color: #1d4ed8; }
+.plaza-tag-admin { background: #fef3c7; color: #b45309; }
+.plaza-tag-influencer { background: #dcfce7; color: #15803d; }
+.plaza-card-title { font-size: 15px; font-weight: 600; color: #0f172a; margin-bottom: 8px; line-height: 1.4; }
+.plaza-card-publisher { font-size: 12px; color: #64748b; margin-bottom: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.plaza-meta { font-size: 12px; color: #64748b; }
+.plaza-card-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.6;
+  margin-bottom: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.plaza-tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.chip-blue { background: #dbeafe; color: #1e40af; }
+.chip-green { background: #dcfce7; color: #166534; }
+.chip-orange { background: #ffedd5; color: #c2410c; }
+.chip-gray { background: #f1f5f9; color: #475569; }
+.inf-level {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.inf-level.level-S { background: #fef3c7; color: #b45309; }
+.inf-level.level-A { background: #dbeafe; color: #1d4ed8; }
+.inf-level.level-B { background: #e0e7ff; color: #4338ca; }
+.inf-level.level-C { background: #f1f5f9; color: #64748b; }
+.plaza-budget { font-size: 13px; color: #0f172a; margin-bottom: 12px; }
+.plaza-budget strong { color: #dc2626; }
+.plaza-respond-btn { margin-top: auto; }
+.btn-block { width: 100%; }
+
+/* chip-check 多选标签 */
+.chip-check-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-check {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+  user-select: none;
+}
+.chip-check input[type="checkbox"] { cursor: pointer; }
+.chip-check:hover { border-color: #2563eb; }
+.chip-check:has(input:checked) { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; }
+
+/* 合作管理 */
+.coop-manage-page { padding: 24px; max-width: 900px; }
+.coop-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; margin-bottom: 20px; }
+.coop-tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  color: #64748b;
+  transition: all 0.15s;
+}
+.coop-tab:hover { color: #2563eb; }
+.coop-tab.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 500; }
+.coop-count {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  margin-left: 4px;
+}
+.coop-tab.active .coop-count { background: #dbeafe; color: #1d4ed8; }
+.coop-list { display: flex; flex-direction: column; gap: 12px; }
+.coop-item {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+}
+.coop-item-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.coop-item-name { font-weight: 600; color: #0f172a; font-size: 15px; }
+.coop-item-dir { font-size: 12px; color: #64748b; }
+.coop-item-msg { font-size: 13px; color: #475569; line-height: 1.6; margin-bottom: 8px; }
+.coop-item-meta { display: flex; gap: 10px; align-items: center; font-size: 12px; color: #94a3b8; }
+.coop-badge { padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+.coop-badge-ok { background: #dcfce7; color: #166534; }
+.coop-badge-rej { background: #fee2e2; color: #991b1b; }
+.coop-item-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* 个人中心 */
+.profile-page { padding: 24px; }
+.profile-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+}
+.profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #f1f5f9; }
+.profile-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff; font-size: 24px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+}
+.profile-name { font-size: 20px; font-weight: 600; color: #0f172a; }
+.profile-role { font-size: 13px; color: #64748b; margin-top: 4px; }
+.profile-section { margin-top: 20px; }
+.profile-section h3 { font-size: 14px; color: #64748b; margin: 0 0 12px; font-weight: 500; }
+.profile-field { display: flex; padding: 10px 0; border-bottom: 1px dashed #f1f5f9; }
+.profile-field label { width: 100px; color: #94a3b8; font-size: 13px; }
+.profile-field > div { flex: 1; color: #0f172a; font-size: 14px; }
+
+/* 系统设置 */
+.settings-page { padding: 24px; }
+.settings-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+}
+.settings-card h3 { margin: 0 0 8px; font-size: 16px; color: #0f172a; }
+.form-hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+/* 通知铃铛 */
+.notify-bell-wrap { position: relative; display: inline-block; }
+.notify-bell {
+  position: relative;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.notify-bell:hover { background: rgba(37, 99, 235, 0.08); }
+.notify-badge {
+  position: absolute;
+  top: 2px; right: 2px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  border-radius: 10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+.notify-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 360px;
+  max-height: 480px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.notify-panel.active { display: flex; }
+.notify-panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.notify-panel-title { font-weight: 600; color: #0f172a; font-size: 14px; }
+.notify-mark-all { font-size: 12px; color: #2563eb; cursor: pointer; background: none; border: none; }
+.notify-list { flex: 1; overflow-y: auto; max-height: 400px; }
+.notify-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f8fafc;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.notify-item.unread { background: #f0f9ff; }
+.notify-item:hover { background: #f1f5f9; }
+.notify-item-content { font-size: 13px; color: #334155; line-height: 1.5; }
+.notify-item-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+.notify-empty { padding: 40px; text-align: center; color: #94a3b8; font-size: 13px; }
+
+/* 隐私授权弹窗 */
+.consent-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  z-index: 9999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.consent-overlay.active { display: flex; }
+.consent-modal {
+  background: #fff;
+  border-radius: 16px;
+  max-width: 480px;
+  width: 90%;
+  padding: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+.consent-modal h2 { font-size: 20px; color: #0f172a; margin: 0 0 16px; }
+.consent-modal p { font-size: 14px; color: #475569; line-height: 1.7; margin: 0 0 12px; }
+.consent-modal .consent-btn {
+  width: 100%;
+  padding: 12px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 20px;
+}
+.consent-modal .consent-btn:hover { background: #1d4ed8; }
+
+/* Demo 快捷登录 */
+.demo-login-row {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed #e2e8f0;
+}
+.demo-login-title {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.demo-login-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.demo-login-btn {
+  padding: 8px 4px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.demo-login-btn:hover {
+  background: #dbeafe;
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+/* 顶部通知栏容器位置（桌面端） */
+.mobile-topbar .notify-bell-wrap { margin-left: auto; margin-right: 12px; }
+
+@media (max-width: 768px) {
+  .plaza-grid { grid-template-columns: 1fr; }
+  .notify-panel { width: calc(100vw - 20px); right: -100px; }
+  .demo-login-buttons { grid-template-columns: 1fr; }
+}

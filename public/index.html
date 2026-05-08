@@ -14,6 +14,24 @@
         <span></span><span></span><span></span>
       </button>
       <h1 class="mobile-title">商达撮合</h1>
+      <div class="notify-bell-wrap" id="notify-bell-wrap" style="display:none">
+        <div class="notify-bell" onclick="toggleNotifyPanel(event)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="notify-badge" id="notify-badge" style="display:none">0</span>
+        </div>
+        <div class="notify-panel" id="notify-panel">
+          <div class="notify-panel-header">
+            <span class="notify-panel-title">通知</span>
+            <button class="notify-mark-all" onclick="markAllNotifyRead()">全部标记已读</button>
+          </div>
+          <div class="notify-list" id="notify-list">
+            <div class="notify-empty">暂无通知</div>
+          </div>
+        </div>
+      </div>
       <div class="mobile-user" id="mobile-user-badge"></div>
     </header>
 
@@ -62,6 +80,14 @@
         <div id="login-error" class="login-error" style="display:none"></div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:12px" id="login-btn">登 录</button>
       </form>
+      <div class="demo-login-row">
+        <div class="demo-login-title">Demo 演示账号 · 一键登录</div>
+        <div class="demo-login-buttons">
+          <button type="button" class="demo-login-btn" onclick="demoLogin('admin','admin123')">腾讯营销<br><small style="color:#94a3b8">admin</small></button>
+          <button type="button" class="demo-login-btn" onclick="demoLogin('13800138001','123456')">商家<br><small style="color:#94a3b8">知行图书</small></button>
+          <button type="button" class="demo-login-btn" onclick="demoLogin('读书小达人','123456')">达人<br><small style="color:#94a3b8">读书小达人</small></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -102,6 +128,17 @@
 
   <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
+
+  <!-- 隐私授权弹窗（首次登录） -->
+  <div class="consent-overlay" id="consent-overlay">
+    <div class="consent-modal">
+      <h2>欢迎使用「商达撮合平台」</h2>
+      <p>本平台由腾讯广告商业管理部运营，用于促成商家与视频号达人的合作撮合。</p>
+      <p>为了提供更好的服务，我们需要收集和展示你的基础资料（包括公司/账号名、行业、粉丝量、合作意向等）。这些信息将在平台内对其他合作方可见，用于撮合匹配。</p>
+      <p>点击「同意并继续」代表你已阅读并同意平台的数据使用规则。你可以随时在「个人中心」中查看或修改你的资料。</p>
+      <button class="consent-btn" onclick="acceptConsent()">同意并继续</button>
+    </div>
+  </div>
 
   <!-- Modal -->
   <div class="modal-overlay" id="modal-overlay">

@@ -263,15 +263,19 @@ router.get('/influencer-demands', (req, res) => {
 // 创建达人货盘需求（新字段）
 router.post('/influencer-demands', (req, res) => {
   try {
-    const { influencer_id, video_account_name, demand_category, book_name, book_category, book_price_min, book_price_max, course_price_min, course_price_max, description, fans_count, subject_category, operator_id } = req.body;
+    const { influencer_id, video_account_name, demand_category, book_name, book_category, book_price_min, book_price_max, course_price_min, course_price_max, description, fans_count, subject_category, operator_id, book_promote_categories, content_formats, cooperation_types } = req.body;
     if (!influencer_id) {
       return res.status(400).json({ success: false, error: '达人ID为必填' });
     }
     const id = uuidv4();
     req.db.prepare(`
-      INSERT INTO influencer_demands (id, influencer_id, video_account_name, demand_category, book_name, book_category, book_price_min, book_price_max, course_price_min, course_price_max, description, fans_count, subject_category, status, operator_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?)
-    `).run(id, influencer_id, video_account_name || '', demand_category || '图书需求', book_name || '', book_category || '', parseFloat(book_price_min) || 0, parseFloat(book_price_max) || 0, parseFloat(course_price_min) || 0, parseFloat(course_price_max) || 0, description || '', parseInt(fans_count) || 0, subject_category || '', operator_id || null);
+      INSERT INTO influencer_demands (id, influencer_id, video_account_name, demand_category, book_name, book_category, book_price_min, book_price_max, course_price_min, course_price_max, description, fans_count, subject_category, status, operator_id, book_promote_categories, content_formats, cooperation_types)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?, ?)
+    `).run(id, influencer_id, video_account_name || '', demand_category || '图书需求', book_name || '', book_category || '', parseFloat(book_price_min) || 0, parseFloat(book_price_max) || 0, parseFloat(course_price_min) || 0, parseFloat(course_price_max) || 0, description || '', parseInt(fans_count) || 0, subject_category || '', operator_id || null,
+      Array.isArray(book_promote_categories) ? JSON.stringify(book_promote_categories) : (book_promote_categories || null),
+      Array.isArray(content_formats) ? JSON.stringify(content_formats) : (content_formats || null),
+      Array.isArray(cooperation_types) ? JSON.stringify(cooperation_types) : (cooperation_types || null)
+    );
     
     const demand = req.db.prepare('SELECT * FROM influencer_demands WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: demand, message: '达人需求发布成功' });
@@ -311,7 +315,10 @@ router.get('/filter-options', (req, res) => {
   }
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', (req, res, next) => {
+  // 排除保留路径，让后续中间件处理
+  const reserved = ['plaza', 'merchant-plaza', 'influencer-demands'];
+  if (reserved.includes(req.params.id)) return next();
   try {
     const demand = req.db.prepare(`
       SELECT d.*, m.name as merchant_name, m.company as merchant_company
@@ -441,32 +448,41 @@ router.post('/course', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const body = req.body;
+    // 自动推断发布者角色：admin 发布标 'admin'，商家发布标 'merchant'
+    const inferPublisherRole = () => {
+      if (req.user && req.user.role === 'admin') return 'admin';
+      return 'merchant';
+    };
+    const adminPublisherId = (req.user && req.user.role === 'admin') ? req.user.id : null;
+
     if (Array.isArray(body)) {
       const results = [];
       const insertStmt = req.db.prepare(`
-        INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, budget_min, budget_max, fans_requirement, cooperation_type, description, requirements, deadline)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, budget_min, budget_max, fans_requirement, cooperation_type, description, requirements, deadline, publisher_role, admin_publisher_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       const insertMany = req.db.transaction((demands) => {
         for (const d of demands) {
           if (!d.merchant_id || !d.title || !d.category) continue;
           const id = uuidv4();
-          insertStmt.run(id, d.merchant_id, d.title, d.demand_type || 'book', d.category, '视频号', d.budget_min || 0, d.budget_max || 0, d.fans_requirement || null, d.cooperation_type || null, d.description || null, d.requirements || null, d.deadline || null);
+          const role = d.publisher_role || inferPublisherRole();
+          insertStmt.run(id, d.merchant_id, d.title, d.demand_type || 'book', d.category, '视频号', d.budget_min || 0, d.budget_max || 0, d.fans_requirement || null, d.cooperation_type || null, d.description || null, d.requirements || null, d.deadline || null, role, adminPublisherId);
           results.push(id);
         }
       });
       insertMany(body);
       res.status(201).json({ success: true, data: { count: results.length }, message: `成功发布 ${results.length} 条需求` });
     } else {
-      const { merchant_id, title, demand_type, category, budget_min, budget_max, fans_requirement, cooperation_type, description, requirements, deadline } = body;
+      const { merchant_id, title, demand_type, category, budget_min, budget_max, fans_requirement, cooperation_type, description, requirements, deadline, publisher_role } = body;
       if (!merchant_id || !title || !category) {
         return res.status(400).json({ success: false, error: '商家ID、标题、类目为必填项' });
       }
       const id = uuidv4();
+      const role = publisher_role || inferPublisherRole();
       req.db.prepare(`
-        INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, budget_min, budget_max, fans_requirement, cooperation_type, description, requirements, deadline)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, merchant_id, title, demand_type || 'book', category, '视频号', budget_min || 0, budget_max || 0, fans_requirement || null, cooperation_type || null, description || null, requirements || null, deadline || null);
+        INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, budget_min, budget_max, fans_requirement, cooperation_type, description, requirements, deadline, publisher_role, admin_publisher_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, merchant_id, title, demand_type || 'book', category, '视频号', budget_min || 0, budget_max || 0, fans_requirement || null, cooperation_type || null, description || null, requirements || null, deadline || null, role, adminPublisherId);
       const demand = req.db.prepare('SELECT * FROM demands WHERE id = ?').get(id);
       res.status(201).json({ success: true, data: demand });
     }
@@ -663,13 +679,15 @@ router.put('/influencer-demands/:id', (req, res) => {
     const existing = req.db.prepare('SELECT * FROM influencer_demands WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ success: false, error: '达人需求不存在' });
     const fields = ['video_account_name','demand_category','book_name','book_category','book_price_min','book_price_max','course_price_min','course_price_max','description','fans_count','subject_category','status'];
+    const jsonFields = new Set(['book_promote_categories','content_formats','cooperation_types']);
     const floatFields = new Set(['book_price_min','book_price_max','course_price_min','course_price_max']);
     const intFields = new Set(['fans_count']);
     const updates = [], params = [];
-    for (const f of fields) {
+    for (const f of [...fields, ...jsonFields]) {
       if (req.body[f] !== undefined) {
         updates.push(`${f} = ?`);
-        if (floatFields.has(f)) params.push(parseFloat(req.body[f]) || 0);
+        if (jsonFields.has(f)) params.push(Array.isArray(req.body[f]) ? JSON.stringify(req.body[f]) : (req.body[f] || null));
+        else if (floatFields.has(f)) params.push(parseFloat(req.body[f]) || 0);
         else if (intFields.has(f)) params.push(parseInt(req.body[f]) || 0);
         else params.push(req.body[f]);
       }
@@ -683,6 +701,141 @@ router.put('/influencer-demands/:id', (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// ========== 需求广场统一接口（V3）==========
+// 按当前用户角色自动过滤：
+// - admin: 看所有（商家需求 + 达人需求 + admin代发）
+// - merchant: 看达人需求 + admin代发的需求（不含其他商家的）
+// - influencer: 看商家需求 + admin代发的需求（不含其他达人的）
+router.get('/plaza', (req, res) => {
+  try {
+    const role = req.user.role;
+    const userId = req.user.id;
+    const { keyword, page, pageSize, source } = req.query;
+    const currentPage = parseInt(page) || 1;
+    const size = parseInt(pageSize) || 20;
+
+    // 三方来源统一结构：
+    // source_type: 'merchant' | 'influencer' | 'admin'
+    // 从 demands 表取（商家或 admin 发布）
+    let merchantRows = [];
+    let influencerRows = [];
+
+    // 需求1：商家 / admin 发布的需求（来自 demands 表）
+    if (role !== 'merchant' || source === 'all') {
+      // admin/influencer 看 demands 表：
+      //   admin 看全部；influencer 看 publisher_role 为 merchant 或 admin 的
+      let sql = `
+        SELECT d.id, d.title, d.category, d.demand_type, d.platform, d.budget_min, d.budget_max,
+          d.fans_requirement, d.cooperation_type, d.description, d.deadline, d.created_at,
+          d.publisher_role, d.merchant_id,
+          m.company as merchant_company, m.industry as merchant_industry,
+          'merchant_or_admin' as source_kind
+        FROM demands d
+        LEFT JOIN merchants m ON d.merchant_id = m.id
+        WHERE d.status = 'published'
+      `;
+      const params = [];
+      if (role === 'influencer') {
+        // 达人看不到其他达人也看不到受限内容，只看商家/admin发布
+        sql += " AND d.publisher_role IN ('merchant', 'admin')";
+      }
+      if (keyword) { sql += ' AND (d.title LIKE ? OR d.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+      sql += ' ORDER BY d.created_at DESC';
+      merchantRows = req.db.prepare(sql).all(...params);
+    } else {
+      // merchant 视角：仅 admin 发布的 demands（不看其他商家）
+      let sql = `
+        SELECT d.id, d.title, d.category, d.demand_type, d.platform, d.budget_min, d.budget_max,
+          d.fans_requirement, d.cooperation_type, d.description, d.deadline, d.created_at,
+          d.publisher_role, d.merchant_id,
+          m.company as merchant_company, m.industry as merchant_industry,
+          'merchant_or_admin' as source_kind
+        FROM demands d
+        LEFT JOIN merchants m ON d.merchant_id = m.id
+        WHERE d.status = 'published' AND d.publisher_role = 'admin'
+      `;
+      const params = [];
+      if (keyword) { sql += ' AND (d.title LIKE ? OR d.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+      sql += ' ORDER BY d.created_at DESC';
+      merchantRows = req.db.prepare(sql).all(...params);
+    }
+
+    // 需求2：达人发布的需求（来自 influencer_demands 表）
+    if (role !== 'influencer') {
+      // admin 和 merchant 都看得到所有达人发布
+      let sql = `
+        SELECT id_tbl.id, id_tbl.influencer_id, id_tbl.video_account_name, id_tbl.demand_category,
+          id_tbl.description, id_tbl.fans_count, id_tbl.book_promote_categories,
+          id_tbl.content_formats, id_tbl.cooperation_types, id_tbl.created_at,
+          inf.level, inf.video_category_track, inf.region, inf.has_mcn,
+          'influencer' as source_kind
+        FROM influencer_demands id_tbl
+        LEFT JOIN influencers inf ON id_tbl.influencer_id = inf.id
+        WHERE id_tbl.status = 'published'
+      `;
+      const params = [];
+      if (keyword) { sql += ' AND (id_tbl.video_account_name LIKE ? OR id_tbl.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+      sql += ' ORDER BY id_tbl.created_at DESC';
+      influencerRows = req.db.prepare(sql).all(...params);
+    }
+
+    // 合并 + 按创建时间倒序 + 分页
+    const merged = [
+      ...merchantRows.map(r => ({
+        type: 'merchant_demand',
+        id: r.id,
+        title: r.title,
+        category: r.category,
+        description: r.description,
+        publisher_role: r.publisher_role,
+        publisher_label: r.publisher_role === 'admin' ? '腾讯营销' : (r.merchant_company || '商家'),
+        budget_min: r.budget_min,
+        budget_max: r.budget_max,
+        fans_requirement: r.fans_requirement,
+        cooperation_type: r.cooperation_type,
+        deadline: r.deadline,
+        merchant_id: r.merchant_id,
+        created_at: r.created_at,
+      })),
+      ...influencerRows.map(r => ({
+        type: 'influencer_demand',
+        id: r.id,
+        title: r.video_account_name + ' · 带货意向',
+        category: r.demand_category,
+        description: r.description,
+        publisher_role: 'influencer',
+        publisher_label: r.video_account_name || '达人',
+        level: r.level,
+        fans_count: r.fans_count,
+        region: r.region,
+        book_promote_categories: r.book_promote_categories,
+        content_formats: r.content_formats,
+        cooperation_types: r.cooperation_types,
+        influencer_id: r.influencer_id,
+        created_at: r.created_at,
+      }))
+    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const total = merged.length;
+    const offset = (currentPage - 1) * size;
+    const pageData = merged.slice(offset, offset + size);
+
+    res.json({
+      success: true,
+      data: pageData,
+      pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 兼容旧版：/merchant-plaza 重定向到 /plaza
+router.get('/merchant-plaza', (req, res) => {
+  req.url = '/plaza' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '');
+  router.handle(req, res);
 });
 
 module.exports = router;
