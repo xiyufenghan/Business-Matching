@@ -362,25 +362,62 @@ router.get('/top-entities', (req, res) => {
   try {
     const scope = buildScope(req.query);
 
-    const topMerchants = req.db.prepare(`
+    // V4 业绩榜 4 类（按次数排序）：
+    //   1. 商家需求榜：商家发布的需求总数
+    //   2. 达人需求榜：达人发布的需求总数
+    //   3. 商家接单榜：商家被达人邀约后接受（confirmed）的次数
+    //   4. 达人接单榜：达人参与/接受合作的次数
+
+    // 1. 商家需求榜
+    const topMerchantDemands = req.db.prepare(`
       SELECT m.id, m.name, m.company,
-        (SELECT COUNT(*) FROM demands WHERE merchant_id = m.id) as demand_count,
-        (SELECT COUNT(*) FROM cooperation WHERE merchant_id = m.id AND status='confirmed') as confirmed_count
+        (SELECT COUNT(*) FROM demands WHERE merchant_id = m.id AND COALESCE(status,'published') = 'published') as count
       FROM merchants m
-      WHERE m.status != 'deleted'${scope.merchWhere}
-      ORDER BY confirmed_count DESC, demand_count DESC LIMIT 10
+      WHERE COALESCE(m.status,'active') != 'deleted'${scope.merchWhere}
+      ORDER BY count DESC LIMIT 10
     `).all(...scope.merchParams);
 
-    const topInfluencers = req.db.prepare(`
+    // 2. 达人需求榜
+    const topInfluencerDemands = req.db.prepare(`
       SELECT inf.id, inf.video_account_name as name, inf.level, inf.fans_count,
-        (SELECT COUNT(*) FROM cooperation WHERE influencer_id = inf.id) as coop_count,
-        (SELECT COUNT(*) FROM cooperation WHERE influencer_id = inf.id AND status='confirmed') as confirmed_count
+        (SELECT COUNT(*) FROM influencer_demands WHERE influencer_id = inf.id AND COALESCE(status,'published') = 'published') as count
       FROM influencers inf
-      WHERE 1=1${scope.infWhere}
-      ORDER BY confirmed_count DESC, coop_count DESC LIMIT 10
+      WHERE COALESCE(inf.status,'active') = 'active'${scope.infWhere}
+      ORDER BY count DESC LIMIT 10
     `).all(...scope.infParams);
 
-    res.json({ success: true, data: { topMerchants, topInfluencers } });
+    // 3. 商家接单榜：达人发起 (initiative='influencer') 且 status='confirmed' 的合作数
+    const topMerchantTakes = req.db.prepare(`
+      SELECT m.id, m.name, m.company,
+        (SELECT COUNT(*) FROM cooperation
+          WHERE merchant_id = m.id AND initiative = 'influencer' AND status = 'confirmed') as count
+      FROM merchants m
+      WHERE COALESCE(m.status,'active') != 'deleted'${scope.merchWhere}
+      ORDER BY count DESC LIMIT 10
+    `).all(...scope.merchParams);
+
+    // 4. 达人接单榜：达人参与的合作数（initiative='merchant' 被邀约接受 + initiative='influencer' 主动申请被确认）
+    const topInfluencerTakes = req.db.prepare(`
+      SELECT inf.id, inf.video_account_name as name, inf.level, inf.fans_count,
+        (SELECT COUNT(*) FROM cooperation WHERE influencer_id = inf.id AND status = 'confirmed') as count
+      FROM influencers inf
+      WHERE COALESCE(inf.status,'active') = 'active'${scope.infWhere}
+      ORDER BY count DESC LIMIT 10
+    `).all(...scope.infParams);
+
+    res.json({
+      success: true,
+      data: {
+        // V4 4 类业绩榜
+        topMerchantDemands,
+        topInfluencerDemands,
+        topMerchantTakes,
+        topInfluencerTakes,
+        // 兼容旧字段（前端如果有依赖）
+        topMerchants: topMerchantDemands,
+        topInfluencers: topInfluencerTakes,
+      }
+    });
   } catch (err) {
     console.error('[stats/top-entities]', err);
     res.status(500).json({ success: false, error: err.message });

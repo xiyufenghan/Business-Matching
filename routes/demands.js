@@ -396,15 +396,15 @@ router.post('/recommend', (req, res) => {
 // 单条图书需求发布
 router.post('/book', (req, res) => {
   try {
-    const { merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id } = req.body;
+    const { merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id, selling_points, remark } = req.body;
     if (!merchant_id || !book_name || !book_category || !book_merchant) {
       return res.status(400).json({ success: false, error: '商家ID、图书名称、图书分类、图书商家为必填项' });
     }
     const bookId = uuidv4();
     req.db.prepare(`
-      INSERT INTO book_demands (id, merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(bookId, merchant_id, book_image || '', book_merchant, book_name, target_audience || '', book_category, product_image || '', book_introduction || '', wechat_shop_link || '', specification || '', parseFloat(selling_price) || 0, parseFloat(pure_commission) || 0, parseFloat(ad_commission) || 0, logistics || '', parseInt(stock) || 0, operator_id || null);
+      INSERT INTO book_demands (id, merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id, selling_points, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(bookId, merchant_id, book_image || '', book_merchant, book_name, target_audience || '', book_category, product_image || '', book_introduction || '', wechat_shop_link || '', specification || '', parseFloat(selling_price) || 0, parseFloat(pure_commission) || 0, parseFloat(ad_commission) || 0, logistics || '', parseInt(stock) || 0, operator_id || null, selling_points || '', remark || '');
     
     const demandId = uuidv4();
     req.db.prepare(`

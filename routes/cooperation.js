@@ -206,9 +206,11 @@ router.get('/merchant/:merchantId', (req, res) => {
       // 商家发出的邀约
       data = req.db.prepare(`
         SELECT c.*, inf.video_account_name, inf.level, inf.fans_count, inf.video_category_track,
-          inf.cooperation_type as inf_cooperation_type, inf.book_willingness, inf.course_willingness
+          inf.cooperation_type as inf_cooperation_type, inf.book_willingness, inf.course_willingness,
+          d.title as demand_title, d.category as demand_category
         FROM cooperation c
         LEFT JOIN influencers inf ON c.influencer_id = inf.id
+        LEFT JOIN demands d ON c.demand_id = d.id
         WHERE c.merchant_id = ? AND c.initiative = 'merchant'
         ORDER BY c.created_at DESC
       `).all(merchantId);
@@ -216,9 +218,11 @@ router.get('/merchant/:merchantId', (req, res) => {
       // 商家收到的带货申请
       data = req.db.prepare(`
         SELECT c.*, inf.video_account_name, inf.level, inf.fans_count, inf.video_category_track,
-          inf.cooperation_type as inf_cooperation_type, inf.book_willingness, inf.course_willingness
+          inf.cooperation_type as inf_cooperation_type, inf.book_willingness, inf.course_willingness,
+          d.title as demand_title, d.category as demand_category
         FROM cooperation c
         LEFT JOIN influencers inf ON c.influencer_id = inf.id
+        LEFT JOIN demands d ON c.demand_id = d.id
         WHERE c.merchant_id = ? AND c.initiative = 'influencer'
         ORDER BY c.created_at DESC
       `).all(merchantId);
@@ -226,9 +230,11 @@ router.get('/merchant/:merchantId', (req, res) => {
       // 所有
       data = req.db.prepare(`
         SELECT c.*, inf.video_account_name, inf.level, inf.fans_count, inf.video_category_track,
-          inf.cooperation_type as inf_cooperation_type, inf.book_willingness, inf.course_willingness
+          inf.cooperation_type as inf_cooperation_type, inf.book_willingness, inf.course_willingness,
+          d.title as demand_title, d.category as demand_category
         FROM cooperation c
         LEFT JOIN influencers inf ON c.influencer_id = inf.id
+        LEFT JOIN demands d ON c.demand_id = d.id
         WHERE c.merchant_id = ?
         ORDER BY c.created_at DESC
       `).all(merchantId);

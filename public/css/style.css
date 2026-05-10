@@ -3573,3 +3573,78 @@ a:hover, .link-text:hover { color: #1e3a8a; }
   .matchmaking-kanban-5col { grid-template-columns: 1fr; }
   .demo-banner { flex-wrap: wrap; }
 }
+
+/* V4 合作管理：链回原需求 */
+.coop-link-back {
+  display: inline-block;
+  margin: 6px 0 0;
+  padding: 3px 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #dbeafe;
+  transition: all 0.15s;
+}
+.coop-link-back:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+/* V4 达人详情：4 字段展示 */
+.inf-detail-section {
+  margin-top: 14px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  border-left: 3px solid #06b6d4;
+}
+.inf-detail-section-title {
+  font-size: 12px;
+  color: #06b6d4;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.inf-detail-section-content {
+  font-size: 13px;
+  color: #1e293b;
+  line-height: 1.6;
+}
+.inf-works-link {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 3px 8px;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #475569;
+  text-decoration: none;
+}
+.inf-works-link:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+
+/* 我的需求：下架/复制按钮 */
+.demand-action-archived {
+  background: #f3f4f6;
+  color: #9ca3af;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* V4 业绩榜 4 tab 切换按钮 */
+.rank-tab-btn {
+  padding: 4px 10px;
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+}
+.rank-tab-btn.active {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+}

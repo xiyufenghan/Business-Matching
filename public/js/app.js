@@ -881,40 +881,20 @@ async function renderDashboard() {
       </div>
       ` : ''}
 
-      <!-- Top10 + 时间线 -->
-      <div class="dash-grid-3">
+      <!-- V4 业绩排行榜（4 类按次数） + 时间线 -->
+      <div class="dash-grid-2">
         <div class="dash-chart-card">
-          <div class="dash-chart-title">商家 Top10 <span class="dash-chart-sub">按已确认合作</span></div>
-          <div class="rank-list">
-            ${top.topMerchants.length === 0 ? '<div class="empty-mini">暂无数据</div>' : top.topMerchants.map((m, i) => `
-              <div class="rank-item">
-                <span class="rank-no rank-no-${i<3?i+1:'rest'}">${i+1}</span>
-                <div class="rank-name" title="${m.company || m.name}">${m.company || m.name}</div>
-                <div class="rank-stat">
-                  <span class="rank-num">${m.confirmed_count}</span>
-                  <span class="rank-unit">/ ${m.demand_count}</span>
-                </div>
-              </div>
-            `).join('')}
+          <div class="dash-chart-title">业绩排行榜 <span class="dash-chart-sub">4 类 · 按次数</span></div>
+          <div class="rank-tabs" style="display:flex;gap:6px;margin:4px 0 10px;flex-wrap:wrap">
+            <button class="rank-tab-btn active" data-rt="md" onclick="switchRankTab('md')">商家需求</button>
+            <button class="rank-tab-btn" data-rt="id" onclick="switchRankTab('id')">达人需求</button>
+            <button class="rank-tab-btn" data-rt="mt" onclick="switchRankTab('mt')">商家接单</button>
+            <button class="rank-tab-btn" data-rt="it" onclick="switchRankTab('it')">达人接单</button>
           </div>
-        </div>
-        <div class="dash-chart-card">
-          <div class="dash-chart-title">达人 Top10 <span class="dash-chart-sub">按已确认合作</span></div>
-          <div class="rank-list">
-            ${top.topInfluencers.length === 0 ? '<div class="empty-mini">暂无数据</div>' : top.topInfluencers.map((inf, i) => `
-              <div class="rank-item">
-                <span class="rank-no rank-no-${i<3?i+1:'rest'}">${i+1}</span>
-                <div class="rank-name" title="${inf.name||'未命名'}">
-                  ${inf.name || '未命名'}
-                  <span class="rank-level rank-level-${(inf.level||'').replace('级','')}">${inf.level || ''}</span>
-                </div>
-                <div class="rank-stat">
-                  <span class="rank-num">${inf.confirmed_count}</span>
-                  <span class="rank-unit">/ ${inf.coop_count}</span>
-                </div>
-              </div>
-            `).join('')}
-          </div>
+          <div class="rank-list" id="rank-list-md">${renderRankList(top.topMerchantDemands || [], '次需求')}</div>
+          <div class="rank-list" id="rank-list-id" style="display:none">${renderRankInfList(top.topInfluencerDemands || [], '次需求')}</div>
+          <div class="rank-list" id="rank-list-mt" style="display:none">${renderRankList(top.topMerchantTakes || [], '次接单')}</div>
+          <div class="rank-list" id="rank-list-it" style="display:none">${renderRankInfList(top.topInfluencerTakes || [], '次接单')}</div>
         </div>
         <div class="dash-chart-card">
           <div class="dash-chart-title">最新动态 <span class="dash-chart-sub">最近 15 条</span></div>
@@ -962,26 +942,37 @@ function renderMiniKpi(label, value, color, tooltip) {
 function renderTimelineItem(ev) {
   const time = ev.created_at ? formatRelativeTime(ev.created_at) : '';
   if (ev.kind === 'demand') {
+    // V4 双标签：① 流程环节（"发布需求"）+ ② 商品品类（图书/课程）
     const typeLabel = ev.subtype === 'book' ? '图书' : '课程';
     const typeColor = ev.subtype === 'book' ? '#3b82f6' : '#8b5cf6';
     return `
       <div class="tl-item">
         <span class="tl-dot" style="background:${typeColor}"></span>
         <div class="tl-content">
-          <div class="tl-text"><span class="tl-tag" style="background:${typeColor}15;color:${typeColor}">${typeLabel}</span> ${ev.text || '未命名'}</div>
-          <div class="tl-meta">${ev.merchant_name || '-'} · ${time}</div>
+          <div class="tl-text">
+            <span class="tl-tag" style="background:#94a3b815;color:#94a3b8">① 发布需求</span>
+            <span class="tl-tag" style="background:${typeColor}15;color:${typeColor}">② ${typeLabel}</span>
+            ${escapeHtml(ev.text || '未命名')}
+          </div>
+          <div class="tl-meta">${escapeHtml(ev.merchant_name || '-')} · ${time}</div>
         </div>
       </div>
     `;
   } else {
-    const stMap = { confirmed: ['已确认', '#10b981'], pending: ['待处理', '#f59e0b'], rejected: ['已拒绝', '#ef4444'] };
+    // 合作事件：① 流程环节（"需求回应/需求建联"）+ ② 商品品类（用 status 体现）
+    const stMap = { confirmed: ['需求建联', '#8b5cf6'], pending: ['需求回应', '#3b82f6'], rejected: ['已拒绝', '#ef4444'] };
     const [stLabel, stColor] = stMap[ev.text] || [ev.text, '#64748b'];
+    const initiativeLabel = ev.subtype === 'merchant' ? '商家发起' : '达人申请';
     return `
       <div class="tl-item">
         <span class="tl-dot" style="background:${stColor}"></span>
         <div class="tl-content">
-          <div class="tl-text"><span class="tl-tag" style="background:${stColor}15;color:${stColor}">合作${stLabel}</span> ${ev.merchant_name||'-'} → ${ev.influencer_name||'-'}</div>
-          <div class="tl-meta">${ev.subtype === 'merchant' ? '商家发起' : '达人申请'} · ${time}</div>
+          <div class="tl-text">
+            <span class="tl-tag" style="background:${stColor}15;color:${stColor}">① ${stLabel}</span>
+            <span class="tl-tag" style="background:#64748b15;color:#64748b">② ${initiativeLabel}</span>
+            ${escapeHtml(ev.merchant_name||'-')} → ${escapeHtml(ev.influencer_name||'-')}
+          </div>
+          <div class="tl-meta">${time}</div>
         </div>
       </div>
     `;
@@ -1459,6 +1450,7 @@ function renderMerchantDemandRow(d, isInfluencer, showSales) {
       <div class="demand-row-actions">
         ${isInfluencer ? `<button class="btn btn-xs btn-primary" onclick="applyCooperation('${d.id}','${d.merchant_id}')">申请合作</button>` : ''}
         ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-xs btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">编辑</button>` : ''}
+        ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? renderArchiveBtns(d.demand_type, d.ref_demand_id, d.status) : ''}
         ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-xs btn-danger-outline" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
       </div>
     </div>`;
@@ -1562,6 +1554,7 @@ function renderMerchantDemandCard(d, isInfluencer) {
         <div class="demand-actions">
           ${isInfluencer ? `<button class="btn btn-sm btn-primary" onclick="applyCooperation('${d.id}','${d.merchant_id}')">申请合作</button>` : ''}
           ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-sm btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">编辑</button>` : ''}
+          ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? renderArchiveBtns(d.demand_type, d.ref_demand_id, d.status) : ''}
           ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-sm btn-danger-outline" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
         </div>
       </div>
@@ -1911,6 +1904,7 @@ function renderInfluencerDemandCardV2(d, isMerchant) {
         <div class="demand-actions">
           ${isMerchant ? `<button class="btn btn-sm btn-primary" onclick="inviteInfluencer('${d.influencer_id}','${d.id}')">邀请合作</button>` : ''}
           ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-sm btn-outline" onclick="editInfluencerDemand('${d.id}')">编辑</button>` : ''}
+          ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? renderArchiveBtns('influencer', d.id, d.status) : ''}
           ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-sm btn-danger-outline" onclick="deleteInfluencerDemand('${d.id}')">删除</button>` : ''}
         </div>
       </div>
@@ -1987,6 +1981,7 @@ function renderInfluencerDemandRow(d, isMerchant) {
       <div class="id-row-actions">
         ${isMerchant ? `<button class="btn btn-xs btn-primary" onclick="inviteInfluencer('${d.influencer_id}','${d.id}')">邀请</button>` : ''}
         ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-xs btn-outline" onclick="editInfluencerDemand('${d.id}')">编辑</button>` : ''}
+        ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? renderArchiveBtns('influencer', d.id, d.status) : ''}
         ${(currentUser.role === 'admin' || currentUser.role === 'influencer') ? `<button class="btn btn-xs btn-danger-outline" onclick="deleteInfluencerDemand('${d.id}')">删除</button>` : ''}
       </div>
     </div>`;
@@ -2858,11 +2853,18 @@ function renderInfCardV2(inf, isMerchant, isSuperAdmin) {
         ${inf.book_willingness ? `<div class="inf-track-line"><span class="inf-track-label">📚 图书</span><span class="inf-track-val">${inf.book_willingness}</span></div>` : ''}
         ${inf.course_willingness ? `<div class="inf-track-line"><span class="inf-track-label">🎓 课程</span><span class="inf-track-val">${inf.course_willingness}</span></div>` : ''}
       </div>` : ''}
+      ${(inf.introduction || inf.audience_profile) ? `
+      <div class="inf-detail-section">
+        ${inf.introduction ? `<div class="inf-detail-section-title">达人介绍</div><div class="inf-detail-section-content">${escapeHtml(String(inf.introduction).slice(0, 80))}${inf.introduction.length > 80 ? '...' : ''}</div>` : ''}
+        ${inf.audience_profile ? `<div class="inf-detail-section-title" style="margin-top:8px">粉丝画像</div><div class="inf-detail-section-content">${escapeHtml(inf.audience_profile)}</div>` : ''}
+      </div>` : ''}
       ${showSales ? `<div class="inf-card-sales">归属销售: ${displayName ? `<span style="color:#16a34a;font-weight:600">${displayName}</span>` : '<span style="color:#cbd5e1">未分配</span>'}</div>` : ''}
       <div class="inf-card-foot">
+        ${renderFavStar('influencer', inf.id)}
         ${isMerchant ? `<button class="btn btn-sm btn-primary" onclick="inviteInfluencer('${inf.id}','')">邀请合作</button>` : ''}
         <button class="btn btn-sm btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
         ${currentUser.role === 'admin' ? `<button class="btn btn-sm btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>` : ''}
+        ${currentUser.role === 'admin' ? `<button class="btn btn-sm btn-outline" onclick="showContactModal('influencer','${inf.id}')">联络</button>` : ''}
       </div>
     </div>`;
 }
@@ -3006,7 +3008,27 @@ async function showInfDetailModal(id) {
         <div><span class="dl">直播频率</span><div class="dv">${inf.live_frequency || '-'}</div></div>
         ${isSuperAdmin ? `<div><span class="dl">归属销售</span><div class="dv">${inf.sales_owner_name || inf.sales_owner || '<span style="color:#cbd5e1">未分配</span>'}</div></div>` : ''}
         ${inf.official_account_name ? `<div><span class="dl">公众号</span><div class="dv">${inf.official_account_name}</div></div>` : ''}
+        <div><span class="dl">公众号可接单</span><div class="dv">${inf.has_official_account || '否'}</div></div>
       </div>
+      ${inf.introduction ? `
+      <div class="inf-detail-section">
+        <div class="inf-detail-section-title">📖 达人账号介绍</div>
+        <div class="inf-detail-section-content">${escapeHtml(inf.introduction)}</div>
+      </div>` : ''}
+      ${inf.audience_profile ? `
+      <div class="inf-detail-section">
+        <div class="inf-detail-section-title">👥 粉丝画像</div>
+        <div class="inf-detail-section-content">${escapeHtml(inf.audience_profile)}</div>
+      </div>` : ''}
+      ${inf.representative_works ? `
+      <div class="inf-detail-section">
+        <div class="inf-detail-section-title">🎬 代表作品（最多 3 条）</div>
+        <div class="inf-detail-section-content">
+          ${String(inf.representative_works).split(/[;；]/).filter(s => s.trim()).slice(0, 3).map((url, i) =>
+            `<a href="${escapeHtml(url.trim())}" target="_blank" class="inf-works-link">作品 ${i + 1} →</a>`
+          ).join('')}
+        </div>
+      </div>` : ''}
     </div>`;
   const footer = `
     <button class="btn btn-outline" onclick="closeModal()">关闭</button>
@@ -3374,6 +3396,8 @@ function renderBookForm() {
           <div class="form-group"><label>库存</label><input type="number" id="pub-book-stock" min="0" step="1" placeholder="5000"></div>
         </div>
         <div class="form-group"><label>图书介绍</label><textarea id="pub-book-intro" rows="3" placeholder="简单介绍图书内容"></textarea></div>
+        <div class="form-group"><label>商品卖点 <span style="color:#94a3b8;font-size:12px">(V4新增 · 突出卖点便于达人筛选)</span></label><textarea id="pub-book-selling-points" rows="2" placeholder="如：①教育部白名单 ②思维启蒙类畅销书 ③配套答案+解析视频"></textarea></div>
+        <div class="form-group"><label>备注 <span style="color:#94a3b8;font-size:12px">(V4新增 · 自由说明)</span></label><textarea id="pub-book-remark" rows="2" placeholder="如：可提供达人专属优惠码 / 节假日发货顺延"></textarea></div>
         <div class="form-group"><label>微信小店商品链接</label><input id="pub-book-link" placeholder="https://"></div>
         <div class="form-group"><label>图书图片URL</label><input id="pub-book-image" placeholder="图片链接（可选）"></div>
         <input type="hidden" id="pub-book-merchant-id" value="${merchantId}">
@@ -3891,6 +3915,8 @@ async function submitBookDemand(e) {
     logistics: document.getElementById('pub-book-logistics').value,
     stock: document.getElementById('pub-book-stock').value,
     book_introduction: document.getElementById('pub-book-intro').value,
+    selling_points: (document.getElementById('pub-book-selling-points') || {}).value || '',
+    remark: (document.getElementById('pub-book-remark') || {}).value || '',
     wechat_shop_link: document.getElementById('pub-book-link').value,
     book_image: document.getElementById('pub-book-image').value,
   };
@@ -6554,16 +6580,42 @@ async function renderCooperationManage() {
     container.innerHTML = `<div class="empty-state"><p>加载失败：${res.error || '未知'}</p></div>`;
     return;
   }
-  const list = res.data || [];
+  let list = res.data || [];
+
+  // V4: 二级方向 tab（仅达人/商家用户视角）
+  // initiative='merchant' → 商家发起，对达人来说是"别人找我的"，对商家来说是"我发起的"
+  // initiative='influencer' → 达人发起，对商家来说是"别人找我的"，对达人来说是"我发起的"
+  const dirTab = window.__coopDirTab || 'all';
+  if (dirTab !== 'all') {
+    if (role === 'merchant') {
+      list = list.filter(c => dirTab === 'mine' ? c.initiative === 'merchant' : c.initiative === 'influencer');
+    } else if (role === 'influencer') {
+      list = list.filter(c => dirTab === 'mine' ? c.initiative === 'influencer' : c.initiative === 'merchant');
+    }
+  }
+
   const pending = list.filter(x => x.status === 'pending');
   const confirmed = list.filter(x => x.status === 'confirmed');
   const rejected = list.filter(x => x.status === 'rejected');
+
+  // 用所有列表（不受 dirTab 过滤）算每个方向的总数，渲染 tab badge
+  const allList = res.data || [];
+  const myCount = allList.filter(c => role === 'merchant' ? c.initiative === 'merchant' : c.initiative === 'influencer').length;
+  const otherCount = allList.filter(c => role === 'merchant' ? c.initiative === 'influencer' : c.initiative === 'merchant').length;
 
   container.innerHTML = `
     ${renderBackButton()}
     <div class="coop-manage-page">
       <h2 style="font-size:22px;margin:0 0 6px;color:#1e293b">合作管理</h2>
-      <p style="font-size:13px;color:#64748b;margin:0 0 20px">查看你的所有合作邀约与进度</p>
+      <p style="font-size:13px;color:#64748b;margin:0 0 16px">查看你的所有合作邀约与进度</p>
+
+      ${role !== 'admin' ? `
+      <div class="coop-dir-tabs" style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="fav-tab ${dirTab==='all'?'active':''}" onclick="coopSwitchDir('all')">全部 ${allList.length}</button>
+        <button class="fav-tab ${dirTab==='mine'?'active':''}" onclick="coopSwitchDir('mine')">我发起的 ${myCount}</button>
+        <button class="fav-tab ${dirTab==='other'?'active':''}" onclick="coopSwitchDir('other')">别人找我的 ${otherCount}</button>
+      </div>
+      ` : ''}
 
       <div class="coop-tabs">
         <div class="coop-tab active" data-tab="pending" onclick="coopSwitchTab('pending')">待处理 <span class="coop-count">${pending.length}</span></div>
@@ -6584,6 +6636,8 @@ async function renderCooperationManage() {
   `;
 }
 
+function coopSwitchDir(d) { window.__coopDirTab = d; renderCooperationManage(); }
+
 function renderCoopList(list, tab) {
   if (list.length === 0) return `<div class="empty-state" style="padding:40px"><p>暂无${tab === 'pending' ? '待处理' : (tab === 'confirmed' ? '已达成' : '已拒绝')}的合作</p></div>`;
   const role = currentUser.role;
@@ -6598,6 +6652,9 @@ function renderCoopList(list, tab) {
       (c.initiative === 'merchant' && role === 'influencer') ||
       (c.initiative === 'influencer' && role === 'merchant')
     );
+    // V4 链回原需求：如果有 demand_id 和 demand_title，加跳转链接
+    const linkBack = (c.demand_id && c.demand_title) ?
+      `<span class="coop-link-back" onclick="navigateToPlaza()" title="点击跳转需求广场">📎 关联需求：${escapeHtml(c.demand_title)}</span>` : '';
     return `
       <div class="coop-item">
         <div class="coop-item-header">
@@ -6605,9 +6662,9 @@ function renderCoopList(list, tab) {
           <span class="coop-item-dir">${direction}</span>
         </div>
         <div class="coop-item-msg">${escapeHtml(c.message || '（无留言）')}</div>
+        ${linkBack}
         <div class="coop-item-meta">
           <span>${formatTimeAgo(c.created_at)}</span>
-          ${c.demand_title ? `<span> · ${escapeHtml(c.demand_title)}</span>` : ''}
           ${tab === 'confirmed' ? '<span class="coop-badge coop-badge-ok">已达成意向</span>' : ''}
           ${tab === 'rejected' ? '<span class="coop-badge coop-badge-rej">已拒绝</span>' : ''}
         </div>
@@ -6621,6 +6678,8 @@ function renderCoopList(list, tab) {
     `;
   }).join('');
 }
+
+function navigateToPlaza() { navigateTo('demand-plaza'); }
 
 function coopSwitchTab(tab) {
   document.querySelectorAll('.coop-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
@@ -7063,4 +7122,76 @@ async function toggleDemandPin(type, id, isPinned) {
   } else {
     showToast(r.error || '操作失败', 'error');
   }
+}
+
+// V4 业绩排行榜 4 类辅助函数
+function renderRankList(list, unit) {
+  if (!list || list.length === 0) return '<div class="empty-mini">暂无数据</div>';
+  return list.map((m, i) => `
+    <div class="rank-item">
+      <span class="rank-no rank-no-${i<3?i+1:'rest'}">${i+1}</span>
+      <div class="rank-name" title="${escapeHtml(m.company || m.name || '')}">${escapeHtml(m.company || m.name || '未命名')}</div>
+      <div class="rank-stat"><span class="rank-num">${m.count || 0}</span><span class="rank-unit">${unit}</span></div>
+    </div>
+  `).join('');
+}
+function renderRankInfList(list, unit) {
+  if (!list || list.length === 0) return '<div class="empty-mini">暂无数据</div>';
+  return list.map((inf, i) => `
+    <div class="rank-item">
+      <span class="rank-no rank-no-${i<3?i+1:'rest'}">${i+1}</span>
+      <div class="rank-name" title="${escapeHtml(inf.name || '')}">
+        ${escapeHtml(inf.name || '未命名')}
+        ${inf.level ? `<span class="rank-level rank-level-${(inf.level||'').replace('级','')}">${inf.level}</span>` : ''}
+      </div>
+      <div class="rank-stat"><span class="rank-num">${inf.count || 0}</span><span class="rank-unit">${unit}</span></div>
+    </div>
+  `).join('');
+}
+function switchRankTab(t) {
+  document.querySelectorAll('.rank-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.rt === t));
+  ['md','id','mt','it'].forEach(k => {
+    const el = document.getElementById('rank-list-' + k);
+    if (el) el.style.display = k === t ? '' : 'none';
+  });
+}
+
+// V4 下架/上架/复制 按钮渲染
+// type: 'book' | 'course' | 'influencer'，targetId: ref_demand_id 或 inf demand id
+function renderArchiveBtns(type, targetId, status) {
+  const t = type === 'book' || type === 'course' ? type : 'influencer';
+  if (status === 'archived') {
+    return `
+      <button class="btn btn-xs btn-outline" onclick="unarchiveDemand('${t}','${targetId}')">恢复上架</button>
+      <button class="btn btn-xs btn-outline" onclick="duplicateDemand('${t}','${targetId}')">复制</button>
+    `;
+  }
+  return `<button class="btn btn-xs btn-outline" onclick="archiveDemand('${t}','${targetId}')">下架</button>`;
+}
+
+async function archiveDemand(type, id) {
+  if (!confirm('确认下架该需求？下架后不会出现在广场中。')) return;
+  const r = await fetchAPI(`/demands/${type}/${id}/archive`, { method: 'PUT' });
+  if (r.success) {
+    showToast('已下架');
+    const cur = navigationHistory[navigationHistory.length - 1];
+    navigateTo(cur, true);
+  } else showToast(r.error || '操作失败', 'error');
+}
+async function unarchiveDemand(type, id) {
+  const r = await fetchAPI(`/demands/${type}/${id}/unarchive`, { method: 'PUT' });
+  if (r.success) {
+    showToast('已恢复上架');
+    const cur = navigationHistory[navigationHistory.length - 1];
+    navigateTo(cur, true);
+  } else showToast(r.error || '操作失败', 'error');
+}
+async function duplicateDemand(type, id) {
+  if (!confirm('复制为新的需求？新需求会以"已发布"状态保存。')) return;
+  const r = await fetchAPI(`/demands/${type}/${id}/duplicate`, { method: 'POST' });
+  if (r.success) {
+    showToast('复制成功');
+    const cur = navigationHistory[navigationHistory.length - 1];
+    navigateTo(cur, true);
+  } else showToast(r.error || '操作失败', 'error');
 }
