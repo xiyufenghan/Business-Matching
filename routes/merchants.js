@@ -101,7 +101,7 @@ router.get('/industries', (req, res) => {
   res.json({ success: true, data: INDUSTRIES });
 });
 
-// ========== 商家列表（支持分页 + 搜索 + 筛选 + 货盘数统计） ==========
+// ========== 商家列表（支持分页 + 搜索 + 筛选 + 需求数统计） ==========
 router.get('/', (req, res) => {
   try {
     const { sales_owner_id, keyword, industry, status, has_sales, page, pageSize } = req.query;
@@ -197,7 +197,7 @@ router.get('/export', (req, res) => {
       ORDER BY m.created_at DESC
     `).all(...params);
 
-    const headers = ['商家ID', '联系人姓名', '公司名称', '行业', '手机号', '邮箱', '描述', '归属销售', '货盘数', '状态', '创建时间'];
+    const headers = ['商家ID', '联系人姓名', '公司名称', '行业', '手机号', '邮箱', '描述', '归属销售', '需求数', '状态', '创建时间'];
     const escape = (v) => {
       if (v == null) return '';
       const s = String(v).replace(/"/g, '""');
@@ -471,7 +471,7 @@ router.delete('/:id', (req, res) => {
     if ((demandCount > 0 || recruitCount > 0 || matchCount > 0) && !force) {
       return res.status(400).json({
         success: false,
-        error: `该商家下还有 ${demandCount} 条货盘 / ${recruitCount} 条招募 / ${matchCount} 条撮合，请先处理后再删除`,
+        error: `该商家下还有 ${demandCount} 条需求 / ${recruitCount} 条招募 / ${matchCount} 条撮合，请先处理后再删除`,
         data: { demandCount, recruitCount, matchCount, requireForce: true }
       });
     }

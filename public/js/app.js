@@ -1165,7 +1165,7 @@ async function renderMerchantDemands(page = 1, pageSize = 20) {
   const isMerchant = currentUser.role === 'merchant';
   // 仅超级管理员可见"归属销售"列与筛选项（普通销售管理员只看到自己负责的需求，无需再筛销售）
   const showSales = currentUser.role === 'admin' && currentUser.is_super === true;
-  const title = isMerchant ? '我的需求' : '商家货盘';
+  const title = isMerchant ? '我的需求' : '商家需求';
   
   let url = `/demands?page=${page}&pageSize=${pageSize}`;
   if (isMerchant) url += `&merchant_id=${currentUser.id}`;
@@ -3274,7 +3274,7 @@ function showPublishTab(tab) {
     content.innerHTML = renderCourseForm();
   } else if (tab === 'recruitment') {
     content.innerHTML = renderRecruitmentForm();
-    // 商家发布时拉取自己的货盘列表（便于关联）
+    // 商家发布时拉取自己的需求列表（便于关联）
     if (currentUser.role === 'merchant' || currentUser.role === 'admin') loadPubLinkableDemands();
   } else if (tab === 'influencer-demand') {
     content.innerHTML = renderInfluencerDemandForm();
@@ -3294,7 +3294,7 @@ function renderPublisherInfoBar(scope) {
     <div class="publisher-info-bar">
       <span class="publisher-info-label">发布者</span>
       <span class="publisher-info-value">${company}</span>
-      <span class="publisher-info-tip">${scopeLabel}发布后将显示在「商家货盘 - 我的需求」</span>
+      <span class="publisher-info-tip">${scopeLabel}发布后将显示在「商家需求 - 我的需求」</span>
     </div>`;
 }
 
@@ -3381,7 +3381,7 @@ function renderCourseForm() {
 }
 
 // ========== 商家招募需求 发布表单 ==========
-let pubLinkableDemands = []; // 商家自己已发布的货盘（用于关联）
+let pubLinkableDemands = []; // 商家自己已发布的需求（用于关联）
 
 function renderRecruitmentForm() {
   if (currentUser.role === 'influencer') {
@@ -3411,11 +3411,11 @@ function renderRecruitmentForm() {
               ${MR_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
             </select>
           </div>
-          <div class="form-group"><label>关联货盘（可选）</label>
+          <div class="form-group"><label>关联需求（可选）</label>
             <select id="pub-mr-linked">
               <option value="">不关联</option>
             </select>
-            <span style="font-size:11px;color:#94a3b8">可关联到具体的图书/课程货盘，便于达人了解推广商品</span>
+            <span style="font-size:11px;color:#94a3b8">可关联到具体的图书/课程需求，便于达人了解推广商品</span>
           </div>
         </div>
         <div class="form-row">
@@ -3460,7 +3460,7 @@ function renderRecruitmentForm() {
 let pubMerchantOptions = []; // 管理员代发招募时缓存的商家列表
 
 async function loadPubLinkableDemands() {
-  // 拉取当前商家的货盘列表（管理员则拉所有）
+  // 拉取当前商家的需求列表（管理员则拉所有）
   const isMerchant = currentUser.role === 'merchant';
   const isAdmin = currentUser.role === 'admin';
   let url = '/demands?page=1&pageSize=200';
@@ -3543,7 +3543,7 @@ function extractFormForModal(fullHtml) {
   return form.outerHTML;
 }
 
-// ========== 商家货盘 - 发布货品 modal（图书/课程双 tab） ==========
+// ========== 商家需求 - 发布货品 modal（图书/课程双 tab） ==========
 let _publishGoodsType = 'book'; // 'book' | 'course'
 
 function showPublishGoodsModal(type) {
@@ -3554,7 +3554,7 @@ function showPublishGoodsModal(type) {
   window._currentPublishOpener = () => showPublishGoodsModal(_publishGoodsType);
 
   const subtitle = currentUser.role === 'merchant'
-    ? `<span style="color:#94a3b8;font-size:12px">发布到「${currentUser.company || currentUser.name}」的货盘</span>`
+    ? `<span style="color:#94a3b8;font-size:12px">发布到「${currentUser.company || currentUser.name}」的需求</span>`
     : (currentUser.role === 'admin' ? `<span style="color:#94a3b8;font-size:12px">管理员代发</span>` : '');
 
   // 顶部 tab 切换 + 表单内容
@@ -3603,7 +3603,7 @@ function submitPublishGoodsFromModal() {
   else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 }
 
-// ========== 商家货盘 - Excel 导入 modal ==========
+// ========== 商家需求 - Excel 导入 modal ==========
 function showImportGoodsModal() {
   if (currentUser.role !== 'admin') return;
   window._currentPublishOpener = () => showImportGoodsModal();
@@ -3638,7 +3638,7 @@ function showPublishRecruitmentModal() {
   `;
   openModal('发布商家招募需求', body, footer);
 
-  // 异步加载关联数据（货盘 + 商家选项）
+  // 异步加载关联数据（需求 + 商家选项）
   if (currentUser.role === 'merchant' || currentUser.role === 'admin') {
     setTimeout(() => loadPubLinkableDemands(), 50);
   }
@@ -4451,7 +4451,7 @@ async function openSuggestDropdown(inputId, type) {
     dd.innerHTML = top.map(item => {
       const badgeColor = item.source === '历史撮合' ? '#f59e0b'
         : item.source === '达人广场' ? '#10b981'
-        : item.source === '达人货盘' ? '#8b5cf6'
+        : item.source === '达人需求' ? '#8b5cf6'
         : item.source === '图书需求' ? '#2563eb'
         : item.source === '课程需求' ? '#ec4899' : '#6b7280';
       const meta = type === 'influencer'
@@ -5394,7 +5394,7 @@ function renderMmTableHeader(isSuper) {
       <div class="im-th">行业</div>
       <div class="im-th">手机号</div>
       <div class="im-th">归属销售</div>
-      <div class="im-th th-right">货盘数</div>
+      <div class="im-th th-right">需求数</div>
       <div class="im-th">状态</div>
       <div class="im-th">创建时间</div>
       <div class="im-th th-right">操作</div>
@@ -5723,7 +5723,7 @@ async function editMerchant(id) {
       </select>
     </div>
     <div style="background:#f8fafc;padding:8px 12px;border-radius:6px;margin-top:8px;font-size:11px;color:#94a3b8">
-      货盘数 ${m.demand_count || 0} 条 · 招募数 ${m.recruitment_count || 0} 条 · 撮合数 ${m.matchmaking_count || 0} 条<br>
+      需求数 ${m.demand_count || 0} 条 · 招募数 ${m.recruitment_count || 0} 条 · 撮合数 ${m.matchmaking_count || 0} 条<br>
       创建时间 ${formatDate(m.created_at)}　最后更新 ${formatDate(m.updated_at)}
     </div>
   `, `
@@ -6414,7 +6414,7 @@ function showInfluencerDemandModal() {
       </div>
       <div class="form-group">
         <label>意向描述 *</label>
-        <textarea name="description" rows="3" required placeholder="介绍你的带货优势和期望合作的货盘类型..."></textarea>
+        <textarea name="description" rows="3" required placeholder="介绍你的带货优势和期望合作的需求类型..."></textarea>
       </div>
       <div class="form-group">
         <label>图书推广品类（可多选）</label>

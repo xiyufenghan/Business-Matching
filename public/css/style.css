@@ -869,7 +869,7 @@ body {
   display: flex; gap: 6px; justify-content: flex-end;
 }
 
-/* 商家管理特有列宽（9 列：公司|联系人|行业|手机|销售|货盘数|状态|时间|操作） */
+/* 商家管理特有列宽（9 列：公司|联系人|行业|手机|销售|需求数|状态|时间|操作） */
 .im-list .im-row.mm-row {
   grid-template-columns: minmax(180px, 1.6fr) 100px 100px 110px minmax(110px, 1.2fr) 70px 80px 100px 280px;
   min-width: 1280px;

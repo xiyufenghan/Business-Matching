@@ -289,10 +289,10 @@ router.get('/influencer/:influencerId', (req, res) => {
 
 // 公共：matchmaking 多源 demand 反查 SQL 片段
 // 同一个 mm.demand_id 可能落在以下任一表（取决于业务场景）：
-//   - demands             商家货盘壳子表（title 通常是"xxx 推广"）
+//   - demands             商家需求壳子表（title 通常是"xxx 推广"）
 //   - book_demands        图书需求（book_name）
 //   - course_demands      课程需求（course_name）
-//   - influencer_demands  达人货盘需求（book_name）
+//   - influencer_demands  达人需求（book_name）
 //   - merchant_recruitments 商家招募（title）
 // 用 COALESCE 串起来按优先级取第一个非空，再用 product_name 兜底
 const MM_DEMAND_JOINS = `
@@ -315,11 +315,11 @@ const MM_DEMAND_TITLE_EXPR = `
 // demand 来源类别（虚拟列）：标记 demand_id 落在哪张表
 const MM_DEMAND_KIND_EXPR = `
   CASE
-    WHEN bd.id IS NOT NULL THEN '图书货盘'
-    WHEN cd.id IS NOT NULL THEN '课程货盘'
+    WHEN bd.id IS NOT NULL THEN '图书需求'
+    WHEN cd.id IS NOT NULL THEN '课程需求'
     WHEN id_t.id IS NOT NULL THEN '达人需求'
     WHEN mr.id IS NOT NULL THEN '商家招募'
-    WHEN d.id IS NOT NULL THEN '商家货盘'
+    WHEN d.id IS NOT NULL THEN '商家需求'
     ELSE NULL
   END
 `;
@@ -726,7 +726,7 @@ router.get('/notifications/count', (req, res) => {
 
 // ============ 撮合联想候选接口 ============
 // 返回三类候选源:
-//   - products: 图书名 + 课程名 + 达人货盘需求的 book_name + 历史撮合 product_name（去重合并）
+//   - products: 图书名 + 课程名 + 达人需求的 book_name + 历史撮合 product_name（去重合并）
 //   - influencers: 达人列表（video_account_name / official_account_name），供达人账号字段模糊检索
 // 支持 q 参数做模糊过滤，limit 限制返回数量
 router.get('/matchmaking/suggest/products', (req, res) => {
@@ -748,12 +748,12 @@ router.get('/matchmaking/suggest/products', (req, res) => {
       : req.db.prepare("SELECT DISTINCT course_name FROM course_demands WHERE course_name IS NOT NULL AND course_name != '' LIMIT ?").all(limit);
     courses.forEach(c => rows.push({ name: c.course_name, source: '课程需求' }));
 
-    // 3. 达人货盘需求
+    // 3. 达人需求
     try {
       const infDem = q
         ? req.db.prepare("SELECT DISTINCT book_name FROM influencer_demands WHERE book_name IS NOT NULL AND book_name != '' AND book_name LIKE ? LIMIT ?").all(like, limit)
         : req.db.prepare("SELECT DISTINCT book_name FROM influencer_demands WHERE book_name IS NOT NULL AND book_name != '' LIMIT ?").all(limit);
-      infDem.forEach(d => rows.push({ name: d.book_name, source: '达人货盘' }));
+      infDem.forEach(d => rows.push({ name: d.book_name, source: '达人需求' }));
     } catch (e) { /* 表不存在则跳过 */ }
 
     // 4. 历史撮合 product_name

@@ -150,7 +150,7 @@ router.get('/', (req, res) => {
   }
 });
 
-// 获取达人货盘需求列表（支持搜索+分页+多维筛选）
+// 获取达人需求列表（支持搜索+分页+多维筛选）
 router.get('/influencer-demands', (req, res) => {
   try {
     const {
@@ -260,7 +260,7 @@ router.get('/influencer-demands', (req, res) => {
   }
 });
 
-// 创建达人货盘需求（新字段）
+// 创建达人需求（新字段）
 router.post('/influencer-demands', (req, res) => {
   try {
     const { influencer_id, video_account_name, demand_category, book_name, book_category, book_price_min, book_price_max, course_price_min, course_price_max, description, fans_count, subject_category, operator_id, book_promote_categories, content_formats, cooperation_types } = req.body;
@@ -284,7 +284,7 @@ router.post('/influencer-demands', (req, res) => {
   }
 });
 
-// 删除达人货盘需求
+// 删除达人需求
 router.delete('/influencer-demands/:id', (req, res) => {
   try {
     req.db.prepare('DELETE FROM influencer_demands WHERE id = ?').run(req.params.id);
@@ -562,7 +562,7 @@ router.delete('/all/clear', (req, res) => {
   }
 });
 
-// 批量删除达人货盘需求
+// 批量删除达人需求
 router.post('/influencer-demands/batch-delete', (req, res) => {
   if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
     return res.status(403).json({ success: false, error: '无权限：仅超级管理员可执行此操作' });
@@ -580,7 +580,7 @@ router.post('/influencer-demands/batch-delete', (req, res) => {
   }
 });
 
-// 一键删除所有达人货盘需求（仅超管）
+// 一键删除所有达人需求（仅超管）
 router.delete('/influencer-demands/all/clear', (req, res) => {
   if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
     return res.status(403).json({ success: false, error: '无权限：仅超级管理员可执行此操作' });
@@ -672,7 +672,7 @@ router.put('/course/:id', (req, res) => {
   }
 });
 
-// ========== 更新达人货盘需求字段 ==========
+// ========== 更新达人需求字段 ==========
 router.put('/influencer-demands/:id', (req, res) => {
   try {
     const id = req.params.id;

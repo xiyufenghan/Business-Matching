@@ -101,6 +101,19 @@ function initDatabase() {
     if (!infCols.includes('operator_id')) {
       db.exec("ALTER TABLE influencers ADD COLUMN operator_id TEXT");
     }
+    // V4 新增：达人详情 4 字段（账号介绍 / 粉丝画像 / 代表作品 / 公众号开关）
+    if (!infCols.includes('introduction')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN introduction TEXT");
+    }
+    if (!infCols.includes('audience_profile')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN audience_profile TEXT");
+    }
+    if (!infCols.includes('representative_works')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN representative_works TEXT");
+    }
+    if (!infCols.includes('has_official_account')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN has_official_account TEXT DEFAULT '否'");
+    }
   } catch (e) { /* ignore */ }
 
   // 图书需求表
@@ -159,6 +172,30 @@ function initDatabase() {
     if (!cdCols.includes('ad_commission')) {
       db.exec('ALTER TABLE course_demands ADD COLUMN ad_commission REAL DEFAULT 0');
     }
+    // V4 新增：商家需求字段（卖点/备注/置顶时间）
+    if (!cdCols.includes('selling_points')) {
+      db.exec('ALTER TABLE course_demands ADD COLUMN selling_points TEXT');
+    }
+    if (!cdCols.includes('remark')) {
+      db.exec('ALTER TABLE course_demands ADD COLUMN remark TEXT');
+    }
+    if (!cdCols.includes('pinned_at')) {
+      db.exec('ALTER TABLE course_demands ADD COLUMN pinned_at DATETIME');
+    }
+  } catch (e) { /* ignore */ }
+
+  // 兼容已有库：补齐 book_demands 的 V4 新增字段
+  try {
+    const bdCols = db.prepare('PRAGMA table_info(book_demands)').all().map(c => c.name);
+    if (!bdCols.includes('selling_points')) {
+      db.exec('ALTER TABLE book_demands ADD COLUMN selling_points TEXT');
+    }
+    if (!bdCols.includes('remark')) {
+      db.exec('ALTER TABLE book_demands ADD COLUMN remark TEXT');
+    }
+    if (!bdCols.includes('pinned_at')) {
+      db.exec('ALTER TABLE book_demands ADD COLUMN pinned_at DATETIME');
+    }
   } catch (e) { /* ignore */ }
 
   // 兼容已有库：补齐 demands 的 operator_id 字段
@@ -201,7 +238,7 @@ function initDatabase() {
     )
   `);
 
-  // 达人货盘需求表
+  // 达人需求表
   db.exec(`
     CREATE TABLE IF NOT EXISTS influencer_demands (
       id TEXT PRIMARY KEY,
@@ -298,7 +335,7 @@ function initDatabase() {
       source TEXT DEFAULT '手动创建',
       source_type TEXT DEFAULT '手动创建',
       cooperation_id TEXT,
-      stage TEXT DEFAULT '需求发布',
+      stage TEXT DEFAULT 'published',
       notes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -404,6 +441,19 @@ function initDatabase() {
     )
   `);
 
+  // V4 新增：收藏表（商家收藏达人 / 达人收藏商家 / 管理员收藏一切 + 任意需求）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS favorites (
+      id TEXT PRIMARY KEY,
+      user_type TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_type, user_id, target_type, target_id)
+    )
+  `);
+
   // 初始化企微 Webhook 配置
   try {
     const existing = db.prepare("SELECT key FROM settings WHERE key = 'wework_webhook_url'").get();
@@ -437,6 +487,8 @@ function initDatabase() {
     if (!idCols2.includes('book_promote_categories')) db.exec('ALTER TABLE influencer_demands ADD COLUMN book_promote_categories TEXT');
     if (!idCols2.includes('content_formats')) db.exec('ALTER TABLE influencer_demands ADD COLUMN content_formats TEXT');
     if (!idCols2.includes('cooperation_types')) db.exec('ALTER TABLE influencer_demands ADD COLUMN cooperation_types TEXT');
+    // V4 新增：达人需求置顶字段
+    if (!idCols2.includes('pinned_at')) db.exec('ALTER TABLE influencer_demands ADD COLUMN pinned_at DATETIME');
   } catch (e) { /* ignore */ }
 
   // cooperation: 补 influencer_demand_id 字段（模式C/D 关联达人需求）
@@ -533,25 +585,28 @@ function initDatabase() {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `);
     const mm1 = uuidv4();
-    insertMatchmaking.run(mm1, 'm001', 'i001', 'd001', 'book', '达人接单', '开始合作', '达人已接单并开始合作推广');
+    insertMatchmaking.run(mm1, 'm001', 'i001', 'd001', 'book', '达人接单', 'cooperating', '达人已接单并开始合作推广');
     const mm2 = uuidv4();
-    insertMatchmaking.run(mm2, 'm002', 'i002', 'd002', 'course', '系统推荐', '样品寄送', '课程资料已发送给达人');
+    insertMatchmaking.run(mm2, 'm002', 'i002', 'd002', 'course', '系统推荐', 'sample_sent', '课程资料已发送给达人');
     const mm3 = uuidv4();
-    insertMatchmaking.run(mm3, 'm003', 'i003', 'd003', 'book', '商家邀请', '合作匹配', '商家邀请达人合作推广绘本');
+    insertMatchmaking.run(mm3, 'm003', 'i003', 'd003', 'book', '商家邀请', 'connected', '商家邀请达人合作推广绘本');
 
     const insertHistory = db.prepare(`
       INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
     `);
-    insertHistory.run(uuidv4(), mm1, '需求发布', '系统', '需求已发布');
-    insertHistory.run(uuidv4(), mm1, '合作匹配', '系统', '达人接单匹配');
-    insertHistory.run(uuidv4(), mm1, '样品寄送', '管理员', '样品已寄出');
-    insertHistory.run(uuidv4(), mm1, '开始合作', '管理员', '双方确认开始合作');
-    insertHistory.run(uuidv4(), mm2, '需求发布', '系统', '需求已发布');
-    insertHistory.run(uuidv4(), mm2, '合作匹配', '系统', '系统智能推荐匹配');
-    insertHistory.run(uuidv4(), mm2, '样品寄送', '管理员', '课程资料已发送');
-    insertHistory.run(uuidv4(), mm3, '需求发布', '系统', '需求已发布');
-    insertHistory.run(uuidv4(), mm3, '合作匹配', '管理员', '商家主动邀请达人');
+    insertHistory.run(uuidv4(), mm1, 'published', '系统', '需求已发布');
+    insertHistory.run(uuidv4(), mm1, 'responded', '系统', '达人响应需求');
+    insertHistory.run(uuidv4(), mm1, 'connected', '系统', '双方建联');
+    insertHistory.run(uuidv4(), mm1, 'sample_sent', '管理员', '样品已寄出');
+    insertHistory.run(uuidv4(), mm1, 'cooperating', '管理员', '双方确认开始合作');
+    insertHistory.run(uuidv4(), mm2, 'published', '系统', '需求已发布');
+    insertHistory.run(uuidv4(), mm2, 'responded', '系统', '达人响应需求');
+    insertHistory.run(uuidv4(), mm2, 'connected', '系统', '双方建联');
+    insertHistory.run(uuidv4(), mm2, 'sample_sent', '管理员', '课程资料已发送');
+    insertHistory.run(uuidv4(), mm3, 'published', '系统', '需求已发布');
+    insertHistory.run(uuidv4(), mm3, 'responded', '系统', '商家发起邀约');
+    insertHistory.run(uuidv4(), mm3, 'connected', '管理员', '双方建联确认意向');
 
     // 示例合作记录
     const insertCoop = db.prepare(`
@@ -607,7 +662,7 @@ function initDatabase() {
         VALUES (?, ?, ?, ?, ?, '视频号', ?, ?, ?, ?, ?, ?, 'published', ?, 'admin', ?)
       `);
       insAdminDem.run('demo_adm_d001', 'm001', '【腾讯营销推荐】少儿科普图书合作招募', 'book', '科普读物',
-        5000, 30000, '20万以上', '纯佣金/低佣金+投流', '腾讯营销精选少儿科普图书项目，优质商家货盘，品质有保障',
+        5000, 30000, '20万以上', '纯佣金/低佣金+投流', '腾讯营销精选少儿科普图书项目，优质商家货品，品质有保障',
         '粉丝≥20万，亲子/科普/教育类账号优先', '2026-07-31', 'a_super');
       insAdminDem.run('demo_adm_d002', 'm002', '【腾讯营销推荐】K12在线课程推广合作', 'course', '在线课程',
         8000, 50000, '50万以上', '话题素材+纯佣金', '腾讯营销战略合作课程品牌，佣金高、转化好，欢迎教育类达人对接',
