@@ -243,6 +243,7 @@ app.use('/api/recruitments', require('./routes/recruitments'));
 app.use('/api/invitations', require('./routes/invitations'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/favorites', require('./routes/favorites'));
 
 // 首页
 app.get('/', (req, res) => {

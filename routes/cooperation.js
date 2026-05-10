@@ -14,7 +14,7 @@ function incubateMatchmakingFromCooperation(db, coop) {
   const existing = db.prepare(`
     SELECT id FROM matchmaking
     WHERE merchant_id = ? AND influencer_id = ?
-      AND stage IN ('需求发布','合作匹配','样品寄送')
+      AND stage IN ('published','responded','connected','sample_sent')
     ORDER BY updated_at DESC LIMIT 1
   `).get(coop.merchant_id, coop.influencer_id);
 
@@ -25,7 +25,7 @@ function incubateMatchmakingFromCooperation(db, coop) {
     db.prepare(`
       INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `).run(uuidv4(), existing.id, '合作匹配', '系统', `${sourceLabel} cooperation#${coop.id.slice(0,8)} 已确认，沿用现有撮合`);
+    `).run(uuidv4(), existing.id, 'connected', '系统', `${sourceLabel} cooperation#${coop.id.slice(0,8)} 已确认，沿用现有撮合`);
     // 回填 cooperation_id（若之前是手动建的，没记 cooperation 来源）
     db.prepare(`UPDATE matchmaking SET cooperation_id = COALESCE(cooperation_id, ?) WHERE id = ?`).run(coop.id, existing.id);
     return { incubated: false, matchmaking_id: existing.id, reused: true };
@@ -46,13 +46,13 @@ function incubateMatchmakingFromCooperation(db, coop) {
     sourceLabel,
     sourceType,
     coop.id,
-    '合作匹配',
+    'connected',
     coop.message ? `来自${sourceLabel}：${coop.message}` : `自动孵化自${sourceLabel}`
   );
   db.prepare(`
     INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
     VALUES (?, ?, ?, ?, ?, datetime('now'))
-  `).run(uuidv4(), id, '合作匹配', '系统', `${sourceLabel}确认 → 自动孵化撮合工单`);
+  `).run(uuidv4(), id, 'connected', '系统', `${sourceLabel}确认 → 自动孵化撮合工单`);
   return { incubated: true, matchmaking_id: id };
 }
 
@@ -450,8 +450,8 @@ router.get('/matchmaking/stats', (req, res) => {
 
     const total = req.db.prepare(`SELECT COUNT(*) as count FROM matchmaking${joinClause}${whereClause}`).get(...opParams).count;
 
-    // 累计 GMV：仅算 stage='开始合作' 阶段已落地的（其他阶段 GMV 多为预估，不计入）
-    const gmvWhere = whereClause ? whereClause + " AND matchmaking.stage = '开始合作'" : " WHERE matchmaking.stage = '开始合作'";
+    // 累计 GMV：仅算 stage='cooperating' 阶段已落地的（其他阶段 GMV 多为预估，不计入）
+    const gmvWhere = whereClause ? whereClause + " AND matchmaking.stage = 'cooperating'" : " WHERE matchmaking.stage = 'cooperating'";
     const gmvRow = req.db.prepare(`
       SELECT COALESCE(SUM(matchmaking.gmv),0) as g, COUNT(*) as c FROM matchmaking${joinClause}${gmvWhere}
     `).get(...opParams);
@@ -491,7 +491,7 @@ router.post('/matchmaking', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `).run(
       id, merchant_id, influencer_id, demand_id || null, demand_type || '',
-      source || '手动创建', stage || '需求发布', notes || '', operator_id || null,
+      source || '手动创建', stage || 'published', notes || '', operator_id || null,
       product_name || null, influencer_account || null,
       priceNum,
       cooperation_mode || null,
@@ -506,7 +506,7 @@ router.post('/matchmaking', (req, res) => {
     req.db.prepare(`
       INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `).run(uuidv4(), id, stage || '需求发布', '管理员', notes || '手动创建撮合记录');
+    `).run(uuidv4(), id, stage || 'published', '管理员', notes || '手动创建撮合记录');
     
     const record = req.db.prepare(`
       SELECT mm.*, m.name as merchant_name, m.company as merchant_company,
@@ -707,13 +707,13 @@ router.get('/notifications/count', (req, res) => {
       const admin = req.db.prepare('SELECT id, is_super FROM admins WHERE id = ?').get(user_id);
       if (!admin) return res.json({ success: true, data: { count: 0 } });
       if (admin.is_super) {
-        count = req.db.prepare("SELECT COUNT(*) as count FROM matchmaking WHERE stage = '合作匹配'").get().count;
+        count = req.db.prepare("SELECT COUNT(*) as count FROM matchmaking WHERE stage = 'connected'").get().count;
       } else {
         count = req.db.prepare(`
           SELECT COUNT(*) as count FROM matchmaking mm
           LEFT JOIN merchants m ON mm.merchant_id = m.id
           LEFT JOIN influencers inf ON mm.influencer_id = inf.id
-          WHERE mm.stage = '合作匹配'
+          WHERE mm.stage = 'connected'
             AND (m.sales_owner_id = ? OR inf.sales_owner_id = ?)
         `).get(user_id, user_id).count;
       }

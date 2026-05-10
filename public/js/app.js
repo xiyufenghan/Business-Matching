@@ -4,6 +4,31 @@ let currentUser = null;
 let navigationHistory = [];
 let notificationCount = 0;
 
+// ============ V4 撮合 5 段流程定义（前端单一来源） ============
+const MM_STAGES = ['published', 'responded', 'connected', 'sample_sent', 'cooperating'];
+const MM_STAGE_LABELS = {
+  published: '发布需求',
+  responded: '需求回应',
+  connected: '需求建联',
+  sample_sent: '样品寄送',
+  cooperating: '开始合作',
+};
+const MM_STAGE_COLORS = {
+  published: '#94a3b8',
+  responded: '#3b82f6',
+  connected: '#8b5cf6',
+  sample_sent: '#f59e0b',
+  cooperating: '#10b981',
+};
+const MM_OPTIONAL_STAGES = ['sample_sent'];
+// 旧值兼容：把任何旧中文 stage 标准化成新英文枚举
+const STAGE_LEGACY_MAP = {
+  '需求发布': 'published', '合作匹配': 'connected', '达成意向': 'connected',
+  '样品寄送': 'sample_sent', '开始合作': 'cooperating',
+};
+function normStage(s) { return STAGE_LEGACY_MAP[s] || (MM_STAGES.includes(s) ? s : 'published'); }
+function stageLabel(s) { return MM_STAGE_LABELS[normStage(s)] || s; }
+
 // ============ 工具函数 ============
 
 // 从 localStorage 获取当前 token
@@ -396,6 +421,7 @@ function initApp() {
   renderNavMenu();
   updateUserInfo();
   checkNotifications();
+  loadFavoriteIds(); // V4: 加载用户收藏 ID 缓存
   // V3：显示通知铃铛、启动通知轮询、检查隐私授权
   const bellWrap = document.getElementById('notify-bell-wrap');
   if (bellWrap) bellWrap.style.display = '';
@@ -567,6 +593,7 @@ function renderNavMenu() {
     const systemItems = [
       { id: 'merchant-manage', icon: 'building', label: '商家管理' },
       { id: 'influencer-manage', icon: 'star', label: '达人管理' },
+      { id: 'batch-import', icon: 'upload', label: '批量导入' },
     ];
     if (currentUser.is_super) {
       systemItems.push({ id: 'admin-manage', icon: 'shield', label: '账号管理' });
@@ -576,18 +603,20 @@ function renderNavMenu() {
       { id: 'workspace', label: '工作台', items: [
         { id: 'dashboard', icon: 'chart', label: '数据看板' },
       ]},
-      { id: 'business', label: '撮合业务', items: [
+      { id: 'business', label: '资源广场', items: [
         { id: 'demand-plaza', icon: 'home', label: '需求广场' },
         { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
         { id: 'matchmaking', icon: 'link', label: '撮合管理', badge: notificationCount },
+        { id: 'favorites', icon: 'heart', label: '我的收藏' },
       ]},
       { id: 'system', label: '系统管理', items: systemItems },
     ];
   } else if (currentUser.role === 'merchant') {
     groups = [
-      { id: 'main', label: '主工作区', items: [
+      { id: 'main', label: '资源广场', items: [
         { id: 'demand-plaza', icon: 'home', label: '需求广场', badge: notificationCount },
         { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
+        { id: 'favorites', icon: 'heart', label: '我的收藏' },
       ]},
       { id: 'mybiz', label: '我的业务', items: [
         { id: 'merchant-demands', icon: 'store', label: '我的需求' },
@@ -600,8 +629,9 @@ function renderNavMenu() {
   } else {
     // 达人视角
     groups = [
-      { id: 'main', label: '主工作区', items: [
+      { id: 'main', label: '资源广场', items: [
         { id: 'demand-plaza', icon: 'home', label: '需求广场', badge: notificationCount },
+        { id: 'favorites', icon: 'heart', label: '我的收藏' },
       ]},
       { id: 'mybiz', label: '我的业务', items: [
         { id: 'influencer-demands', icon: 'target', label: '我的需求' },
@@ -669,6 +699,8 @@ function navigateTo(page, isBack = false) {
     case 'influencer-manage': renderInfluencerManage(); break;
     case 'admin-manage': renderAdminManage(); break;
     case 'settings-manage': renderSettingsManage(); break;
+    case 'favorites': renderFavorites(); break;
+    case 'batch-import': renderBatchImport(); break;
     default: renderDashboard();
   }
 }
@@ -739,6 +771,11 @@ async function renderDashboard() {
   container.innerHTML = `
     ${renderBackButton()}
     <div class="dashboard-page">
+      <!-- V4 Demo 占位横幅 -->
+      <div class="demo-banner" title="本看板各项指标算法尚未与业务最终对齐，演示仅供参考">
+        <span class="demo-banner-tag">DEMO</span>
+        <span class="demo-banner-text">演示占位 · 各项指标口径待业务最终确认</span>
+      </div>
       <!-- 顶部：标题 + 时间范围筛选 -->
       <div class="dash-header">
         <div>
@@ -802,7 +839,7 @@ async function renderDashboard() {
         ${renderMiniKpi('管理员', d.adminCount, '#64748b')}
         ${renderMiniKpi('商家需求', d.totalDemands, '#8b5cf6')}
         ${renderMiniKpi('达人需求', d.totalInfDemands, '#ec4899')}
-        ${renderMiniKpi('待处理合作', d.pendingCooperations, '#f59e0b')}
+        ${renderMiniKpi('待处理合作', d.pendingCooperations, '#f59e0b', '用户（达人/商家）收到一个需求或邀约后，未处理（未接受 / 未拒绝）的合作数量')}
         ${renderMiniKpi('本周新增需求', d.newDemandsThisWeek, '#ef4444')}
       </div>
 
@@ -813,14 +850,14 @@ async function renderDashboard() {
           <div id="chart-funnel" style="height:340px"></div>
         </div>
         <div class="dash-chart-card">
-          <div class="dash-chart-title">需求类型 / 类目分布</div>
+          <div class="dash-chart-title">需求商品品类 / 类目分布</div>
           <div id="chart-distribution" style="height:340px"></div>
         </div>
       </div>
 
       <!-- 时间趋势 -->
       <div class="dash-chart-card" style="margin-bottom:16px">
-        <div class="dash-chart-title">${range}天业务趋势 <span class="dash-chart-sub">每日新增需求 / 合作 / 接单</span></div>
+        <div class="dash-chart-title">${range}天业务趋势 <span class="dash-chart-sub">每日新增需求 / 合作 / 接单</span><span class="kpi-help-dot" title="新增合作：用户处理完成（接受/拒绝）后系统产生的'新增'状态合作数量">?</span></div>
         <div id="chart-trend" style="height:300px"></div>
       </div>
 
@@ -910,12 +947,14 @@ function onDashRangeChange(days) {
   renderDashboard();
 }
 
-function renderMiniKpi(label, value, color) {
+function renderMiniKpi(label, value, color, tooltip) {
+  const tip = tooltip ? ` title="${tooltip}"` : '';
+  const helpDot = tooltip ? '<span class="kpi-help-dot">?</span>' : '';
   return `
-    <div class="mini-kpi">
+    <div class="mini-kpi"${tip}>
       <div class="mini-kpi-bar" style="background:${color}"></div>
       <div class="mini-kpi-value">${formatBigNumber(value || 0)}</div>
-      <div class="mini-kpi-label">${label}</div>
+      <div class="mini-kpi-label">${label}${helpDot}</div>
     </div>
   `;
 }
@@ -1706,7 +1745,7 @@ async function renderInfluencerDemands(page = 1, pageSize = 20) {
     <div class="page-header">
       <h2>${title}</h2>
       <div class="page-header-actions">
-        ${currentUser.role !== 'merchant' ? '<button class="btn btn-sm btn-danger" onclick="clearAllInfluencerDemands()">一键清空</button>' : ''}
+        ${currentUser.role === 'admin' ? '<button class="btn btn-sm btn-danger" onclick="clearAllInfluencerDemands()">一键清空</button>' : ''}
       </div>
     </div>
 
@@ -4008,22 +4047,28 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
     fetchAPI(`/cooperation/matchmaking?page=${page}&pageSize=${pageSize}${stage ? '&stage=' + encodeURIComponent(stage) : ''}${keyword ? '&keyword=' + encodeURIComponent(keyword) : ''}${stTail}${upTail}${baseQuery}`)
   ]);
 
-  const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
+  const stages = MM_STAGES.slice(); // ['published','responded','connected','sample_sent','cooperating']
   const stageStats = statsRes.success ? statsRes.data.stages : [];
-  const getStageCount = (s) => { const found = stageStats.find(x => x.stage === s); return found ? found.count : 0; };
+  // 兼容后端返回老中文 stage（若有）：标准化后查询
+  const getStageCount = (s) => {
+    const found = stageStats.find(x => normStage(x.stage) === s);
+    return found ? found.count : 0;
+  };
   const totalCount = statsRes.success ? statsRes.data.total : 0;
   const totalGmv = statsRes.success ? (statsRes.data.totalGmv || 0) : 0;
   const dealCount = statsRes.success ? (statsRes.data.dealCount || 0) : 0;
   const sourceTypeStats = statsRes.success ? (statsRes.data.sourceTypes || []) : [];
   const stCount = (t) => { const f = sourceTypeStats.find(x => x.source_type === t); return f ? f.count : 0; };
 
-  // 按环节分组数据
+  // 按环节分组数据（标准化 stage）
   const groupedData = {};
   stages.forEach(s => { groupedData[s] = []; });
   if (listRes.success && listRes.data) {
     listRes.data.forEach(mm => {
-      if (groupedData[mm.stage]) groupedData[mm.stage].push(mm);
-      else groupedData['需求发布'].push(mm);
+      const ns = normStage(mm.stage);
+      mm.stage = ns; // 标准化后续渲染用
+      if (groupedData[ns]) groupedData[ns].push(mm);
+      else groupedData['published'].push(mm);
     });
   }
 
@@ -4043,18 +4088,18 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
         <div class="mm-summary-sub">来自 ${dealCount} 单「开始合作」</div>
       </div>
       <div class="mm-summary-item">
-        <div class="mm-summary-label">合作匹配（待跟进）</div>
-        <div class="mm-summary-value" style="color:#f59e0b">${getStageCount('合作匹配')}</div>
+        <div class="mm-summary-label">需求建联（待跟进）</div>
+        <div class="mm-summary-value" style="color:#8b5cf6">${getStageCount('connected')}</div>
         <div class="mm-summary-sub">需运营尽快推进</div>
       </div>
       <div class="mm-summary-item">
         <div class="mm-summary-label">样品寄送中</div>
-        <div class="mm-summary-value" style="color:#6366f1">${getStageCount('样品寄送')}</div>
-        <div class="mm-summary-sub">寄出待确认</div>
+        <div class="mm-summary-value" style="color:#f59e0b">${getStageCount('sample_sent')}</div>
+        <div class="mm-summary-sub">寄出待确认（可选环节）</div>
       </div>
       <div class="mm-summary-item">
         <div class="mm-summary-label">开始合作</div>
-        <div class="mm-summary-value" style="color:#10b981">${getStageCount('开始合作')}</div>
+        <div class="mm-summary-value" style="color:#10b981">${getStageCount('cooperating')}</div>
         <div class="mm-summary-sub">已落地</div>
       </div>
     </div>
@@ -4076,29 +4121,28 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
       </span>
     </div>
     ${stage || mmSourceType ? '' : '<div class="mm-tip"> 点击环节标题可单独查看该环节</div>'}
-    <div class="matchmaking-kanban">
-      ${stages.map((s, idx) => {
+    <div class="matchmaking-kanban matchmaking-kanban-5col">
+      ${stages.map((s) => {
         const stageItems = stage ? (s === stage ? groupedData[s] : []) : groupedData[s];
         const isFiltered = stage && s !== stage;
         const isActive = stage && s === stage;
-        const stageIcon = ['', '~', 'D', '^'][idx];
-        const stageColor = ['#3b82f6', '#f59e0b', '#6366f1', '#10b981'][idx];
-        const stageBgLight = ['#eff6ff', '#fffbeb', '#eef2ff', '#ecfdf5'][idx];
+        const stageColor = MM_STAGE_COLORS[s];
+        const isOptional = MM_OPTIONAL_STAGES.includes(s);
+        const sLabel = MM_STAGE_LABELS[s];
 
         return `
-          <div class="kanban-column ${isFiltered ? 'kanban-column-dim' : ''} ${isActive ? 'kanban-column-active' : ''}" data-stage="${s}">
+          <div class="kanban-column ${isFiltered ? 'kanban-column-dim' : ''} ${isActive ? 'kanban-column-active' : ''} ${isOptional ? 'kanban-column-optional' : ''}" data-stage="${s}">
             <div class="kanban-column-header" style="background:linear-gradient(135deg, ${stageColor}, ${stageColor}dd);" onclick="filterMatchmakingByStage('${isActive ? '' : s}')">
               <div class="kanban-col-title">
-                <span class="kanban-col-icon">${stageIcon}</span>
-                <span class="kanban-col-name">${s}</span>
+                <span class="kanban-col-name">${sLabel}</span>
+                ${isOptional ? '<span class="kanban-col-optional">可选</span>' : ''}
               </div>
               <span class="kanban-col-count">${getStageCount(s)}</span>
             </div>
-            <div class="kanban-column-body" style="background:${stageBgLight}">
+            <div class="kanban-column-body" style="background:${stageColor}15">
               ${stageItems.length === 0 ?
                 `<div class="kanban-empty">
-                  <div class="kanban-empty-icon">${stageIcon}</div>
-                  <div class="kanban-empty-text">暂无「${s}」记录</div>
+                  <div class="kanban-empty-text">暂无「${sLabel}」记录</div>
                 </div>` :
                 stageItems.map(mm => renderKanbanMatchmakingCard(mm, stageColor)).join('')
               }
@@ -4168,11 +4212,11 @@ function renderKanbanMatchmakingCard(mm, stageColor) {
       <div class="kanban-card-product">
         ${mm.demand_kind ? `<span class="kanban-demand-kind">${mm.demand_kind}</span>` : ''}
         <div class="kanban-product-name" title="${mm.product_name || mm.demand_title}">${mm.product_name || mm.demand_title}</div>
-        ${mm.stage === '开始合作' && mm.order_count != null && mm.order_count !== '' ? `
+        ${mm.stage === 'cooperating' && mm.order_count != null && mm.order_count !== '' ? `
         <div class="kanban-product-meta">
           <span>D ${mm.order_count}单</span>
         </div>` : ''}
-      </div>` : (mm.stage === '开始合作' && mm.order_count != null && mm.order_count !== '' ? `
+      </div>` : (mm.stage === 'cooperating' && mm.order_count != null && mm.order_count !== '' ? `
       <div class="kanban-card-product">
         <div class="kanban-product-meta">
           <span>D ${mm.order_count}单</span>
@@ -4198,8 +4242,9 @@ function renderKanbanMatchmakingCard(mm, stageColor) {
 }
 
 function renderVerticalMatchmakingCard(mm, stageColor) {
-  const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
-  const currentIdx = stages.indexOf(mm.stage);
+  const stages = MM_STAGES.slice();
+  const ns = normStage(mm.stage);
+  const currentIdx = stages.indexOf(ns);
   const upgradeBadge = renderUpgradeBadge(mm.commission_rate, mm.upgrade_commission_rate);
   const hasUpgrade = !!upgradeBadge;
   
@@ -4259,7 +4304,7 @@ async function viewMatchmakingDetail(id) {
   const res = await fetchAPI(`/cooperation/matchmaking/${id}`);
   if (!res.success) { showToast('获取详情失败', 'error'); return; }
   const mm = res.data;
-  const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
+  const stages = MM_STAGES.slice();
   const upgradeBadge = renderUpgradeBadge(mm.commission_rate, mm.upgrade_commission_rate);
   const hasUpgrade = !!upgradeBadge;
   
@@ -4316,13 +4361,13 @@ async function editMatchmakingDetail(id) {
   const res = await fetchAPI(`/cooperation/matchmaking/${id}`);
   if (!res.success) { showToast('获取详情失败', 'error'); return; }
   const mm = res.data;
-  const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
+  const stages = MM_STAGES.slice();
   
   openModal('编辑撮合详情', `
     <div class="form-group">
       <label>当前环节</label>
       <select id="edit-mm-stage">
-        ${stages.map(s => `<option value="${s}" ${mm.stage === s ? 'selected' : ''}>${s}</option>`).join('')}
+        ${stages.map(s => `<option value="${s}" ${normStage(mm.stage) === s ? 'selected' : ''}>${MM_STAGE_LABELS[s]}${MM_OPTIONAL_STAGES.includes(s) ? '（可选）' : ''}</option>`).join('')}
       </select>
     </div>
     <div class="form-group">
@@ -4547,15 +4592,16 @@ function checkUpgradeStar(prefix) {
 }
 
 async function editMatchmakingStage(id, currentStage) {
-  const stages = ['需求发布', '合作匹配', '样品寄送', '开始合作'];
-  const currentIdx = stages.indexOf(currentStage);
+  const stages = MM_STAGES.slice();
+  const cur = normStage(currentStage);
+  const currentIdx = stages.indexOf(cur);
   const nextStage = stages[Math.min(currentIdx + 1, stages.length - 1)];
   
   openModal('⏭ 流转环节', `
     <div class="form-group">
       <label>选择目标环节</label>
       <select id="mm-target-stage">
-        ${stages.map(s => `<option value="${s}" ${s === nextStage ? 'selected' : ''}>${s}</option>`).join('')}
+        ${stages.map(s => `<option value="${s}" ${s === nextStage ? 'selected' : ''}>${MM_STAGE_LABELS[s]}${MM_OPTIONAL_STAGES.includes(s) ? '（可选）' : ''}</option>`).join('')}
       </select>
     </div>
     <div class="form-group">
@@ -4624,10 +4670,7 @@ async function showCreateMatchmaking() {
     <div class="form-group">
       <label>当前环节</label>
       <select id="mm-stage">
-        <option value="需求发布">需求发布</option>
-        <option value="合作匹配">合作匹配</option>
-        <option value="样品寄送">样品寄送</option>
-        <option value="开始合作">开始合作</option>
+        ${MM_STAGES.map(s => `<option value="${s}">${MM_STAGE_LABELS[s]}${MM_OPTIONAL_STAGES.includes(s) ? '（可选）' : ''}</option>`).join('')}
       </select>
     </div>
     <h4 style="font-size:13px;color:var(--primary-700);margin:14px 0 8px;padding-bottom:6px;border-bottom:1px dashed var(--primary-200)"> 商品信息（选填）</h4>
@@ -4890,7 +4933,7 @@ async function renderInfluencerProfile() {
 
 // 确认/拒绝合作
 async function confirmCooperation(id) {
-  if (!confirm('确认同意合作？\n\n确认后，运营会自动收到一条「合作匹配」阶段的撮合工单进行后续跟进。')) return;
+  if (!confirm('确认同意合作？\n\n确认后，运营会自动收到一条「需求建联」阶段的撮合工单进行后续跟进。')) return;
   const res = await fetchAPI(`/cooperation/confirm/${id}`, { method: 'PUT' });
   if (res.success) {
     showToast(res.message || '已确认合作！');
@@ -6180,14 +6223,26 @@ function renderPlazaCard(item) {
   };
   const tagHtml = roleLabel[item.publisher_role] || '';
   const canRespond = shouldShowRespondBtn(item);
-  const respondBtnText = isInfDem ? '响应意向' : '我有意向';
+  // V4 按钮文案统一：
+  //   - 商家视角：所有"响应"动作 = "邀请合作"
+  //   - 达人视角：所有"响应"动作 = "申请合作"
+  //   - 管理员视角：按对方需求来源判定（达人需求 → "邀请合作"；商家需求 → "申请合作"）
+  let respondBtnText;
+  if (currentUser.role === 'merchant') respondBtnText = '邀请合作';
+  else if (currentUser.role === 'influencer') respondBtnText = '申请合作';
+  else respondBtnText = isInfDem ? '邀请合作' : '申请合作';
 
   if (isInfDem) {
     const bookCats = parseJsonArray(item.book_promote_categories);
     const formats = parseJsonArray(item.content_formats);
     const coopTypes = parseJsonArray(item.cooperation_types);
+    const isPinned = !!item.pinned_at;
+    const pinBadge = isPinned ? '<span class="pin-badge">🔥 热推</span>' : '';
+    const adminPinBtn = currentUser.role === 'admin' ?
+      `<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();toggleDemandPin('influencer-demands','${item.id}',${isPinned})">${isPinned ? '取消置顶' : '📌 置顶'}</button>` : '';
     return `
-      <div class="plaza-card">
+      <div class="plaza-card" style="position:relative">
+        ${pinBadge}
         <div class="plaza-card-header">
           ${tagHtml}
           <span class="plaza-card-time">${formatTimeAgo(item.created_at)}</span>
@@ -6204,15 +6259,28 @@ function renderPlazaCard(item) {
           ${formats.map(c => `<span class="chip chip-green">${escapeHtml(c)}</span>`).join('')}
           ${coopTypes.map(c => `<span class="chip chip-orange">${escapeHtml(c)}</span>`).join('')}
         </div>
-        ${canRespond ? `<button class="btn btn-primary btn-block plaza-respond-btn" onclick="respondToInfluencerDemand('${item.id}','${item.influencer_id}')">${respondBtnText}</button>` : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+          ${renderFavStar('influencer_demand', item.id)}
+          ${adminPinBtn}
+          ${canRespond ? `<button class="btn btn-primary plaza-respond-btn" style="flex:1" onclick="respondToInfluencerDemand('${item.id}','${item.influencer_id}')">${respondBtnText}</button>` : '<span style="flex:1"></span>'}
+        </div>
       </div>
     `;
   }
 
   // merchant_demand
   const budget = (item.budget_min || item.budget_max) ? `${item.budget_min || 0}-${item.budget_max || '不限'} 元` : '面议';
+  const isPinned = !!item.pinned_at;
+  const pinBadge = isPinned ? '<span class="pin-badge">🔥 热推</span>' : '';
+  // 管理员置顶按钮：商家需求要根据 demand_type 决定 type=book/course
+  const pinType = item.demand_type === 'course' ? 'course' : 'book';
+  // 注意：置顶操作的是 ref_demand_id（book_demands/course_demands 的 id）
+  const pinTargetId = item.ref_demand_id || item.id;
+  const adminPinBtn = currentUser.role === 'admin' ?
+    `<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();toggleDemandPin('${pinType}','${pinTargetId}',${isPinned})">${isPinned ? '取消置顶' : '📌 置顶'}</button>` : '';
   return `
-    <div class="plaza-card">
+    <div class="plaza-card" style="position:relative">
+      ${pinBadge}
       <div class="plaza-card-header">
         ${tagHtml}
         <span class="plaza-card-time">${formatTimeAgo(item.created_at)}</span>
@@ -6228,7 +6296,11 @@ function renderPlazaCard(item) {
         ${item.fans_requirement ? `<span class="chip chip-gray">粉丝要求：${escapeHtml(item.fans_requirement)}</span>` : ''}
       </div>
       <div class="plaza-budget">预算：<strong>${budget}</strong></div>
-      ${canRespond ? `<button class="btn btn-primary btn-block plaza-respond-btn" onclick="respondToMerchantDemand('${item.id}','${item.merchant_id}')">${respondBtnText}</button>` : ''}
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+        ${renderFavStar('merchant_demand', item.id)}
+        ${adminPinBtn}
+        ${canRespond ? `<button class="btn btn-primary plaza-respond-btn" style="flex:1" onclick="respondToMerchantDemand('${item.id}','${item.merchant_id}')">${respondBtnText}</button>` : '<span style="flex:1"></span>'}
+      </div>
     </div>
   `;
 }
@@ -6711,3 +6783,284 @@ async function testWeworkWebhook() {
 
 // ============ 通用辅助 ============
 // escapeHtml 已在前文定义，此处复用
+
+
+// ============================================================
+// V4 收藏功能
+// ============================================================
+
+// 当前用户的收藏 ID 缓存：set("type:id")
+let favoriteIds = new Set();
+
+async function loadFavoriteIds() {
+  const r = await fetchAPI('/favorites/ids');
+  if (r.success && r.data) {
+    favoriteIds = new Set(r.data.map(f => `${f.target_type}:${f.target_id}`));
+  }
+}
+
+function isFavorited(targetType, targetId) {
+  return favoriteIds.has(`${targetType}:${targetId}`);
+}
+
+async function toggleFavorite(targetType, targetId, btn) {
+  const key = `${targetType}:${targetId}`;
+  const wasFav = favoriteIds.has(key);
+  const url = '/favorites';
+  const method = wasFav ? 'DELETE' : 'POST';
+  const r = await fetchAPI(url, { method, body: JSON.stringify({ target_type: targetType, target_id: targetId }) });
+  if (!r.success) { showToast(r.error || '操作失败', 'error'); return; }
+  if (wasFav) {
+    favoriteIds.delete(key);
+    if (btn) { btn.classList.remove('is-fav'); btn.innerHTML = '☆'; btn.title = '收藏'; }
+    showToast('已取消收藏');
+  } else {
+    favoriteIds.add(key);
+    if (btn) { btn.classList.add('is-fav'); btn.innerHTML = '★'; btn.title = '已收藏'; }
+    showToast('收藏成功');
+  }
+}
+
+function renderFavStar(targetType, targetId) {
+  // 检查角色是否能收藏此类型
+  const role = currentUser.role;
+  const allowed = {
+    merchant: ['influencer', 'merchant_demand', 'influencer_demand'],
+    influencer: ['merchant', 'merchant_demand', 'influencer_demand'],
+    admin: ['merchant', 'influencer', 'merchant_demand', 'influencer_demand'],
+  };
+  if (!(allowed[role] || []).includes(targetType)) return '';
+  const fav = isFavorited(targetType, targetId);
+  return `<button class="fav-star ${fav ? 'is-fav' : ''}" onclick="event.stopPropagation();toggleFavorite('${targetType}','${targetId}',this)" title="${fav ? '已收藏' : '收藏'}">${fav ? '★' : '☆'}</button>`;
+}
+
+async function renderFavorites() {
+  const container = document.getElementById('page-container');
+  await loadFavoriteIds();
+  const r = await fetchAPI('/favorites');
+  if (!r.success) { container.innerHTML = `<div class="error-tip">${r.error}</div>`; return; }
+  const { entities, demands, total } = r.data;
+  const tab = window.__favTab || 'demands';
+
+  container.innerHTML = `
+    ${renderBackButton()}
+    <div class="page-header">
+      <h2>我的收藏</h2>
+      <span style="font-size:13px;color:var(--gray-500)">共 ${total} 条</span>
+    </div>
+    <div class="fav-page-tabs">
+      <button class="fav-tab ${tab==='demands'?'active':''}" onclick="switchFavTab('demands')">需求列表（${demands.length}）</button>
+      <button class="fav-tab ${tab==='entities'?'active':''}" onclick="switchFavTab('entities')">主体列表（${entities.length}）</button>
+    </div>
+    <div class="fav-page-content">
+      ${tab === 'demands' ? renderFavDemandsList(demands) : renderFavEntitiesList(entities)}
+    </div>
+  `;
+}
+
+function switchFavTab(tab) { window.__favTab = tab; renderFavorites(); }
+
+function renderFavDemandsList(demands) {
+  if (!demands.length) return '<div class="empty-tip" style="padding:40px;text-align:center;color:#94a3b8">暂无收藏的需求</div>';
+  return `<div class="plaza-grid">${demands.map(d => {
+    const isInf = d.target_type === 'influencer_demand';
+    const title = d.title || d.book_name || d.video_account_name || '未命名';
+    return `
+      <div class="plaza-card">
+        <div class="plaza-card-header">
+          <span class="plaza-tag ${isInf ? 'plaza-tag-influencer' : 'plaza-tag-merchant'}">${isInf ? '达人需求' : '商家需求'}</span>
+          <span class="plaza-card-time">收藏于 ${formatTimeAgo(d.favorited_at)}</span>
+        </div>
+        <div class="plaza-card-title">${escapeHtml(title)}</div>
+        <div class="plaza-card-desc">${escapeHtml(d.description || d.book_introduction || '—').slice(0, 100)}</div>
+        <div class="plaza-card-footer">
+          ${renderFavStar(d.target_type, d.id)}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
+function renderFavEntitiesList(entities) {
+  if (!entities.length) return '<div class="empty-tip" style="padding:40px;text-align:center;color:#94a3b8">暂无收藏的主体</div>';
+  return `<div class="plaza-grid">${entities.map(e => {
+    const isInf = e.target_type === 'influencer';
+    const title = isInf ? e.video_account_name : (e.company || e.name);
+    const subtitle = isInf ?
+      `${e.level || '-'} · 粉丝 ${formatBigNumber(e.fans_count || 0)} · ${e.region || '-'}` :
+      `${e.industry || '-'} · ${e.phone || '-'}`;
+    const desc = isInf ? (e.introduction || e.audience_profile || '—') : (e.description || '—');
+    return `
+      <div class="plaza-card">
+        <div class="plaza-card-header">
+          <span class="plaza-tag ${isInf ? 'plaza-tag-influencer' : 'plaza-tag-merchant'}">${isInf ? '达人' : '商家'}</span>
+          <span class="plaza-card-time">收藏于 ${formatTimeAgo(e.favorited_at)}</span>
+        </div>
+        <div class="plaza-card-title">${escapeHtml(title || '—')}</div>
+        <div class="plaza-card-meta" style="font-size:12px;color:#64748b;margin:4px 0 8px">${escapeHtml(subtitle)}</div>
+        <div class="plaza-card-desc">${escapeHtml(String(desc).slice(0, 100))}</div>
+        <div class="plaza-card-footer">
+          ${renderFavStar(e.target_type, e.id)}
+          ${currentUser.role === 'admin' ? `<button class="btn btn-sm btn-outline" onclick="showContactModal('${e.target_type}','${e.id}')">联络</button>` : ''}
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
+
+// ============================================================
+// V4 联络功能（管理员专属）
+// ============================================================
+async function showContactModal(targetType, targetId) {
+  let detail;
+  if (targetType === 'merchant') {
+    const r = await fetchAPI(`/merchants/${targetId}`);
+    detail = r.success ? r.data : null;
+  } else if (targetType === 'influencer') {
+    const r = await fetchAPI(`/influencers/${targetId}`);
+    detail = r.success ? r.data : null;
+  }
+  if (!detail) { showToast('获取联系方式失败', 'error'); return; }
+
+  const isMerchant = targetType === 'merchant';
+  const rows = isMerchant ? [
+    ['联系人', detail.name],
+    ['公司名', detail.company],
+    ['手机号', detail.phone],
+    ['邮箱', detail.email],
+  ] : [
+    ['视频号', detail.video_account_name],
+    ['公众号', detail.official_account_name || '—'],
+    ['手机号', detail.phone || '—'],
+    ['邮箱', detail.email || '—'],
+    ['MCN', detail.has_mcn === '是' ? (detail.mcn_name || '是') : '无'],
+  ];
+
+  openModal('联络方式', `
+    <div style="margin-bottom:12px;color:#64748b;font-size:13px">复制下方信息，可通过电话/微信/邮件联系对方</div>
+    ${rows.map(([k, v]) => `
+      <div class="contact-modal-row">
+        <span class="contact-label">${k}</span>
+        <span style="display:flex;align-items:center">
+          <span class="contact-value">${escapeHtml(v || '—')}</span>
+          ${v && v !== '—' ? `<button class="contact-copy-btn" onclick="copyText('${escapeHtml(v).replace(/'/g, "\\'")}',this)">复制</button>` : ''}
+        </span>
+      </div>
+    `).join('')}
+    <button class="contact-future-btn" disabled title="待企业微信集成后启用">📨 发送企微通知（敬请期待）</button>
+  `);
+}
+
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    if (btn) { const old = btn.textContent; btn.textContent = '已复制'; setTimeout(() => btn.textContent = old, 1500); }
+  } catch (e) {
+    showToast('复制失败，请手动选择文本', 'error');
+  }
+}
+
+// ============================================================
+// V4 批量导入工具（管理员专属）
+// ============================================================
+function renderBatchImport() {
+  const container = document.getElementById('page-container');
+  if (currentUser.role !== 'admin') { container.innerHTML = '<div class="error-tip">无权限</div>'; return; }
+  const tab = window.__importTab || 'influencer';
+
+  container.innerHTML = `
+    ${renderBackButton()}
+    <div class="page-header">
+      <h2>批量导入</h2>
+      <span style="font-size:13px;color:var(--gray-500)">管理员专属 · 三类数据批量导入</span>
+    </div>
+    <div class="batch-import-tabs">
+      <button class="batch-import-tab ${tab==='influencer'?'active':''}" onclick="switchImportTab('influencer')">达人导入（16 列）</button>
+      <button class="batch-import-tab ${tab==='merchant_demand'?'active':''}" onclick="switchImportTab('merchant_demand')">商家需求导入（10 列）</button>
+      <button class="batch-import-tab ${tab==='influencer_demand'?'active':''}" onclick="switchImportTab('influencer_demand')">达人需求导入（7 列）</button>
+    </div>
+    <div class="batch-import-panel">
+      ${renderImportPanel(tab)}
+    </div>
+  `;
+}
+
+function switchImportTab(t) { window.__importTab = t; renderBatchImport(); }
+
+function renderImportPanel(tab) {
+  const cfg = {
+    influencer: {
+      title: '达人导入',
+      desc: '按 16 列模板批量导入达人数据：达人等级 / 视频号账号名称 / 视频号带货品类赛道 / 月销售额（短视频）/ 月销售额（直播）/ 粉丝数 / 合作类型 / 图书带货意愿 / 课程带货意愿 / 短视频频率 / 直播频率 / 是否MCN / MCN名称 / 地区 / 是否入驻互选 / 归属销售',
+      templateUrl: '/api/influencers/excel/template',
+      uploadUrl: '/influencers/excel/import',
+    },
+    merchant_demand: {
+      title: '商家需求导入',
+      desc: '按 10 列模板：标题（商品名）/ 商品品类 / 商品价格 / 合作模式 / 纯佣金 / 投流佣金 / 商品卖点 / 粉丝要求 / 合作预算 / 备注。仅对图书需求开放。',
+      templateUrl: '/api/excel/template/book',
+      uploadUrl: '/excel/import/book',
+    },
+    influencer_demand: {
+      title: '达人需求导入',
+      desc: '按 7 列模板：视频号名称 / 需求类型 / 图书售价范围 / 图书分类 / 课程分类 / 粉丝数量 / 需求描述',
+      templateUrl: '/api/excel/template/influencer-demand',
+      uploadUrl: '/excel/import/influencer-demand',
+    },
+  };
+  const c = cfg[tab];
+  return `
+    <h3 style="margin:0 0 8px;color:#1e293b">${c.title}</h3>
+    <p style="font-size:13px;color:#64748b;margin:0 0 18px;line-height:1.7">${c.desc}</p>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <a href="${c.templateUrl}" class="btn btn-outline" download>⤓ 下载模板</a>
+      <input type="file" id="batch-import-file" accept=".xlsx,.xls" style="display:none" onchange="onBatchImportFile('${tab}','${c.uploadUrl}')">
+      <button class="btn btn-primary" onclick="document.getElementById('batch-import-file').click()">▶ 选择 Excel 上传</button>
+    </div>
+    <div class="batch-import-drop" id="batch-import-result">
+      请下载模板填写后上传 · 仅支持 .xlsx / .xls
+    </div>
+  `;
+}
+
+async function onBatchImportFile(tab, uploadUrl) {
+  const fileInput = document.getElementById('batch-import-file');
+  const f = fileInput.files[0];
+  if (!f) return;
+  const result = document.getElementById('batch-import-result');
+  result.innerHTML = '⏳ 上传中...';
+  try {
+    const fd = new FormData();
+    fd.append('file', f);
+    const token = getAuthToken();
+    const resp = await fetch(API_BASE + uploadUrl, {
+      method: 'POST', body: fd,
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+    });
+    const data = await resp.json();
+    if (data.success) {
+      result.innerHTML = `<span style="color:#10b981">✓ 导入成功</span><br><span style="color:#64748b;font-size:12px">${data.message || '已写入数据库'}${data.data && data.data.imported ? ' · ' + data.data.imported + ' 条' : ''}</span>`;
+      showToast('导入成功');
+    } else {
+      result.innerHTML = `<span style="color:#ef4444">× 导入失败</span><br><span style="color:#64748b;font-size:12px">${data.error || '未知错误'}</span>`;
+    }
+  } catch (e) {
+    result.innerHTML = `<span style="color:#ef4444">× 上传出错：${e.message}</span>`;
+  }
+  fileInput.value = '';
+}
+
+// ============================================================
+// V4 置顶/取消置顶（管理员）
+// ============================================================
+async function toggleDemandPin(type, id, isPinned) {
+  if (currentUser.role !== 'admin') return;
+  const url = isPinned ? `/demands/${type}/${id}/unpin` : `/demands/${type}/${id}/pin`;
+  const r = await fetchAPI(url, { method: 'PUT' });
+  if (r.success) {
+    showToast(isPinned ? '已取消置顶' : '已置顶');
+    const cur = navigationHistory[navigationHistory.length - 1];
+    navigateTo(cur, true);
+  } else {
+    showToast(r.error || '操作失败', 'error');
+  }
+}

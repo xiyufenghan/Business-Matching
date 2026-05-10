@@ -729,36 +729,42 @@ router.get('/plaza', (req, res) => {
       let sql = `
         SELECT d.id, d.title, d.category, d.demand_type, d.platform, d.budget_min, d.budget_max,
           d.fans_requirement, d.cooperation_type, d.description, d.deadline, d.created_at,
-          d.publisher_role, d.merchant_id,
+          d.publisher_role, d.merchant_id, d.ref_demand_id,
+          COALESCE(bd.pinned_at, cd.pinned_at) as pinned_at,
           m.company as merchant_company, m.industry as merchant_industry,
           'merchant_or_admin' as source_kind
         FROM demands d
         LEFT JOIN merchants m ON d.merchant_id = m.id
+        LEFT JOIN book_demands bd ON d.ref_demand_id = bd.id AND d.demand_type = 'book'
+        LEFT JOIN course_demands cd ON d.ref_demand_id = cd.id AND d.demand_type = 'course'
         WHERE d.status = 'published'
       `;
       const params = [];
       if (role === 'influencer') {
-        // 达人看不到其他达人也看不到受限内容，只看商家/admin发布
         sql += " AND d.publisher_role IN ('merchant', 'admin')";
       }
       if (keyword) { sql += ' AND (d.title LIKE ? OR d.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
-      sql += ' ORDER BY d.created_at DESC';
+      // V4: 置顶优先
+      sql += " ORDER BY CASE WHEN COALESCE(bd.pinned_at, cd.pinned_at) IS NULL THEN 1 ELSE 0 END, COALESCE(bd.pinned_at, cd.pinned_at) DESC, d.created_at DESC";
       merchantRows = req.db.prepare(sql).all(...params);
     } else {
       // merchant 视角：仅 admin 发布的 demands（不看其他商家）
       let sql = `
         SELECT d.id, d.title, d.category, d.demand_type, d.platform, d.budget_min, d.budget_max,
           d.fans_requirement, d.cooperation_type, d.description, d.deadline, d.created_at,
-          d.publisher_role, d.merchant_id,
+          d.publisher_role, d.merchant_id, d.ref_demand_id,
+          COALESCE(bd.pinned_at, cd.pinned_at) as pinned_at,
           m.company as merchant_company, m.industry as merchant_industry,
           'merchant_or_admin' as source_kind
         FROM demands d
         LEFT JOIN merchants m ON d.merchant_id = m.id
+        LEFT JOIN book_demands bd ON d.ref_demand_id = bd.id AND d.demand_type = 'book'
+        LEFT JOIN course_demands cd ON d.ref_demand_id = cd.id AND d.demand_type = 'course'
         WHERE d.status = 'published' AND d.publisher_role = 'admin'
       `;
       const params = [];
       if (keyword) { sql += ' AND (d.title LIKE ? OR d.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
-      sql += ' ORDER BY d.created_at DESC';
+      sql += " ORDER BY CASE WHEN COALESCE(bd.pinned_at, cd.pinned_at) IS NULL THEN 1 ELSE 0 END, COALESCE(bd.pinned_at, cd.pinned_at) DESC, d.created_at DESC";
       merchantRows = req.db.prepare(sql).all(...params);
     }
 
@@ -768,7 +774,7 @@ router.get('/plaza', (req, res) => {
       let sql = `
         SELECT id_tbl.id, id_tbl.influencer_id, id_tbl.video_account_name, id_tbl.demand_category,
           id_tbl.description, id_tbl.fans_count, id_tbl.book_promote_categories,
-          id_tbl.content_formats, id_tbl.cooperation_types, id_tbl.created_at,
+          id_tbl.content_formats, id_tbl.cooperation_types, id_tbl.created_at, id_tbl.pinned_at,
           inf.level, inf.video_category_track, inf.region, inf.has_mcn,
           'influencer' as source_kind
         FROM influencer_demands id_tbl
@@ -777,11 +783,12 @@ router.get('/plaza', (req, res) => {
       `;
       const params = [];
       if (keyword) { sql += ' AND (id_tbl.video_account_name LIKE ? OR id_tbl.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
-      sql += ' ORDER BY id_tbl.created_at DESC';
+      // V4: 置顶优先
+      sql += ' ORDER BY CASE WHEN id_tbl.pinned_at IS NULL THEN 1 ELSE 0 END, id_tbl.pinned_at DESC, id_tbl.created_at DESC';
       influencerRows = req.db.prepare(sql).all(...params);
     }
 
-    // 合并 + 按创建时间倒序 + 分页
+    // 合并 + 置顶优先 + 创建时间倒序 + 分页
     const merged = [
       ...merchantRows.map(r => ({
         type: 'merchant_demand',
@@ -797,6 +804,9 @@ router.get('/plaza', (req, res) => {
         cooperation_type: r.cooperation_type,
         deadline: r.deadline,
         merchant_id: r.merchant_id,
+        ref_demand_id: r.ref_demand_id,
+        demand_type: r.demand_type,
+        pinned_at: r.pinned_at,
         created_at: r.created_at,
       })),
       ...influencerRows.map(r => ({
@@ -814,9 +824,17 @@ router.get('/plaza', (req, res) => {
         content_formats: r.content_formats,
         cooperation_types: r.cooperation_types,
         influencer_id: r.influencer_id,
+        pinned_at: r.pinned_at,
         created_at: r.created_at,
       }))
-    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    ].sort((a, b) => {
+      // 置顶优先：有 pinned_at 的排前
+      const ap = a.pinned_at ? 1 : 0;
+      const bp = b.pinned_at ? 1 : 0;
+      if (ap !== bp) return bp - ap;
+      if (ap) return new Date(b.pinned_at) - new Date(a.pinned_at);
+      return new Date(b.created_at) - new Date(a.created_at);
+    });
 
     const total = merged.length;
     const offset = (currentPage - 1) * size;
@@ -836,6 +854,158 @@ router.get('/plaza', (req, res) => {
 router.get('/merchant-plaza', (req, res) => {
   req.url = '/plaza' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '');
   router.handle(req, res);
+});
+
+// ========== V4 置顶 / 下架 / 复制 ==========
+
+// 置顶限额：商家广场 5 + 达人广场 5（独立计算）
+const PIN_LIMIT_MERCHANT = 5;
+const PIN_LIMIT_INFLUENCER = 5;
+
+// 商家需求置顶（管理员）
+// PUT /api/demands/:type/:id/pin   type=book|course
+router.put('/:type/:id/pin', (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可置顶' });
+    const { type, id } = req.params;
+    if (!['book', 'course'].includes(type)) return res.status(400).json({ success: false, error: 'type 必须是 book 或 course' });
+    const tbl = type === 'book' ? 'book_demands' : 'course_demands';
+
+    // 检查总置顶数（商家广场 = book_demands + course_demands 联合）
+    const cnt = req.db.prepare("SELECT (SELECT COUNT(*) FROM book_demands WHERE pinned_at IS NOT NULL) + (SELECT COUNT(*) FROM course_demands WHERE pinned_at IS NOT NULL) as c").get().c;
+    // 检查当前是否已置顶
+    const cur = req.db.prepare(`SELECT pinned_at FROM ${tbl} WHERE id = ?`).get(id);
+    if (!cur) return res.status(404).json({ success: false, error: '需求不存在' });
+    if (cur.pinned_at) return res.json({ success: true, message: '已经处于置顶状态', data: { already: true } });
+    if (cnt >= PIN_LIMIT_MERCHANT) {
+      return res.status(400).json({ success: false, error: `商家需求广场最多置顶 ${PIN_LIMIT_MERCHANT} 条，请先取消其它置顶` });
+    }
+
+    req.db.prepare(`UPDATE ${tbl} SET pinned_at = datetime('now') WHERE id = ?`).run(id);
+    res.json({ success: true, message: '置顶成功' });
+  } catch (err) {
+    console.error('[demands/pin]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 商家需求取消置顶
+router.put('/:type/:id/unpin', (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可操作' });
+    const { type, id } = req.params;
+    if (!['book', 'course'].includes(type)) return res.status(400).json({ success: false, error: 'type 必须是 book 或 course' });
+    const tbl = type === 'book' ? 'book_demands' : 'course_demands';
+    req.db.prepare(`UPDATE ${tbl} SET pinned_at = NULL WHERE id = ?`).run(id);
+    res.json({ success: true, message: '已取消置顶' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 达人需求置顶（管理员）
+router.put('/influencer-demands/:id/pin', (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可置顶' });
+    const { id } = req.params;
+    const cnt = req.db.prepare('SELECT COUNT(*) as c FROM influencer_demands WHERE pinned_at IS NOT NULL').get().c;
+    const cur = req.db.prepare('SELECT pinned_at FROM influencer_demands WHERE id = ?').get(id);
+    if (!cur) return res.status(404).json({ success: false, error: '需求不存在' });
+    if (cur.pinned_at) return res.json({ success: true, message: '已经置顶', data: { already: true } });
+    if (cnt >= PIN_LIMIT_INFLUENCER) {
+      return res.status(400).json({ success: false, error: `达人需求广场最多置顶 ${PIN_LIMIT_INFLUENCER} 条，请先取消其它置顶` });
+    }
+    req.db.prepare("UPDATE influencer_demands SET pinned_at = datetime('now') WHERE id = ?").run(id);
+    res.json({ success: true, message: '置顶成功' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/influencer-demands/:id/unpin', (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可操作' });
+    req.db.prepare('UPDATE influencer_demands SET pinned_at = NULL WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: '已取消置顶' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ========== 下架（archive）==========
+// PUT /api/demands/:type/:id/archive    type=book|course|influencer
+router.put('/:type/:id/archive', (req, res) => {
+  try {
+    const { type, id } = req.params;
+    if (!['book', 'course', 'influencer'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'type 必须是 book/course/influencer' });
+    }
+    const tbl = type === 'book' ? 'book_demands' : type === 'course' ? 'course_demands' : 'influencer_demands';
+    req.db.prepare(`UPDATE ${tbl} SET status = 'archived', updated_at = datetime('now') WHERE id = ?`).run(id);
+    // 同步把 demands 壳子表 archive 掉（仅商家需求）
+    if (type === 'book' || type === 'course') {
+      try {
+        req.db.prepare(`UPDATE demands SET status = 'archived' WHERE ref_demand_id = ? AND demand_type = ?`).run(id, type);
+      } catch (e) {}
+    }
+    res.json({ success: true, message: '已下架' });
+  } catch (err) {
+    console.error('[demands/archive]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 上架（恢复）
+router.put('/:type/:id/unarchive', (req, res) => {
+  try {
+    const { type, id } = req.params;
+    if (!['book', 'course', 'influencer'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'type 必须是 book/course/influencer' });
+    }
+    const tbl = type === 'book' ? 'book_demands' : type === 'course' ? 'course_demands' : 'influencer_demands';
+    req.db.prepare(`UPDATE ${tbl} SET status = 'published', updated_at = datetime('now') WHERE id = ?`).run(id);
+    if (type === 'book' || type === 'course') {
+      try {
+        req.db.prepare(`UPDATE demands SET status = 'published' WHERE ref_demand_id = ? AND demand_type = ?`).run(id, type);
+      } catch (e) {}
+    }
+    res.json({ success: true, message: '已恢复上架' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 复制（duplicate）— 复制为新需求并置为 published
+router.post('/:type/:id/duplicate', (req, res) => {
+  try {
+    const { type, id } = req.params;
+    if (!['book', 'course', 'influencer'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'type 必须是 book/course/influencer' });
+    }
+    const tbl = type === 'book' ? 'book_demands' : type === 'course' ? 'course_demands' : 'influencer_demands';
+    const src = req.db.prepare(`SELECT * FROM ${tbl} WHERE id = ?`).get(id);
+    if (!src) return res.status(404).json({ success: false, error: '原需求不存在' });
+
+    const { v4: uuidv4 } = require('uuid');
+    const newId = uuidv4();
+
+    // 取所有列除去自动管理的字段
+    const skipFields = new Set(['id', 'created_at', 'updated_at', 'pinned_at']);
+    const cols = Object.keys(src).filter(k => !skipFields.has(k));
+
+    // 强制 status='published'
+    const colValues = cols.map(k => k === 'status' ? 'published' : src[k]);
+
+    const insertCols = ['id', ...cols, 'created_at', 'updated_at'].join(',');
+    const insertPlaceholders = ['?', ...cols.map(() => '?'), "datetime('now')", "datetime('now')"].join(',');
+    const sql = `INSERT INTO ${tbl} (${insertCols}) VALUES (${insertPlaceholders})`;
+    req.db.prepare(sql).run(newId, ...colValues);
+
+    res.status(201).json({ success: true, message: '复制成功', data: { id: newId } });
+  } catch (err) {
+    console.error('[demands/duplicate]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 module.exports = router;

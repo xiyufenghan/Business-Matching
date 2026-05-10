@@ -3370,3 +3370,206 @@ a:hover, .link-text:hover { color: #1e3a8a; }
   .notify-panel { width: calc(100vw - 20px); right: -100px; }
   .demo-login-buttons { grid-template-columns: 1fr; }
 }
+
+/* ========== V4 新增样式 ========== */
+
+/* Demo 占位横幅 */
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 0 0 14px;
+  background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #92400e;
+}
+.demo-banner-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  letter-spacing: 1px;
+}
+.demo-banner-text { flex: 1; }
+
+/* KPI 旁的"?"小图标 */
+.kpi-help-dot {
+  display: inline-block;
+  margin-left: 4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  cursor: help;
+}
+.kpi-help-dot:hover { background: #f59e0b; }
+
+/* 撮合 5 列看板 */
+.matchmaking-kanban-5col {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.kanban-column-optional .kanban-column-header {
+  position: relative;
+  opacity: 0.92;
+}
+.kanban-col-optional {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.35);
+  color: #fff;
+  font-size: 10px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* 置顶（热推）角标 */
+.pin-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+  z-index: 2;
+}
+
+/* 收藏 ⭐ 按钮 */
+.fav-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #cbd5e1;
+  font-size: 18px;
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+  transition: all 0.15s;
+}
+.fav-star:hover { color: #f59e0b; transform: scale(1.1); }
+.fav-star.is-fav { color: #f59e0b; background: #fff7ed; border-color: #fde68a; }
+
+/* 联络弹窗 */
+.contact-modal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px dashed #e2e8f0;
+}
+.contact-modal-row:last-child { border-bottom: none; }
+.contact-label { font-size: 13px; color: #64748b; }
+.contact-value { font-size: 14px; color: #1e293b; font-weight: 500; }
+.contact-copy-btn {
+  margin-left: 10px;
+  padding: 3px 10px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.contact-copy-btn:hover { background: #2563eb; }
+.contact-future-btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  background: #f1f5f9;
+  color: #94a3b8;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: not-allowed;
+}
+
+/* "我的收藏"页 */
+.fav-page-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+.fav-tab {
+  padding: 8px 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
+}
+.fav-tab.active {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+}
+
+/* 批量导入页 */
+.batch-import-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+.batch-import-tab {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  color: #64748b;
+  cursor: pointer;
+  margin-bottom: -2px;
+}
+.batch-import-tab.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+  font-weight: 600;
+}
+.batch-import-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 24px;
+}
+.batch-import-drop {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+@media (max-width: 1100px) {
+  .matchmaking-kanban-5col { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .matchmaking-kanban-5col { grid-template-columns: 1fr; }
+  .demo-banner { flex-wrap: wrap; }
+}

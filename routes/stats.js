@@ -202,15 +202,17 @@ router.get('/funnel', (req, res) => {
     mmAll.forEach(r => { stageMap[r.stage] = r.c; });
 
     // 累积漏斗：到达该阶段及之后的总和
-    const reachMatch = (stageMap['合作匹配'] || 0) + (stageMap['样品寄送'] || 0) + (stageMap['开始合作'] || 0);
-    const reachSample = (stageMap['样品寄送'] || 0) + (stageMap['开始合作'] || 0);
-    const reachStart = (stageMap['开始合作'] || 0);
+    const reachResponded = (stageMap['responded']||0) + (stageMap['connected']||0) + (stageMap['sample_sent']||0) + (stageMap['cooperating']||0);
+    const reachConnected = (stageMap['connected']||0) + (stageMap['sample_sent']||0) + (stageMap['cooperating']||0);
+    const reachSample = (stageMap['sample_sent']||0) + (stageMap['cooperating']||0);
+    const reachStart = (stageMap['cooperating']||0);
 
     const funnel = [
-      { stage: '需求发布', count: stage0 },
-      { stage: '合作匹配', count: reachMatch },
-      { stage: '样品寄送', count: reachSample },
-      { stage: '开始合作', count: reachStart },
+      { stage: 'published', label: '发布需求', count: stage0 },
+      { stage: 'responded', label: '需求回应', count: reachResponded },
+      { stage: 'connected', label: '需求建联', count: reachConnected },
+      { stage: 'sample_sent', label: '样品寄送', count: reachSample, optional: true },
+      { stage: 'cooperating', label: '开始合作', count: reachStart },
     ];
     funnel.forEach((f, i) => {
       f.conversionFromTop = stage0 > 0 ? +(f.count / stage0 * 100).toFixed(1) : 0;
@@ -452,7 +454,7 @@ router.get('/matchmaking-overview', (req, res) => {
     const stages = req.db.prepare(`
       SELECT stage, COUNT(*) as count
       FROM matchmaking
-      WHERE stage IN ('需求发布','合作匹配','达成意向','样品寄送','开始合作')
+      WHERE stage IN ('published','responded','connected','sample_sent','cooperating')
       GROUP BY stage
     `).all();
 
@@ -471,11 +473,11 @@ router.get('/matchmaking-overview', (req, res) => {
     // 当前进行中的撮合数（不含已合作的）
     const activeMatchmaking = req.db.prepare(`
       SELECT COUNT(*) as count FROM matchmaking
-      WHERE stage IN ('需求发布','合作匹配','达成意向','样品寄送')
+      WHERE stage IN ('published','responded','connected','sample_sent')
     `).get().count;
 
     // 已开始合作数
-    const startedCoop = req.db.prepare("SELECT COUNT(*) as count FROM matchmaking WHERE stage = '开始合作'").get().count;
+    const startedCoop = req.db.prepare("SELECT COUNT(*) as count FROM matchmaking WHERE stage = 'cooperating'").get().count;
 
     res.json({
       success: true,
@@ -505,11 +507,11 @@ router.get('/matchmaking-detail', (req, res) => {
     if (dimension === 'influencer') {
       sql = `
         SELECT inf.id, inf.video_account_name as name, inf.level,
-          SUM(CASE WHEN mm.stage = '需求发布' THEN 1 ELSE 0 END) as stage_publish,
-          SUM(CASE WHEN mm.stage = '合作匹配' THEN 1 ELSE 0 END) as stage_match,
-          SUM(CASE WHEN mm.stage = '达成意向' THEN 1 ELSE 0 END) as stage_intent,
-          SUM(CASE WHEN mm.stage = '样品寄送' THEN 1 ELSE 0 END) as stage_sample,
-          SUM(CASE WHEN mm.stage = '开始合作' THEN 1 ELSE 0 END) as stage_started,
+          SUM(CASE WHEN mm.stage = 'published' THEN 1 ELSE 0 END) as stage_publish,
+          SUM(CASE WHEN mm.stage = 'connected' THEN 1 ELSE 0 END) as stage_match,
+          SUM(CASE WHEN mm.stage = 'responded' THEN 1 ELSE 0 END) as stage_responded,
+          SUM(CASE WHEN mm.stage = 'sample_sent' THEN 1 ELSE 0 END) as stage_sample,
+          SUM(CASE WHEN mm.stage = 'cooperating' THEN 1 ELSE 0 END) as stage_started,
           COUNT(*) as total
         FROM matchmaking mm
         LEFT JOIN influencers inf ON mm.influencer_id = inf.id
@@ -521,11 +523,11 @@ router.get('/matchmaking-detail', (req, res) => {
     } else {
       sql = `
         SELECT m.id, m.company as name, m.industry,
-          SUM(CASE WHEN mm.stage = '需求发布' THEN 1 ELSE 0 END) as stage_publish,
-          SUM(CASE WHEN mm.stage = '合作匹配' THEN 1 ELSE 0 END) as stage_match,
-          SUM(CASE WHEN mm.stage = '达成意向' THEN 1 ELSE 0 END) as stage_intent,
-          SUM(CASE WHEN mm.stage = '样品寄送' THEN 1 ELSE 0 END) as stage_sample,
-          SUM(CASE WHEN mm.stage = '开始合作' THEN 1 ELSE 0 END) as stage_started,
+          SUM(CASE WHEN mm.stage = 'published' THEN 1 ELSE 0 END) as stage_publish,
+          SUM(CASE WHEN mm.stage = 'connected' THEN 1 ELSE 0 END) as stage_match,
+          SUM(CASE WHEN mm.stage = 'responded' THEN 1 ELSE 0 END) as stage_responded,
+          SUM(CASE WHEN mm.stage = 'sample_sent' THEN 1 ELSE 0 END) as stage_sample,
+          SUM(CASE WHEN mm.stage = 'cooperating' THEN 1 ELSE 0 END) as stage_started,
           COUNT(*) as total
         FROM matchmaking mm
         LEFT JOIN merchants m ON mm.merchant_id = m.id
