@@ -114,6 +114,10 @@ function initDatabase() {
     if (!infCols.includes('has_official_account')) {
       db.exec("ALTER TABLE influencers ADD COLUMN has_official_account TEXT DEFAULT '否'");
     }
+    // V4.1 新增：达人手机号（登录用，主键之一）
+    if (!infCols.includes('phone')) {
+      db.exec("ALTER TABLE influencers ADD COLUMN phone TEXT");
+    }
   } catch (e) { /* ignore */ }
 
   // 图书需求表

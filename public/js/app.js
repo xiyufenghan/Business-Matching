@@ -3063,6 +3063,7 @@ async function editInfluencer(id) {
   const body = `
     <div class="form-grid-2">
       <div class="form-group"><label>达人账号名 *</label><input id="ei-video-account" value="${escapeHtml(inf.video_account_name || '')}"></div>
+      <div class="form-group"><label>手机号</label><input id="ei-phone" value="${escapeHtml(inf.phone || '')}" placeholder="用于登录"></div>
       <div class="form-group"><label>等级</label><select id="ei-level"><option value="">-</option>${levelOpts}</select></div>
       <div class="form-group"><label>带货品类</label><input id="ei-video-category" value="${escapeHtml(inf.video_category_track || '')}"></div>
       <div class="form-group"><label>粉丝数</label><input type="number" id="ei-fans-count" value="${inf.fans_count || 0}"></div>
@@ -3094,6 +3095,7 @@ async function editInfluencer(id) {
 async function saveInfluencerEdit(id) {
   const payload = {
     video_account_name: document.getElementById('ei-video-account').value.trim(),
+    phone: document.getElementById('ei-phone').value.trim(),
     level: document.getElementById('ei-level').value,
     video_category_track: document.getElementById('ei-video-category').value.trim(),
     fans_count: parseInt(document.getElementById('ei-fans-count').value) || 0,
@@ -3181,8 +3183,12 @@ async function showAddInfluencerModal() {
             <div class="form-group"><label>视频号账号名称 *</label><input id="add-inf-name" required placeholder="达人视频号名称"></div>
           </div>
           <div class="form-row">
+            <div class="form-group"><label>手机号</label><input id="add-inf-phone" placeholder="11 位手机号（用于登录）" maxlength="11"></div>
             <div class="form-group"><label>带货品类赛道</label><input id="add-inf-track" placeholder="如：图书,课程"></div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label>粉丝数量</label><input type="number" id="add-inf-fans" placeholder="500000"></div>
+            <div class="form-group"><label>地区</label><input id="add-inf-region" placeholder="如：北京"></div>
           </div>
           <div class="form-row">
             <div class="form-group"><label>短视频销售额(月/万)</label><input type="number" id="add-inf-short-sales" step="0.1" placeholder="15.5"></div>
@@ -3194,19 +3200,19 @@ async function showAddInfluencerModal() {
           </div>
           <div class="form-row">
             <div class="form-group"><label>课程带货意愿</label><select id="add-inf-course-will"><option value="高">高</option><option value="中">中</option><option value="低">低</option></select></div>
-            <div class="form-group"><label>地区</label><input id="add-inf-region" placeholder="如：北京"></div>
-          </div>
-          <div class="form-row">
             <div class="form-group"><label>短视频更新频率</label><input id="add-inf-short-freq" placeholder="如：每周3-5条"></div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label>直播频率</label><input id="add-inf-live-freq" placeholder="如：每周1-2场"></div>
-          </div>
-          <div class="form-row">
             <div class="form-group"><label>是否有MCN</label><select id="add-inf-mcn"><option value="否">否</option><option value="是">是</option></select></div>
-            <div class="form-group"><label>MCN名称</label><input id="add-inf-mcn-name" placeholder="MCN机构名称"></div>
           </div>
           <div class="form-row">
+            <div class="form-group"><label>MCN名称</label><input id="add-inf-mcn-name" placeholder="MCN机构名称"></div>
             <div class="form-group"><label>是否入驻互选</label><select id="add-inf-mutual"><option value="是">是</option><option value="否">否</option></select></div>
+          </div>
+          <div class="form-row">
             <div class="form-group"><label>公众号账号名称</label><input id="add-inf-official" placeholder="公众号名称"></div>
+            <div class="form-group"></div>
           </div>
           ${isSalesAdmin ? `
             <div class="info-box" style="padding:10px 12px;background:#ecfdf5;border-radius:6px;font-size:12px;color:#15803d;margin-bottom:10px">
@@ -3239,6 +3245,7 @@ async function submitAddInfluencer(e) {
   const data = {
     level: document.getElementById('add-inf-level').value,
     video_account_name: document.getElementById('add-inf-name').value,
+    phone: document.getElementById('add-inf-phone').value.trim(),
     video_category_track: document.getElementById('add-inf-track').value,
     fans_count: parseInt(document.getElementById('add-inf-fans').value) || 0,
     monthly_short_video_sales: parseFloat(document.getElementById('add-inf-short-sales').value) || 0,

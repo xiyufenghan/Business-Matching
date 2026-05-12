@@ -154,8 +154,11 @@ app.post('/api/login', (req, res) => {
     return res.json({ success: true, data: { token, id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry, privacy_consented: merchant.privacy_consented === 1 }});
   }
 
-  // 3. 匹配达人
-  const inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ? AND password = ?').get(username, password);
+  // 3. 匹配达人（手机号优先 → 视频号账号名兜底）
+  let inf = db.prepare('SELECT * FROM influencers WHERE phone = ? AND password = ?').get(username, password);
+  if (!inf) {
+    inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ? AND password = ?').get(username, password);
+  }
   if (inf) {
     if (inf.invite_status === 'pending') {
       return res.status(403).json({ success: false, error: '账号尚未激活，请先使用邀请链接完成激活' });

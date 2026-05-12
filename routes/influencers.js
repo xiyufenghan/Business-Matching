@@ -34,6 +34,7 @@ const upload = multer({
 const INFLUENCER_FIELD_ALIASES = {
   level: ['达人等级', '等级'],
   video_account_name: ['账号名称', '视频号', '账号名称', '达人名称', '视频号账号名称'],
+  phone: ['手机号', '联系电话', '手机', '电话'],
   video_category_track: ['内容赛道', '带货品类', '品类赛道', '视频号带货品类赛道'],
   monthly_short_video_sales: ['短视频月销（万）', '短视频月销', '短视频销售额', '现视频号品类销售额（月）短视频（万）'],
   monthly_live_sales: ['直播月销（万）', '直播月销', '直播销售额', '现视频号品类销售额（月）直播（万）'],
@@ -75,7 +76,7 @@ function mapRowByAliases(row) {
 }
 
 const INFLUENCER_FIELDS_ORDER = [
-  '达人等级', '账号名称', '内容赛道',
+  '达人等级', '账号名称', '手机号', '内容赛道',
   '短视频月销（万）', '直播月销（万）',
   '粉丝数', '合作类型', '图书带货意愿', '课程带货意愿',
   '短视频频率', '直播频率',
@@ -90,8 +91,8 @@ router.get('/excel/template', (req, res) => {
     const headers = INFLUENCER_FIELDS_ORDER;
     const sampleData = [
       headers,
-      ['S', '读书小达人', '图书,教育', 15.5, 8.2, 500000, '纯佣,投流', '高', '中', '每周3-5条', '每周1-2场', '否', '', '北京', '是', '销售A', '读书小达人公众号'],
-      ['A', '知识课堂', '课程,教育', 8.0, 25.0, 1200000, '纯佣,坑位费', '中', '高', '每周1-2条', '每周3-5场', '是', '星辰MCN', '上海', '是', '销售B', '知识课堂Official']
+      ['S', '读书小达人', '13800138888', '图书,教育', 15.5, 8.2, 500000, '纯佣,投流', '高', '中', '每周3-5条', '每周1-2场', '否', '', '北京', '是', '销售A', '读书小达人公众号'],
+      ['A', '知识课堂', '13800139999', '课程,教育', 8.0, 25.0, 1200000, '纯佣,坑位费', '中', '高', '每周1-2条', '每周3-5场', '是', '星辰MCN', '上海', '是', '销售B', '知识课堂Official']
     ];
     const ws = XLSX.utils.aoa_to_sheet(sampleData);
     ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 14) }));
@@ -101,6 +102,7 @@ router.get('/excel/template', (req, res) => {
       ['字段', '说明', '是否必填'],
       ['达人等级', 'S/A/B/C/D等级', '否'],
       ['账号名称', '视频号昵称（唯一标识）', '是'],
+      ['手机号', '11位手机号，可作为登录账号', '否'],
       ['内容赛道', '多值，逗号分隔，如：图书,课程', '否'],
       ['短视频月销（万）', '数值，单位万元', '否'],
       ['直播月销（万）', '数值，单位万元', '否'],
@@ -157,12 +159,12 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
     // 按 video_account_name UPSERT：重复账号则更新，新账号则插入
     const findStmt = req.db.prepare(`SELECT id FROM influencers WHERE video_account_name = ?`);
     const insertStmt = req.db.prepare(`
-      INSERT INTO influencers (id, level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, sales_owner_id, official_account_name, password)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO influencers (id, level, video_account_name, phone, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, sales_owner_id, official_account_name, password)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const updateStmt = req.db.prepare(`
       UPDATE influencers SET 
-        level = ?, video_category_track = ?,
+        level = ?, phone = ?, video_category_track = ?,
         monthly_short_video_sales = ?, monthly_live_sales = ?, fans_count = ?,
         cooperation_type = ?, book_willingness = ?, course_willingness = ?,
         short_video_frequency = ?, live_frequency = ?,
@@ -188,6 +190,7 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
 
           const fields = {
             level: normalizeText(mapped.level),
+            phone: normalizeText(mapped.phone),
             video_category_track: normalizeText(mapped.video_category_track),
             monthly_short_video_sales: parseChineseNumber(mapped.monthly_short_video_sales) || 0,
             monthly_live_sales: parseChineseNumber(mapped.monthly_live_sales) || 0,
@@ -209,7 +212,7 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
           const existing = findStmt.get(accountName);
           if (existing) {
             updateStmt.run(
-              fields.level, fields.video_category_track,
+              fields.level, fields.phone, fields.video_category_track,
               fields.monthly_short_video_sales, fields.monthly_live_sales, fields.fans_count,
               fields.cooperation_type, fields.book_willingness, fields.course_willingness,
               fields.short_video_frequency, fields.live_frequency,
@@ -222,7 +225,7 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
           } else {
             const id = uuidv4();
             insertStmt.run(
-              id, fields.level, accountName, fields.video_category_track,
+              id, fields.level, accountName, fields.phone, fields.video_category_track,
               fields.monthly_short_video_sales, fields.monthly_live_sales, fields.fans_count,
               fields.cooperation_type, fields.book_willingness, fields.course_willingness,
               fields.short_video_frequency, fields.live_frequency,
@@ -738,7 +741,7 @@ router.put('/:id', (req, res) => {
       }
     }
     
-    const fields = ['level', 'video_account_name', 'video_category_track', 'monthly_short_video_sales', 'monthly_live_sales', 'fans_count', 'cooperation_type', 'book_willingness', 'course_willingness', 'short_video_frequency', 'live_frequency', 'has_mcn', 'mcn_name', 'region', 'has_joined_mutual_select', 'sales_owner', 'official_account_name', 'sales_owner_id'];
+    const fields = ['level', 'video_account_name', 'phone', 'video_category_track', 'monthly_short_video_sales', 'monthly_live_sales', 'fans_count', 'cooperation_type', 'book_willingness', 'course_willingness', 'short_video_frequency', 'live_frequency', 'has_mcn', 'mcn_name', 'region', 'has_joined_mutual_select', 'sales_owner', 'official_account_name', 'sales_owner_id'];
     
     const updates = [];
     const params = [];
@@ -769,7 +772,7 @@ router.put('/:id', (req, res) => {
 // 可选参数 invite_mode=1：走邀请制（status=pending，生成 invite_code，不设密码）
 router.post('/add', (req, res) => {
   try {
-    let { level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, operator_id, sales_owner_id, invite_mode, invited_by } = req.body;
+    let { level, video_account_name, phone, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, operator_id, sales_owner_id, invite_mode, invited_by } = req.body;
 
     if (!video_account_name) {
       return res.status(400).json({ success: false, error: '视频号账号名称为必填' });
@@ -779,6 +782,13 @@ router.post('/add', (req, res) => {
     const dup = req.db.prepare('SELECT id FROM influencers WHERE video_account_name = ?').get(video_account_name);
     if (dup) {
       return res.status(400).json({ success: false, error: '该视频号账号名已存在' });
+    }
+    // 唯一性：phone 如有则全局唯一
+    if (phone) {
+      const dupPhone = req.db.prepare('SELECT id FROM influencers WHERE phone = ?').get(phone);
+      if (dupPhone) {
+        return res.status(400).json({ success: false, error: '该手机号已被其他达人使用' });
+      }
     }
     
     // 联动：若传了 sales_owner_id，则以管理员当前 name 覆盖 sales_owner 文本
@@ -807,11 +817,11 @@ router.post('/add', (req, res) => {
     const finalPassword = isInviteMode ? '' : '123456';
 
     req.db.prepare(`
-      INSERT INTO influencers (id, level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, password, operator_id, sales_owner_id,
+      INSERT INTO influencers (id, level, video_account_name, phone, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, password, operator_id, sales_owner_id,
         invite_code, invite_status, invited_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, level || '', video_account_name,
+      id, level || '', video_account_name, phone || '',
       video_category_track || '',
       parseFloat(monthly_short_video_sales) || 0,
       parseFloat(monthly_live_sales) || 0,
