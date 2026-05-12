@@ -20,3 +20,4 @@ decode.py
 # 业务数据源（不入仓库）
 *.xlsx
 *.docx
+*.db.bak.*

@@ -34,10 +34,21 @@ node app.js
 
 访问 http://localhost:3000
 
-默认账号（密码均为 `123456`）：
-- 超管：`admin`（密码 `admin123`）
-- 商家：`卢金路`
-- 达人：`耿铭鸿`
+**首次登录**：
+- 超管：`admin` / `admin123` （请首次登录后立即修改密码）
+- 商家/达人：通过超管邀请链接激活注册，系统默认不预置任何业务账号
+
+## 生产数据重置
+
+如需清空所有业务数据（商家/达人/需求/合作/收藏等），回到全新部署状态：
+
+```bash
+node db/reset-to-production.js            # 交互确认
+node db/reset-to-production.js --yes      # 非交互直接执行
+```
+
+执行前会自动备份 `db/merchant_match.db` 到 `merchant_match.db.bak.<时间戳>`。
+清空后仅保留 `admin` 超管账号。
 
 ## API 模块
 

@@ -538,13 +538,6 @@ async function acceptConsent() {
   }
 }
 
-// ============ V3 Demo 快捷登录 ============
-function demoLogin(username, password) {
-  document.getElementById('login-username').value = username;
-  document.getElementById('login-password').value = password;
-  document.getElementById('login-form').dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-}
-
 function getDefaultNav() {
   if (currentUser.role === 'admin') return 'dashboard';
   if (currentUser.role === 'merchant') return 'demand-plaza';
@@ -766,11 +759,6 @@ async function renderDashboard() {
   container.innerHTML = `
     ${renderBackButton()}
     <div class="dashboard-page">
-      <!-- V4 Demo 占位横幅 -->
-      <div class="demo-banner" title="本看板各项指标算法尚未与业务最终对齐，演示仅供参考">
-        <span class="demo-banner-tag">DEMO</span>
-        <span class="demo-banner-text">演示占位 · 各项指标口径待业务最终确认</span>
-      </div>
       <!-- 顶部：标题 + 时间范围筛选 -->
       <div class="dash-header">
         <div>

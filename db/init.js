@@ -510,166 +510,18 @@ function initDatabase() {
     }
   } catch (e) { /* ignore */ }
 
-  // 插入示例数据
-  const merchantCount = db.prepare('SELECT COUNT(*) as count FROM merchants').get();
-  if (merchantCount.count === 0) {
-    const insertMerchant = db.prepare(`
-      INSERT INTO merchants (id, name, company, phone, email, industry, description, password)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertMerchant.run('m001', '张经理', '知行图书出版社', '13800138001', 'zhang@book.com', '图书出版', '专注教育类图书出版发行', '123456');
-    insertMerchant.run('m002', '李总监', '博学在线教育', '13800138002', 'li@edu.com', '在线教育', 'K12在线课程平台', '123456');
-    insertMerchant.run('m003', '王主管', '启明文化传媒', '13800138003', 'wang@culture.com', '文化传媒', '儿童绘本与课程研发', '123456');
-
-    const insertInfluencer = db.prepare(`
-      INSERT INTO influencers (id, level, video_account_name, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, password)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertInfluencer.run('i001', 'S', '读书小达人', '图书,教育', 15.5, 8.2, 500000, '纯佣,投流', '高', '中', '每周3-5条', '每周1-2场', '否', '', '北京', '是', '销售A', '读书小达人公众号', '123456');
-    insertInfluencer.run('i002', 'A', '知识课堂', '课程,教育', 8.0, 25.0, 1200000, '纯佣,坑位费', '中', '高', '每周1-2条', '每周3-5场', '是', '星辰MCN', '上海', '是', '销售B', '知识课堂Official', '123456');
-    insertInfluencer.run('i003', 'A', '亲子阅读馆', '图书,亲子', 12.0, 5.5, 800000, '纯佣', '高', '低', '每周5条以上', '每周1场', '否', '', '广州', '是', '销售A', '亲子阅读馆号', '123456');
-    insertInfluencer.run('i004', 'S', '学霸说', '课程,考试', 5.0, 35.0, 2000000, '坑位费,投流', '低', '高', '每周1-2条', '每天1场', '是', '教育MCN联盟', '深圳', '是', '销售C', '学霸说公众号', '123456');
-    insertInfluencer.run('i005', 'B', '好书推荐官', '图书,文学', 6.5, 2.0, 350000, '纯佣', '高', '低', '每周3-5条', '每月1-2场', '否', '', '成都', '否', '销售A', '好书每日推荐', '123456');
-
-    // 图书需求
-    const insertBookDemand = db.prepare(`
-      INSERT INTO book_demands (id, merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertBookDemand.run('bd001', 'm001', '', '知行图书出版社', '趣味数学启蒙', '小学生,家长', '教育图书', '', '适合6-12岁儿童的数学思维训练图书', 'https://shop.weixin.qq.com/example1', '单本', 39.9, 25, 35, '中通快递', 5000);
-    insertBookDemand.run('bd002', 'm003', '', '启明文化传媒', '经典绘本10册套装', '幼儿,宝妈', '儿童绘本', '', '获奖经典绘本合集，适合3-6岁亲子阅读', 'https://shop.weixin.qq.com/example2', '套组', 128.0, 30, 40, '顺丰快递', 3000);
-    insertBookDemand.run('bd003', 'm001', '', '知行图书出版社', '高中必读名著精选', '中学生,教师', '文学经典', '', '高中语文推荐阅读书目合集', 'https://shop.weixin.qq.com/example3', '套组', 89.0, 20, 30, '中通快递', 8000);
-
-    // 课程需求
-    const insertCourseDemand = db.prepare(`
-      INSERT INTO course_demands (id, merchant_id, course_image, course_name, unit_price, grade_level, subject, course_introduction, course_link)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertCourseDemand.run('cd001', 'm002', '', '少儿编程入门班', 1999, '小学,初中', '编程,信息技术', 'Scratch+Python双轨编程课程，适合8-15岁', 'https://edu.example.com/course1');
-    insertCourseDemand.run('cd002', 'm002', '', '英语自然拼读课', 899, '幼儿园,小学', '英语', '外教自然拼读课程，帮助孩子轻松掌握拼读规则', 'https://edu.example.com/course2');
-    insertCourseDemand.run('cd003', 'm003', '', '少儿美术创意课', 1299, '小学', '美术', '专业美术老师带领创意绘画，培养审美能力', 'https://edu.example.com/course3');
-
-    // 通用需求表
-    const insertDemand = db.prepare(`
-      INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, budget_min, budget_max, fans_requirement, cooperation_type, description, requirements, status, deadline, ref_demand_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertDemand.run('d001', 'm001', '趣味数学启蒙推广', 'book', '教育图书', '视频号', 5000, 20000, '30万以上', '短视频推广', '趣味数学启蒙图书需要视频号达人推广', '1.粉丝30万以上 2.教育类目', 'published', '2026-06-30', 'bd001');
-    insertDemand.run('d002', 'm002', '少儿编程入门课程推广', 'course', '编程课程', '视频号', 8000, 30000, '50万以上', '视频推广+直播', '少儿编程入门课程推广招生', '1.教育类博主 2.有课程推广经验', 'published', '2026-05-30', 'cd001');
-    insertDemand.run('d003', 'm003', '经典绘本套装带货', 'book', '儿童绘本', '视频号', 4000, 15000, '20万以上', '短视频+橱窗', '经典儿童绘本套装带货推广', '1.亲子类 2.有童书推广经验', 'published', '2026-05-20', 'bd002');
-    insertDemand.run('d004', 'm001', '高中名著推广', 'book', '文学经典', '视频号', 3000, 10000, '10万以上', '短视频推广', '高中必读名著推广', '图书/教育类达人', 'published', '2026-07-15', 'bd003');
-    insertDemand.run('d005', 'm002', '英语拼读课程推广', 'course', '英语课程', '视频号', 5000, 15000, '30万以上', '视频推广', '英语自然拼读课推广招生', '亲子/教育类达人', 'published', '2026-06-15', 'cd002');
-    insertDemand.run('d006', 'm003', '少儿美术课程推广', 'course', '美术课程', '视频号', 4000, 12000, '20万以上', '直播推广', '少儿美术创意课招生推广', '亲子/教育类达人', 'published', '2026-06-20', 'cd003');
-
-    // 达人需求
-    const insertInfluencerDemand = db.prepare(`
-      INSERT INTO influencer_demands (id, influencer_id, video_account_name, demand_category, book_name, book_category, book_price_min, book_price_max, course_price_min, course_price_max, description, fans_count, subject_category, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertInfluencerDemand.run('id001', 'i001', '读书小达人', '图书需求', '儿童科普百科全书', '科普读物', 20, 60, 0, 0, '想找适合6-10岁的科普类图书带货', 500000, '科学', 'published');
-    insertInfluencerDemand.run('id002', 'i003', '亲子阅读馆', '图书需求,课程需求', '亲子互动绘本', '儿童绘本', 30, 80, 500, 2000, '寻找高质量的亲子互动绘本和早教课程', 800000, '语文,美术', 'published');
-    insertInfluencerDemand.run('id003', 'i002', '知识课堂', '课程需求', '', '教辅', 0, 0, 800, 3000, '想找优质在线课程合作带货', 1200000, '数学,编程', 'published');
-
-    // 接单
-    const insertOrder = db.prepare(`
-      INSERT INTO orders (id, demand_id, demand_type, ref_demand_id, influencer_id, merchant_id, status, message)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insertOrder.run('o001', 'd001', 'book', 'bd001', 'i001', 'm001', 'accepted', '我擅长图书推广');
-    insertOrder.run('o002', 'd002', 'course', 'cd001', 'i002', 'm002', 'accepted', '教育课程是我的专长');
-
-    // 示例撮合记录
-    const { v4: uuidv4 } = require('uuid');
-    const insertMatchmaking = db.prepare(`
-      INSERT INTO matchmaking (id, merchant_id, influencer_id, demand_id, demand_type, source, stage, notes, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `);
-    const mm1 = uuidv4();
-    insertMatchmaking.run(mm1, 'm001', 'i001', 'd001', 'book', '达人接单', 'cooperating', '达人已接单并开始合作推广');
-    const mm2 = uuidv4();
-    insertMatchmaking.run(mm2, 'm002', 'i002', 'd002', 'course', '系统推荐', 'sample_sent', '课程资料已发送给达人');
-    const mm3 = uuidv4();
-    insertMatchmaking.run(mm3, 'm003', 'i003', 'd003', 'book', '商家邀请', 'connected', '商家邀请达人合作推广绘本');
-
-    const insertHistory = db.prepare(`
-      INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
-      VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `);
-    insertHistory.run(uuidv4(), mm1, 'published', '系统', '需求已发布');
-    insertHistory.run(uuidv4(), mm1, 'responded', '系统', '达人响应需求');
-    insertHistory.run(uuidv4(), mm1, 'connected', '系统', '双方建联');
-    insertHistory.run(uuidv4(), mm1, 'sample_sent', '管理员', '样品已寄出');
-    insertHistory.run(uuidv4(), mm1, 'cooperating', '管理员', '双方确认开始合作');
-    insertHistory.run(uuidv4(), mm2, 'published', '系统', '需求已发布');
-    insertHistory.run(uuidv4(), mm2, 'responded', '系统', '达人响应需求');
-    insertHistory.run(uuidv4(), mm2, 'connected', '系统', '双方建联');
-    insertHistory.run(uuidv4(), mm2, 'sample_sent', '管理员', '课程资料已发送');
-    insertHistory.run(uuidv4(), mm3, 'published', '系统', '需求已发布');
-    insertHistory.run(uuidv4(), mm3, 'responded', '系统', '商家发起邀约');
-    insertHistory.run(uuidv4(), mm3, 'connected', '管理员', '双方建联确认意向');
-
-    // 示例合作记录
-    const insertCoop = db.prepare(`
-      INSERT INTO cooperation (id, merchant_id, influencer_id, demand_id, demand_type, initiative, status, message, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `);
-    insertCoop.run(uuidv4(), 'm001', 'i001', 'd001', 'invite', 'merchant', 'confirmed', '邀请您合作推广趣味数学启蒙');
-    insertCoop.run(uuidv4(), 'm003', 'i003', 'd003', 'invite', 'merchant', 'pending', '邀请您合作推广绘本套装');
-    insertCoop.run(uuidv4(), 'm002', 'i002', 'd002', 'apply', 'influencer', 'confirmed', '我想带货编程课程');
-  }
-
-  // ====== V3 Demo 数据预置（幂等：仅在未初始化时执行） ======
+  // ============ 生产初始化：仅自动创建超管账号 ============
+  // 所有业务数据（商家/达人/需求/合作/收藏等）从零开始，由用户通过 UI 或邀请链接录入
   try {
     const adminCount = db.prepare('SELECT COUNT(*) as c FROM admins').get().c;
     if (adminCount === 0) {
-      // 超管账号
       db.prepare(`INSERT INTO admins (id, username, password, name, is_super, admin_role, phone, email, status)
         VALUES (?, ?, ?, ?, 1, '超管', ?, ?, 'active')`)
-        .run('a_super', 'admin', 'admin123', '郭雷（腾讯营销）', '13800000000', 'admin@tencent.com');
-      // 销售账号
-      db.prepare(`INSERT INTO admins (id, username, password, name, is_super, admin_role, phone, email, status)
-        VALUES (?, ?, ?, ?, 0, '销售', ?, ?, 'active')`)
-        .run('a_sales1', 'sales1', '123456', '张销售', '13800000011', 'sales1@tencent.com');
-    }
-
-    // 演示达人需求（模式A 样例：达人发布的带货意向，含新字段）
-    const infDemandCount = db.prepare("SELECT COUNT(*) as c FROM influencer_demands WHERE id LIKE 'demo_%'").get().c;
-    if (infDemandCount === 0) {
-      const insDemoInfDem = db.prepare(`
-        INSERT INTO influencer_demands (id, influencer_id, video_account_name, demand_category, book_name, book_category,
-          book_price_min, book_price_max, description, fans_count, subject_category, status,
-          book_promote_categories, content_formats, cooperation_types)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?, ?, ?)
-      `);
-      insDemoInfDem.run('demo_infd_001', 'i001', '读书小达人', '图书需求', '想带历史类畅销书', '社科历史', 30, 80,
-        '擅长深度图书解读，粉丝年龄集中在25-45岁，对历史社科类图书有强烈兴趣', 500000, '历史,社科',
-        '["文学小说","社科历史","科普百科"]', '["短视频","直播"]', '["纯佣金","商家投流+低佣金"]');
-      insDemoInfDem.run('demo_infd_002', 'i003', '亲子阅读馆', '图书需求', '寻找高品质亲子绘本', '儿童绘本', 20, 100,
-        '亲子阅读垂类账号，宝妈粉丝占比80%，擅长绘本推荐与亲子互动', 800000, '绘本,亲子',
-        '["少儿图书","童书绘本","艺术生活"]', '["短视频","公众号"]', '["纯佣金","话题素材发布"]');
-      insDemoInfDem.run('demo_infd_003', 'i005', '好书推荐官', '图书需求', '想带文学小说', '文学经典', 25, 120,
-        '文学类内容为主，粉丝粘性高，擅长图书深度解读和阅读种草', 350000, '文学',
-        '["文学小说","经管励志"]', '["短视频","直播"]', '["纯佣金"]');
-    }
-
-    // 演示 admin 代发需求（模式B 样例）
-    const adminDemandCount = db.prepare("SELECT COUNT(*) as c FROM demands WHERE publisher_role = 'admin'").get().c;
-    if (adminDemandCount === 0) {
-      const insAdminDem = db.prepare(`
-        INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, budget_min, budget_max,
-          fans_requirement, cooperation_type, description, requirements, status, deadline,
-          publisher_role, admin_publisher_id)
-        VALUES (?, ?, ?, ?, ?, '视频号', ?, ?, ?, ?, ?, ?, 'published', ?, 'admin', ?)
-      `);
-      insAdminDem.run('demo_adm_d001', 'm001', '【腾讯营销推荐】少儿科普图书合作招募', 'book', '科普读物',
-        5000, 30000, '20万以上', '纯佣金/低佣金+投流', '腾讯营销精选少儿科普图书项目，优质商家货品，品质有保障',
-        '粉丝≥20万，亲子/科普/教育类账号优先', '2026-07-31', 'a_super');
-      insAdminDem.run('demo_adm_d002', 'm002', '【腾讯营销推荐】K12在线课程推广合作', 'course', '在线课程',
-        8000, 50000, '50万以上', '话题素材+纯佣金', '腾讯营销战略合作课程品牌，佣金高、转化好，欢迎教育类达人对接',
-        '教育类账号，有课程带货经验', '2026-08-15', 'a_super');
+        .run('a_super', 'admin', 'admin123', '超级管理员', '', '');
+      console.log('[DB] 已创建超管账号：admin / admin123 （请首次登录后立即修改密码）');
     }
   } catch (e) {
-    console.error('[DB V3 Demo Data]', e.message);
+    console.error('[DB Init Admin]', e.message);
   }
 
   return db;

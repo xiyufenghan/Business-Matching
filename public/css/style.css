@@ -3342,74 +3342,15 @@ a:hover, .link-text:hover { color: #1e3a8a; }
 }
 .consent-modal .consent-btn:hover { background: #1d4ed8; }
 
-/* Demo 快捷登录 */
-.demo-login-row {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px dashed #e2e8f0;
-}
-.demo-login-title {
-  font-size: 12px;
-  color: #94a3b8;
-  margin-bottom: 10px;
-  text-align: center;
-}
-.demo-login-buttons {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.demo-login-btn {
-  padding: 8px 4px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 12px;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.demo-login-btn:hover {
-  background: #dbeafe;
-  border-color: #2563eb;
-  color: #1d4ed8;
-}
-
 /* 顶部通知栏容器位置（桌面端） */
 .mobile-topbar .notify-bell-wrap { margin-left: auto; margin-right: 12px; }
 
 @media (max-width: 768px) {
   .plaza-grid { grid-template-columns: 1fr; }
   .notify-panel { width: calc(100vw - 20px); right: -100px; }
-  .demo-login-buttons { grid-template-columns: 1fr; }
 }
 
 /* ========== V4 新增样式 ========== */
-
-/* Demo 占位横幅 */
-.demo-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  margin: 0 0 14px;
-  background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
-  border: 1px solid #fde68a;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #92400e;
-}
-.demo-banner-tag {
-  display: inline-block;
-  padding: 2px 8px;
-  background: #f59e0b;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 4px;
-  letter-spacing: 1px;
-}
-.demo-banner-text { flex: 1; }
 
 /* KPI 旁的"?"小图标 */
 .kpi-help-dot {
@@ -3584,7 +3525,6 @@ a:hover, .link-text:hover { color: #1e3a8a; }
 }
 @media (max-width: 768px) {
   .matchmaking-kanban-5col { grid-template-columns: 1fr; }
-  .demo-banner { flex-wrap: wrap; }
 }
 
 /* V4 合作管理：链回原需求 */
