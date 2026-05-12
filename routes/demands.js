@@ -878,6 +878,39 @@ router.get('/merchant-plaza', (req, res) => {
 const PIN_LIMIT_MERCHANT = 5;
 const PIN_LIMIT_INFLUENCER = 5;
 
+// ⚠️ 注意：达人需求路由必须注册在通配 /:type/:id/... 之前，
+//    否则 Express 会把 'influencer-demands' 匹配成 :type 参数，
+//    落到商家 pin/unpin 里报 "type 必须是 book 或 course"（V4.1 发现并修复）。
+
+// 达人需求置顶（管理员）
+router.put('/influencer-demands/:id/pin', (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可置顶' });
+    const { id } = req.params;
+    const cnt = req.db.prepare('SELECT COUNT(*) as c FROM influencer_demands WHERE pinned_at IS NOT NULL').get().c;
+    const cur = req.db.prepare('SELECT pinned_at FROM influencer_demands WHERE id = ?').get(id);
+    if (!cur) return res.status(404).json({ success: false, error: '需求不存在' });
+    if (cur.pinned_at) return res.json({ success: true, message: '已经置顶', data: { already: true } });
+    if (cnt >= PIN_LIMIT_INFLUENCER) {
+      return res.status(400).json({ success: false, error: `达人需求广场最多置顶 ${PIN_LIMIT_INFLUENCER} 条，请先取消其它置顶` });
+    }
+    req.db.prepare("UPDATE influencer_demands SET pinned_at = datetime('now') WHERE id = ?").run(id);
+    res.json({ success: true, message: '置顶成功' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/influencer-demands/:id/unpin', (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可操作' });
+    req.db.prepare('UPDATE influencer_demands SET pinned_at = NULL WHERE id = ?').run(req.params.id);
+    res.json({ success: true, message: '已取消置顶' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 商家需求置顶（管理员）
 // PUT /api/demands/:type/:id/pin   type=book|course
 router.put('/:type/:id/pin', (req, res) => {
@@ -913,35 +946,6 @@ router.put('/:type/:id/unpin', (req, res) => {
     if (!['book', 'course'].includes(type)) return res.status(400).json({ success: false, error: 'type 必须是 book 或 course' });
     const tbl = type === 'book' ? 'book_demands' : 'course_demands';
     req.db.prepare(`UPDATE ${tbl} SET pinned_at = NULL WHERE id = ?`).run(id);
-    res.json({ success: true, message: '已取消置顶' });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// 达人需求置顶（管理员）
-router.put('/influencer-demands/:id/pin', (req, res) => {
-  try {
-    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可置顶' });
-    const { id } = req.params;
-    const cnt = req.db.prepare('SELECT COUNT(*) as c FROM influencer_demands WHERE pinned_at IS NOT NULL').get().c;
-    const cur = req.db.prepare('SELECT pinned_at FROM influencer_demands WHERE id = ?').get(id);
-    if (!cur) return res.status(404).json({ success: false, error: '需求不存在' });
-    if (cur.pinned_at) return res.json({ success: true, message: '已经置顶', data: { already: true } });
-    if (cnt >= PIN_LIMIT_INFLUENCER) {
-      return res.status(400).json({ success: false, error: `达人需求广场最多置顶 ${PIN_LIMIT_INFLUENCER} 条，请先取消其它置顶` });
-    }
-    req.db.prepare("UPDATE influencer_demands SET pinned_at = datetime('now') WHERE id = ?").run(id);
-    res.json({ success: true, message: '置顶成功' });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-router.put('/influencer-demands/:id/unpin', (req, res) => {
-  try {
-    if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: '仅管理员可操作' });
-    req.db.prepare('UPDATE influencer_demands SET pinned_at = NULL WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '已取消置顶' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
