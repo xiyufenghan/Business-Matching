@@ -712,9 +712,13 @@ router.get('/plaza', (req, res) => {
   try {
     const role = req.user.role;
     const userId = req.user.id;
-    const { keyword, page, pageSize, source } = req.query;
+    const { keyword, page, pageSize, source, type, demand_type, category } = req.query;
     const currentPage = parseInt(page) || 1;
     const size = parseInt(pageSize) || 20;
+
+    // V4.1 type 维度：merchant_demand / influencer_demand / 空(全部)
+    const wantMerchant = !type || type === 'merchant_demand';
+    const wantInfluencer = !type || type === 'influencer_demand';
 
     // 三方来源统一结构：
     // source_type: 'merchant' | 'influencer' | 'admin'
@@ -723,7 +727,7 @@ router.get('/plaza', (req, res) => {
     let influencerRows = [];
 
     // 需求1：商家 / admin 发布的需求（来自 demands 表）
-    if (role !== 'merchant' || source === 'all') {
+    if (wantMerchant && (role !== 'merchant' || source === 'all')) {
       // admin/influencer 看 demands 表：
       //   admin 看全部；influencer 看 publisher_role 为 merchant 或 admin 的
       let sql = `
@@ -744,10 +748,16 @@ router.get('/plaza', (req, res) => {
         sql += " AND d.publisher_role IN ('merchant', 'admin')";
       }
       if (keyword) { sql += ' AND (d.title LIKE ? OR d.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+      // V4.1 商品品类（demand_type）过滤
+      if (demand_type && (demand_type === 'book' || demand_type === 'course')) {
+        sql += ' AND d.demand_type = ?'; params.push(demand_type);
+      }
+      // V4.1 类目（category）过滤
+      if (category) { sql += ' AND d.category = ?'; params.push(category); }
       // V4: 置顶优先
       sql += " ORDER BY CASE WHEN COALESCE(bd.pinned_at, cd.pinned_at) IS NULL THEN 1 ELSE 0 END, COALESCE(bd.pinned_at, cd.pinned_at) DESC, d.created_at DESC";
       merchantRows = req.db.prepare(sql).all(...params);
-    } else {
+    } else if (wantMerchant) {
       // merchant 视角：仅 admin 发布的 demands（不看其他商家）
       let sql = `
         SELECT d.id, d.title, d.category, d.demand_type, d.platform, d.budget_min, d.budget_max,
@@ -764,12 +774,16 @@ router.get('/plaza', (req, res) => {
       `;
       const params = [];
       if (keyword) { sql += ' AND (d.title LIKE ? OR d.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+      if (demand_type && (demand_type === 'book' || demand_type === 'course')) {
+        sql += ' AND d.demand_type = ?'; params.push(demand_type);
+      }
+      if (category) { sql += ' AND d.category = ?'; params.push(category); }
       sql += " ORDER BY CASE WHEN COALESCE(bd.pinned_at, cd.pinned_at) IS NULL THEN 1 ELSE 0 END, COALESCE(bd.pinned_at, cd.pinned_at) DESC, d.created_at DESC";
       merchantRows = req.db.prepare(sql).all(...params);
     }
 
     // 需求2：达人发布的需求（来自 influencer_demands 表）
-    if (role !== 'influencer') {
+    if (wantInfluencer && role !== 'influencer') {
       // admin 和 merchant 都看得到所有达人发布
       let sql = `
         SELECT id_tbl.id, id_tbl.influencer_id, id_tbl.video_account_name, id_tbl.demand_category,
@@ -783,6 +797,8 @@ router.get('/plaza', (req, res) => {
       `;
       const params = [];
       if (keyword) { sql += ' AND (id_tbl.video_account_name LIKE ? OR id_tbl.description LIKE ?)'; params.push(`%${keyword}%`, `%${keyword}%`); }
+      // V4.1 类目筛选（达人需求按 demand_category 过滤）
+      if (category) { sql += ' AND id_tbl.demand_category = ?'; params.push(category); }
       // V4: 置顶优先
       sql += ' ORDER BY CASE WHEN id_tbl.pinned_at IS NULL THEN 1 ELSE 0 END, id_tbl.pinned_at DESC, id_tbl.created_at DESC';
       influencerRows = req.db.prepare(sql).all(...params);

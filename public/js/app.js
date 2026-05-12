@@ -607,7 +607,6 @@ function renderNavMenu() {
         { id: 'demand-plaza', icon: 'home', label: '需求广场' },
         { id: 'influencer-plaza', icon: 'star', label: '达人广场' },
         { id: 'matchmaking', icon: 'link', label: '撮合管理', badge: notificationCount },
-        { id: 'favorites', icon: 'heart', label: '我的收藏' },
       ]},
       { id: 'system', label: '系统管理', items: systemItems },
     ];
@@ -736,7 +735,7 @@ async function renderDashboard() {
   const baseQs = `?days=${range}` + (opFilter || '');
 
   // 并行调用所有看板接口
-  let dashRes, funnelRes, trendRes, distRes, salesRes, topRes, timelineRes;
+  let dashRes, funnelRes, trendRes, distRes, topRes, timelineRes;
   try {
     [dashRes, funnelRes, trendRes, distRes, topRes, timelineRes] = await Promise.all([
       fetchAPI('/stats/dashboard' + baseQs),
@@ -746,9 +745,6 @@ async function renderDashboard() {
       fetchAPI('/stats/top-entities' + (opFilter ? '?' + opFilter.substring(1) : '')),
       fetchAPI('/stats/timeline?limit=15' + (opFilter || '')),
     ]);
-    if (isSuperAdmin) {
-      salesRes = await fetchAPI('/stats/sales-ranking');
-    }
   } catch (e) {
     container.innerHTML = '<p style="text-align:center;padding:40px;color:#ef4444">看板数据加载失败：' + e.message + '</p>';
     return;
@@ -765,7 +761,6 @@ async function renderDashboard() {
   const dist = distRes.success ? distRes.data : { typeStats:[], categoryStats:[], levelStats:[], fansBuckets:[] };
   const top = topRes.success ? topRes.data : { topMerchants:[], topInfluencers:[] };
   const timeline = timelineRes.success ? timelineRes.data : [];
-  const salesRank = (salesRes && salesRes.success) ? salesRes.data : [];
 
   // 渲染 HTML 骨架
   container.innerHTML = `
@@ -795,7 +790,7 @@ async function renderDashboard() {
         </div>
       </div>
 
-      <!-- Level 1: 北极星指标（4 张大卡） -->
+      <!-- Level 1: 北极星指标（2 张大卡） -->
       <div class="kpi-row kpi-row-primary">
         <div class="kpi-card kpi-blue">
           <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
@@ -805,28 +800,12 @@ async function renderDashboard() {
             <div class="kpi-sub">总撮合 ${d.totalCooperations} 次</div>
           </div>
         </div>
-        <div class="kpi-card kpi-green">
-          <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
-          <div class="kpi-content">
-            <div class="kpi-label">潜在合作金额 <span class="kpi-tip" title="估算：已确认合作的需求售价之和">ⓘ</span></div>
-            <div class="kpi-value">¥${formatBigNumber(d.potentialGmv)}</div>
-            <div class="kpi-sub">基于已确认合作估算</div>
-          </div>
-        </div>
         <div class="kpi-card kpi-orange">
           <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
           <div class="kpi-content">
             <div class="kpi-label">撮合达成率</div>
             <div class="kpi-value">${d.matchRate}%</div>
             <div class="kpi-sub">已确认 / 总撮合</div>
-          </div>
-        </div>
-        <div class="kpi-card kpi-purple">
-          <div class="kpi-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg></div>
-          <div class="kpi-content">
-            <div class="kpi-label">活跃主体</div>
-            <div class="kpi-value">${d.activeMerchants + d.activeInfluencers}</div>
-            <div class="kpi-sub">商家 ${d.activeMerchants} · 达人 ${d.activeInfluencers}</div>
           </div>
         </div>
       </div>
@@ -862,34 +841,20 @@ async function renderDashboard() {
       </div>
 
       <!-- 达人结构画像 -->
-      <div class="dash-grid-2">
-        <div class="dash-chart-card">
-          <div class="dash-chart-title">达人等级分布</div>
-          <div id="chart-level" style="height:280px"></div>
-        </div>
-        <div class="dash-chart-card">
-          <div class="dash-chart-title">达人粉丝量段</div>
-          <div id="chart-fans" style="height:280px"></div>
-        </div>
-      </div>
-
-      <!-- 销售排行（仅超管） -->
-      ${isSuperAdmin && salesRank.length > 0 ? `
       <div class="dash-chart-card" style="margin-bottom:16px">
-        <div class="dash-chart-title">销售业绩排行</div>
-        <div id="chart-sales-rank" style="height:${Math.max(140, salesRank.length * 50)}px"></div>
+        <div class="dash-chart-title">达人等级分布</div>
+        <div id="chart-level" style="height:280px"></div>
       </div>
-      ` : ''}
 
-      <!-- V4 业绩排行榜（4 类按次数） + 时间线 -->
+      <!-- V4 需求排行榜（4 类按次数） + 时间线 -->
       <div class="dash-grid-2">
         <div class="dash-chart-card">
-          <div class="dash-chart-title">业绩排行榜 <span class="dash-chart-sub">4 类 · 按次数</span></div>
+          <div class="dash-chart-title">需求排行榜 <span class="dash-chart-sub">4 类 · 按次数</span></div>
           <div class="rank-tabs" style="display:flex;gap:6px;margin:4px 0 10px;flex-wrap:wrap">
-            <button class="rank-tab-btn active" data-rt="md" onclick="switchRankTab('md')">商家需求</button>
-            <button class="rank-tab-btn" data-rt="id" onclick="switchRankTab('id')">达人需求</button>
-            <button class="rank-tab-btn" data-rt="mt" onclick="switchRankTab('mt')">商家接单</button>
-            <button class="rank-tab-btn" data-rt="it" onclick="switchRankTab('it')">达人接单</button>
+            <button class="rank-tab-btn active" data-rt="md" onclick="switchRankTab('md')">需求商家</button>
+            <button class="rank-tab-btn" data-rt="id" onclick="switchRankTab('id')">需求达人</button>
+            <button class="rank-tab-btn" data-rt="mt" onclick="switchRankTab('mt')">接单商家</button>
+            <button class="rank-tab-btn" data-rt="it" onclick="switchRankTab('it')">接单达人</button>
           </div>
           <div class="rank-list" id="rank-list-md">${renderRankList(top.topMerchantDemands || [], '次需求')}</div>
           <div class="rank-list" id="rank-list-id" style="display:none">${renderRankInfList(top.topInfluencerDemands || [], '次需求')}</div>
@@ -912,8 +877,6 @@ async function renderDashboard() {
     initDistributionChart(dist);
     initTrendChart(trend);
     initLevelChart(dist.levelStats);
-    initFansChart(dist.fansBuckets);
-    if (isSuperAdmin && salesRank.length > 0) initSalesRankChart(salesRank);
   }, 50);
 
   // 响应式
@@ -1020,8 +983,8 @@ function initFunnelChart(data) {
       emphasis: { label: { fontSize: 14 } },
       data: data.map((f, i) => ({
         value: f.count,
-        name: f.stage,
-        itemStyle: { color: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd'][i] }
+        name: f.label || f.stage,
+        itemStyle: { color: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'][i] || '#93c5fd' }
       }))
     }]
   });
@@ -2631,15 +2594,15 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20) {
       <div class="inf-hero">
         <div class="inf-hero-title">
           <h2>达人广场</h2>
-          <p>视频号优质达人资源库</p>
+          <p>视频号优质达人资源库 · 点击卡片快速筛选</p>
         </div>
         <div class="inf-hero-stats">
-          <div class="inf-stat-card inf-stat-primary">
+          <div class="inf-stat-card inf-stat-primary ${getInfQuickActive('all') ? 'inf-stat-active' : ''}" onclick="quickFilterInf('all')" title="点击查看全部达人">
             <div class="inf-stat-value">${formatBigNumber(hero.total)}</div>
             <div class="inf-stat-label">达人总数</div>
           </div>
           ${hero.levels.map(l => `
-            <div class="inf-stat-card">
+            <div class="inf-stat-card ${getInfQuickActive('level', l.level) ? 'inf-stat-active' : ''}" onclick="quickFilterInf('level','${l.level}')" title="点击筛选${l.level}达人">
               <div class="inf-stat-value">
                 <span class="level-badge-mini ${getLevelClass(l.level)}">${l.level}</span>
                 ${l.c}
@@ -2647,11 +2610,11 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20) {
               <div class="inf-stat-label">${l.level}达人</div>
             </div>
           `).join('')}
-          <div class="inf-stat-card">
+          <div class="inf-stat-card ${getInfQuickActive('mutual') ? 'inf-stat-active' : ''}" onclick="quickFilterInf('mutual')" title="点击筛选已入驻互选达人">
             <div class="inf-stat-value" style="color:#16a34a">${hero.mutualCount}</div>
             <div class="inf-stat-label">已入互选</div>
           </div>
-          <div class="inf-stat-card">
+          <div class="inf-stat-card ${getInfQuickActive('mcn') ? 'inf-stat-active' : ''}" onclick="quickFilterInf('mcn')" title="点击筛选MCN达人">
             <div class="inf-stat-value" style="color:#f59e0b">${hero.mcnCount}</div>
             <div class="inf-stat-label">MCN达人</div>
           </div>
@@ -2935,6 +2898,49 @@ function renderInfRow(inf, isMerchant, isSuperAdmin) {
 function toggleInfFilter() {
   infFilterPanelOpen = !infFilterPanelOpen;
   renderInfluencerPlaza();
+}
+
+// V4.1 Hero 数据卡快速筛选 ============
+// kind: 'all' | 'level' | 'mutual' | 'mcn'
+function quickFilterInf(kind, value) {
+  switch (kind) {
+    case 'all':
+      // 清空所有筛选
+      infFilters = { keyword: '', level: [], fans_min: '', fans_max: '', region_province: '', video_category: '', book_category: '', course_category: '', has_mcn: '', mutual_select: '', cooperation_type: '', filter_sales_id: '' };
+      break;
+    case 'level': {
+      // toggle：已选中再点 = 取消
+      const arr = Array.isArray(infFilters.level) ? infFilters.level.slice() : [];
+      const idx = arr.indexOf(value);
+      if (idx >= 0) arr.splice(idx, 1);
+      else arr.length = 0, arr.push(value);  // 单选切换
+      infFilters.level = arr;
+      break;
+    }
+    case 'mutual':
+      infFilters.mutual_select = infFilters.mutual_select === '是' ? '' : '是';
+      break;
+    case 'mcn':
+      infFilters.has_mcn = infFilters.has_mcn === '是' ? '' : '是';
+      break;
+  }
+  renderInfluencerPlaza(1, 20);
+}
+function getInfQuickActive(kind, value) {
+  switch (kind) {
+    case 'all':
+      // "全部"卡片高亮：所有筛选都为空
+      return !((infFilters.level && infFilters.level.length) || infFilters.has_mcn || infFilters.mutual_select || infFilters.keyword
+        || infFilters.fans_min || infFilters.fans_max || infFilters.region_province || infFilters.video_category
+        || infFilters.book_category || infFilters.course_category || infFilters.cooperation_type || infFilters.filter_sales_id);
+    case 'level':
+      return Array.isArray(infFilters.level) && infFilters.level.includes(value);
+    case 'mutual':
+      return infFilters.mutual_select === '是';
+    case 'mcn':
+      return infFilters.has_mcn === '是';
+  }
+  return false;
 }
 function onInfFilterChange(key, value) { infFilters[key] = value; }
 function applyInfFilter() { renderInfluencerPlaza(1, 20); }
@@ -6170,21 +6176,39 @@ document.addEventListener('DOMContentLoaded', () => {
 // =======================================================================
 
 // ============ 需求广场（三角色自适应） ============
-let demandPlazaState = { keyword: '', page: 1, pageSize: 20 };
+// V4.1 扩展筛选：type / demand_type / category
+let demandPlazaState = { keyword: '', type: '', demand_type: '', category: '', page: 1, pageSize: 20, filterOpen: false };
 
 async function renderDemandPlaza() {
   const container = document.getElementById('page-container');
   container.innerHTML = '<div class="empty-state"><p>加载中...</p></div>';
 
   const role = currentUser.role;
-  const kw = demandPlazaState.keyword ? `&keyword=${encodeURIComponent(demandPlazaState.keyword)}` : '';
-  const res = await fetchAPI(`/demands/plaza?page=${demandPlazaState.page}&pageSize=${demandPlazaState.pageSize}${kw}`);
+  // 构造查询串
+  const qs = new URLSearchParams();
+  qs.append('page', demandPlazaState.page);
+  qs.append('pageSize', demandPlazaState.pageSize);
+  if (demandPlazaState.keyword) qs.append('keyword', demandPlazaState.keyword);
+  if (demandPlazaState.type) qs.append('type', demandPlazaState.type);
+  if (demandPlazaState.demand_type) qs.append('demand_type', demandPlazaState.demand_type);
+  if (demandPlazaState.category) qs.append('category', demandPlazaState.category);
+  const res = await fetchAPI('/demands/plaza?' + qs.toString());
   if (!res.success) {
     container.innerHTML = `<div class="empty-state"><p>加载失败：${res.error || '未知错误'}</p></div>`;
     return;
   }
   const list = res.data || [];
   const pag = res.pagination || { page: 1, total: 0, totalPages: 1 };
+
+  // 统计激活的筛选数（不含 keyword，它有独立搜索框）
+  const activeCnt = (demandPlazaState.type ? 1 : 0) + (demandPlazaState.demand_type ? 1 : 0) + (demandPlazaState.category ? 1 : 0);
+
+  // 动态抽取当前结果中的 category 供下拉（保持用户看到的数据内选项 + 常见内置类目）
+  const categoryFromData = [...new Set(list.map(x => x.category).filter(Boolean))].sort();
+  // 为避免筛选后下拉项变少：如果已经选中某个 category，确保它保留在选项里
+  if (demandPlazaState.category && !categoryFromData.includes(demandPlazaState.category)) {
+    categoryFromData.unshift(demandPlazaState.category);
+  }
 
   // 角色对应的引导语
   const hints = {
@@ -6197,6 +6221,11 @@ async function renderDemandPlaza() {
   const publishBtnText = role === 'admin' ? '+ 代发需求' : (role === 'merchant' ? '+ 发布需求' : '+ 发布带货意向');
   const publishAction = role === 'influencer' ? 'showInfluencerDemandModal()' : 'showMerchantDemandModalV3()';
 
+  // 达人视角看不到"达人需求"（那是自己人发的），所以筛选里不放 influencer_demand
+  const canSeeInfluencerDemand = role !== 'influencer';
+  // 商家视角主要看 admin 代发 + 达人需求，不太需要 merchant_demand 选项（后端也会过滤掉）
+  const canSeeMerchantDemand = role !== 'merchant' ? true : false;
+
   container.innerHTML = `
     ${renderBackButton()}
     <div class="plaza-page">
@@ -6205,15 +6234,50 @@ async function renderDemandPlaza() {
           <h2 style="font-size:22px;margin:0;color:#1e293b">需求广场</h2>
           <p style="font-size:13px;color:#64748b;margin:6px 0 0">${hints[role]}</p>
         </div>
-        <div style="display:flex;gap:10px;align-items:center">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <input type="text" id="plaza-kw" placeholder="搜索标题/描述" value="${escapeHtml(demandPlazaState.keyword)}" onkeydown="if(event.key==='Enter')plazaSearch()" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;width:220px;">
           <button class="btn btn-sm btn-outline" onclick="plazaSearch()">搜索</button>
+          <button class="btn btn-sm btn-outline" onclick="togglePlazaFilter()" title="筛选">
+            筛选${activeCnt > 0 ? ` <span style="background:#2563eb;color:#fff;border-radius:10px;padding:0 6px;font-size:11px;margin-left:4px">${activeCnt}</span>` : ''}
+          </button>
+          ${activeCnt > 0 ? '<button class="btn btn-sm btn-outline" onclick="resetPlazaFilter()">重置</button>' : ''}
           ${canPublish ? `<button class="btn btn-sm btn-primary" onclick="${publishAction}">${publishBtnText}</button>` : ''}
         </div>
       </div>
 
+      <!-- V4.1 筛选面板 -->
+      <div class="filter-panel" id="plaza-filter-panel" style="display:${demandPlazaState.filterOpen ? 'block' : 'none'};margin:12px 0 0">
+        <div class="filter-row" style="display:flex;gap:16px;flex-wrap:wrap">
+          ${(canSeeMerchantDemand || canSeeInfluencerDemand) ? `
+          <div class="filter-item" style="min-width:180px">
+            <label>需求类型</label>
+            <select onchange="onPlazaFilterChange('type', this.value)">
+              <option value="">全部类型</option>
+              ${canSeeMerchantDemand ? `<option value="merchant_demand" ${demandPlazaState.type==='merchant_demand'?'selected':''}>商家需求</option>` : ''}
+              ${canSeeInfluencerDemand ? `<option value="influencer_demand" ${demandPlazaState.type==='influencer_demand'?'selected':''}>达人需求</option>` : ''}
+            </select>
+          </div>
+          ` : ''}
+          <div class="filter-item" style="min-width:180px">
+            <label>商品品类</label>
+            <select onchange="onPlazaFilterChange('demand_type', this.value)">
+              <option value="">全部品类</option>
+              <option value="book" ${demandPlazaState.demand_type==='book'?'selected':''}>图书</option>
+              <option value="course" ${demandPlazaState.demand_type==='course'?'selected':''}>课程</option>
+            </select>
+          </div>
+          <div class="filter-item" style="min-width:200px">
+            <label>类目</label>
+            <select onchange="onPlazaFilterChange('category', this.value)">
+              <option value="">全部类目</option>
+              ${categoryFromData.map(c => `<option value="${escapeHtml(c)}" ${demandPlazaState.category===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div class="plaza-stats">
-        <div class="stat-card"><div class="stat-label">共 ${pag.total} 条需求</div></div>
+        <div class="stat-card"><div class="stat-label">共 ${pag.total} 条需求${activeCnt > 0 ? '（已筛选）' : ''}</div></div>
       </div>
 
       <div class="plaza-grid">
@@ -6234,6 +6298,25 @@ async function renderDemandPlaza() {
 
 function plazaSearch() {
   demandPlazaState.keyword = document.getElementById('plaza-kw').value.trim();
+  demandPlazaState.page = 1;
+  renderDemandPlaza();
+}
+
+// V4.1 需求广场筛选交互
+function togglePlazaFilter() {
+  demandPlazaState.filterOpen = !demandPlazaState.filterOpen;
+  renderDemandPlaza();
+}
+function onPlazaFilterChange(key, value) {
+  demandPlazaState[key] = value;
+  demandPlazaState.page = 1;
+  renderDemandPlaza();
+}
+function resetPlazaFilter() {
+  demandPlazaState.type = '';
+  demandPlazaState.demand_type = '';
+  demandPlazaState.category = '';
+  demandPlazaState.keyword = '';
   demandPlazaState.page = 1;
   renderDemandPlaza();
 }
@@ -6909,7 +6992,7 @@ async function renderFavorites() {
     </div>
     <div class="fav-page-tabs">
       <button class="fav-tab ${tab==='demands'?'active':''}" onclick="switchFavTab('demands')">需求列表（${demands.length}）</button>
-      <button class="fav-tab ${tab==='entities'?'active':''}" onclick="switchFavTab('entities')">主体列表（${entities.length}）</button>
+      <button class="fav-tab ${tab==='entities'?'active':''}" onclick="switchFavTab('entities')">身份列表（${entities.length}）</button>
     </div>
     <div class="fav-page-content">
       ${tab === 'demands' ? renderFavDemandsList(demands) : renderFavEntitiesList(entities)}
@@ -6940,7 +7023,7 @@ function renderFavDemandsList(demands) {
 }
 
 function renderFavEntitiesList(entities) {
-  if (!entities.length) return '<div class="empty-tip" style="padding:40px;text-align:center;color:#94a3b8">暂无收藏的主体</div>';
+  if (!entities.length) return '<div class="empty-tip" style="padding:40px;text-align:center;color:#94a3b8">暂无收藏的身份</div>';
   return `<div class="plaza-grid">${entities.map(e => {
     const isInf = e.target_type === 'influencer';
     const title = isInf ? e.video_account_name : (e.company || e.name);

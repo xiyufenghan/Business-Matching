@@ -2829,6 +2829,19 @@ a:hover, .link-text:hover { color: #1e3a8a; }
   border-radius: 8px; padding: 8px 14px;
   min-width: 84px; text-align: center;
   border: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.inf-stat-card:hover {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.12);
+}
+.inf-stat-card.inf-stat-active {
+  background: #dbeafe;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 .inf-stat-card.inf-stat-primary {
   background: #eff6ff;
