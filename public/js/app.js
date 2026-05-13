@@ -1648,7 +1648,7 @@ let idSortOrder = 'desc';
 
 const ID_BOOK_CATEGORIES = ['少儿科普', '绘本', '教辅', '文学', '家庭教育', '童书', '人文社科', '其他'];
 const ID_SUBJECT_CATEGORIES = ['语文', '数学', '英语', '科学', '艺术', '编程', '通用'];
-const ID_LEVELS = ['S级', 'A级', 'B级', 'C级', 'D级'];
+// 注：等级统一用 LEVEL_OPTIONS（{v:'S',label:'S级'}）。DB 存裸字母，UI 显示带"级"。
 
 async function renderInfluencerDemands(page = 1, pageSize = 20) {
   const container = document.getElementById('page-container');
@@ -1749,7 +1749,7 @@ async function renderInfluencerDemands(page = 1, pageSize = 20) {
           <label>达人等级</label>
           <select onchange="onIdFilterChange('level', this.value); applyIdFilter()">
             <option value="">全部</option>
-            ${ID_LEVELS.map(l => `<option value="${l}" ${idFilters.level===l?'selected':''}>${l}</option>`).join('')}
+            ${LEVEL_OPTIONS.map(o => `<option value="${o.v}" ${idFilters.level===o.v?'selected':''}>${o.label}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -1807,7 +1807,7 @@ function renderInfluencerDemandCardV2(d, isMerchant) {
   const fansCount = d.fans_count || d.inf_fans_count || 0;
   const statusBadge = (typeof getStatusBadge === 'function') ? getStatusBadge(d.status) : '';
   const levelBadge = d.level
-    ? `<span class="level-badge" style="background:${getLevelColor(d.level)}">${d.level}</span>`
+    ? `<span class="level-badge" style="background:${getLevelColor(d.level)}">${levelLabel(d.level)}</span>`
     : '';
 
   const priceRangeBook = (d.book_price_max > 0)
@@ -1911,7 +1911,7 @@ function renderInfluencerDemandRow(d, isMerchant) {
   }
 
   const levelTag = d.level
-    ? `<span class="level-badge" style="background:${getLevelColor(d.level)}">${d.level}</span>`
+    ? `<span class="level-badge" style="background:${getLevelColor(d.level)}">${levelLabel(d.level)}</span>`
     : '<span style="color:#cbd5e1">-</span>';
 
   return `
@@ -2071,7 +2071,7 @@ let mrSortField = 'created_at';
 let mrSortOrder = 'desc';
 
 const MR_TYPES = ['图书推广', '课程推广', '综合招募', '专场直播'];
-const MR_LEVELS = ['S级', 'A级', 'B级', 'C级', 'D级'];
+// 等级用 LEVEL_OPTIONS（裸字母 value + 带"级"显示）
 const MR_COOPERATION_MODES = ['纯佣', '投流', '寄样', '视频专场', '直播带货', '混合'];
 
 async function renderMerchantRecruitments(page = 1, pageSize = 20) {
@@ -2159,7 +2159,7 @@ async function renderMerchantRecruitments(page = 1, pageSize = 20) {
           <label>目标达人等级</label>
           <select onchange="onMrFilterChange('level', this.value); applyMrFilter()">
             <option value="">全部</option>
-            ${MR_LEVELS.map(l => `<option value="${l}" ${mrFilters.level===l?'selected':''}>${l}</option>`).join('')}
+            ${LEVEL_OPTIONS.map(o => `<option value="${o.v}" ${mrFilters.level===o.v?'selected':''}>${o.label}</option>`).join('')}
           </select>
         </div>
         <div class="filter-item">
@@ -2587,15 +2587,18 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20) {
             <div class="inf-stat-value">${formatBigNumber(hero.total)}</div>
             <div class="inf-stat-label">达人总数</div>
           </div>
-          ${hero.levels.map(l => `
-            <div class="inf-stat-card ${getInfQuickActive('level', l.level) ? 'inf-stat-active' : ''}" onclick="quickFilterInf('level','${l.level}')" title="点击筛选${l.level}达人">
+          ${hero.levels.map(l => {
+            const lv = normalizeLevel(l.level);
+            const lbl = lv ? lv + '级' : (l.level || '-');
+            return `
+            <div class="inf-stat-card ${getInfQuickActive('level', lv) ? 'inf-stat-active' : ''}" onclick="quickFilterInf('level','${lv}')" title="点击筛选${lbl}达人">
               <div class="inf-stat-value">
-                <span class="level-badge-mini ${getLevelClass(l.level)}">${l.level}</span>
+                <span class="level-badge-mini ${getLevelClass(lv)}">${lbl}</span>
                 ${l.c}
               </div>
-              <div class="inf-stat-label">${l.level}达人</div>
-            </div>
-          `).join('')}
+              <div class="inf-stat-label">${lbl}达人</div>
+            </div>`;
+          }).join('')}
           <div class="inf-stat-card ${getInfQuickActive('mutual') ? 'inf-stat-active' : ''}" onclick="quickFilterInf('mutual')" title="点击筛选已入驻互选达人">
             <div class="inf-stat-value" style="color:#16a34a">${hero.mutualCount}</div>
             <div class="inf-stat-label">已入互选</div>
@@ -2617,10 +2620,12 @@ async function renderInfluencerPlaza(page = 1, pageSize = 20) {
           <div class="filter-item" style="flex:1.5">
             <label>等级（多选）</label>
             <div class="chip-group">
-              ${opts.levels.map(l => `
-                <span class="chip ${(infFilters.level||[]).includes(l.level) ? 'chip-active' : ''}" 
-                      onclick="toggleInfLevel('${l.level}')">${l.level} (${l.count})</span>
-              `).join('')}
+              ${opts.levels.map(l => {
+                const lv = normalizeLevel(l.level);
+                const lbl = lv ? lv + '级' : l.level;
+                return `<span class="chip ${(infFilters.level||[]).includes(lv) ? 'chip-active' : ''}"
+                      onclick="toggleInfLevel('${lv}')">${lbl} (${l.count})</span>`;
+              }).join('')}
             </div>
           </div>
         </div>
@@ -2751,6 +2756,22 @@ function getLevelClass(level) {
   return map[level] || 'lv-D';
 }
 
+// ============ 等级规范化辅助（统一双轨制） ============
+// DB / 后端 query 参数 ：S / A / B / C / D（裸字母）
+// UI 用户可见显示       ：S级 / A级 / B级 / C级 / D级（带后缀）
+const LEVEL_ENUM = ['S', 'A', 'B', 'C', 'D'];
+const LEVEL_OPTIONS = LEVEL_ENUM.map(v => ({ v, label: v + '级' }));
+// 任意输入归一为裸字母（'S级'/'s'/'S' → 'S'，无效返回 ''）
+function normalizeLevel(v) {
+  const s = String(v || '').toUpperCase().replace(/级$/, '').trim();
+  return LEVEL_ENUM.includes(s) ? s : '';
+}
+// 显示用：把 DB 值（'S' 或 'S级'）转成 'S级'；空值返回 '-'
+function levelLabel(v) {
+  const norm = normalizeLevel(v);
+  return norm ? norm + '级' : (v || '-');
+}
+
 function formatSalesAmount(n) {
   if (!n || n <= 0) return '-';
   if (n >= 10000) return '¥' + (n / 10000).toFixed(n % 10000 === 0 ? 0 : 1) + '万';
@@ -2771,7 +2792,7 @@ function renderInfCardV2(inf, isMerchant, isSuperAdmin) {
     <div class="inf-card-v2" data-id="${inf.id}">
       <div class="inf-card-head">
         <input type="checkbox" class="inf-checkbox" value="${inf.id}">
-        <span class="level-badge-mini ${getLevelClass(inf.level)}">${inf.level || '-'}</span>
+        <span class="level-badge-mini ${getLevelClass(inf.level)}">${levelLabel(inf.level)}</span>
         <div class="inf-card-name" title="${inf.video_account_name}">${inf.video_account_name}</div>
         ${inf.has_joined_mutual_select === '是' ? '<span class="inf-mutual-tag">互选</span>' : ''}
       </div>
@@ -2862,7 +2883,7 @@ function renderInfRow(inf, isMerchant, isSuperAdmin) {
   return `
     <div class="inf-row ${showSales?'has-sales':''}" data-id="${inf.id}">
       <input type="checkbox" class="inf-checkbox">
-      <span class="level-badge-mini ${getLevelClass(inf.level)}">${inf.level || '-'}</span>
+      <span class="level-badge-mini ${getLevelClass(inf.level)}">${levelLabel(inf.level)}</span>
       <div class="inf-row-name">
         <span class="inf-row-account">${inf.video_account_name}</span>
         ${inf.has_joined_mutual_select === '是' ? '<span class="inf-mutual-tag-sm">互选</span>' : ''}
@@ -2983,7 +3004,7 @@ async function showInfDetailModal(id) {
   const body = `
     <div class="inf-detail">
       <div class="inf-detail-head">
-        <span class="level-badge-mini ${getLevelClass(inf.level)}" style="font-size:13px;padding:4px 10px;">${inf.level || '-'}</span>
+        <span class="level-badge-mini ${getLevelClass(inf.level)}" style="font-size:13px;padding:4px 10px;">${levelLabel(inf.level)}</span>
         <div>
           <div style="font-size:18px;font-weight:600;color:#1e293b">${inf.video_account_name}</div>
           <div style="font-size:12px;color:#94a3b8;margin-top:2px">${region || '-'} ${inf.has_mcn === '是' ? '· MCN: ' + (inf.mcn_name || '-') : '· 独立达人'}</div>
@@ -4536,7 +4557,7 @@ async function openSuggestDropdown(inputId, type) {
         : item.source === '图书需求' ? '#2563eb'
         : item.source === '课程需求' ? '#ec4899' : '#6b7280';
       const meta = type === 'influencer'
-        ? `<span class="suggest-meta">${item.level ? '⭐' + item.level + ' · ' : ''}${item.fans ? 'N' + (item.fans>= 10000 ? (item.fans/10000).toFixed(1) + 'w' : item.fans) : ''}${item.region ? ' · ' + item.region : ''}</span>`
+        ? `<span class="suggest-meta">${item.level ? '⭐' + levelLabel(item.level) + ' · ' : ''}${item.fans ? 'N' + (item.fans>= 10000 ? (item.fans/10000).toFixed(1) + 'w' : item.fans) : ''}${item.region ? ' · ' + item.region : ''}</span>`
         : '';
       const safeName = (item.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
       return `<div class="suggest-item" onmousedown="pickSuggest('${inputId}','${safeName}')">
@@ -4821,7 +4842,7 @@ async function renderMerchantProfile() {
         <div class="coop-card">
           <div class="coop-card-header">
             <div style="display:flex;align-items:center;gap:8px">
-              <span class="level-badge" style="background:${getLevelColor(c.level)}">${c.level || '-'}</span>
+              <span class="level-badge" style="background:${getLevelColor(c.level)}">${levelLabel(c.level)}</span>
               <strong>${c.video_account_name || '未知达人'}</strong>
             </div>
             ${getStatusBadge(c.status)}
@@ -4846,7 +4867,7 @@ async function renderMerchantProfile() {
         <div class="coop-card">
           <div class="coop-card-header">
             <div style="display:flex;align-items:center;gap:8px">
-              <span class="level-badge" style="background:${getLevelColor(c.level)}">${c.level || '-'}</span>
+              <span class="level-badge" style="background:${getLevelColor(c.level)}">${levelLabel(c.level)}</span>
               <strong>${c.video_account_name || '未知达人'}</strong>
             </div>
             ${getStatusBadge(c.status)}
@@ -4863,7 +4884,7 @@ async function renderMerchantProfile() {
         <div class="coop-card" style="border-left:3px solid var(--success)">
           <div class="coop-card-header">
             <div style="display:flex;align-items:center;gap:8px">
-              <span class="level-badge" style="background:${getLevelColor(c.level)}">${c.level || '-'}</span>
+              <span class="level-badge" style="background:${getLevelColor(c.level)}">${levelLabel(c.level)}</span>
               <strong>${c.video_account_name || '未知达人'}</strong>
             </div>
             <span class="badge badge-confirmed">已合作</span>
@@ -4993,7 +5014,7 @@ async function viewInfluencerDetail(influencerId) {
   
   openModal('达人详情', `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-      <span class="level-badge" style="background:${getLevelColor(inf.level)};width:32px;height:32px;line-height:32px;font-size:14px">${inf.level || '-'}</span>
+      <span class="level-badge" style="background:${getLevelColor(inf.level)};width:32px;height:32px;line-height:32px;font-size:14px">${levelLabel(inf.level)}</span>
       <div>
         <h4 style="font-size:16px">${inf.video_account_name}</h4>
         <p style="font-size:12px;color:var(--gray-500)">${inf.video_category_track || ''} · ${inf.region || ''}</p>
@@ -5093,7 +5114,11 @@ async function renderInfluencerManage() {
 
   const hero = heroRes.success ? heroRes.data : { total: 0, levels: [], mcnCount: 0, mutualCount: 0, newCount: 0, highSales: 0 };
   const levelCount = {};
-  (hero.levels || []).forEach(x => { levelCount[x.level] = x.c; });
+  // 兼容老库可能存在的"S级"和新库的"S"，统一收口为裸字母
+  (hero.levels || []).forEach(x => {
+    const k = normalizeLevel(x.level);
+    if (k) levelCount[k] = (levelCount[k] || 0) + x.c;
+  });
 
   container.innerHTML = `
     ${renderBackButton()}
@@ -5105,11 +5130,11 @@ async function renderInfluencerManage() {
     <!-- Hero 统计 -->
     <div class="im-hero">
       ${renderImHeroCard('达人总数', hero.total, '#3b82f6')}
-      ${renderImHeroCard('S级', levelCount['S级'] || 0, '#dc2626')}
-      ${renderImHeroCard('A级', levelCount['A级'] || 0, '#ea580c')}
-      ${renderImHeroCard('B级', levelCount['B级'] || 0, '#16a34a')}
-      ${renderImHeroCard('C级', levelCount['C级'] || 0, '#0ea5e9')}
-      ${renderImHeroCard('D级', levelCount['D级'] || 0, '#94a3b8')}
+      ${renderImHeroCard('S级', levelCount['S'] || 0, '#dc2626')}
+      ${renderImHeroCard('A级', levelCount['A'] || 0, '#ea580c')}
+      ${renderImHeroCard('B级', levelCount['B'] || 0, '#16a34a')}
+      ${renderImHeroCard('C级', levelCount['C'] || 0, '#0ea5e9')}
+      ${renderImHeroCard('D级', levelCount['D'] || 0, '#94a3b8')}
       ${renderImHeroCard('已签 MCN', hero.mcnCount, '#8b5cf6')}
       ${renderImHeroCard('近 30 天新增', hero.newCount, '#ec4899')}
     </div>
@@ -5136,7 +5161,7 @@ async function renderInfluencerManage() {
           <label>等级</label>
           <select onchange="onImFilterChange('level', this.value); applyImFilter()">
             <option value="">全部</option>
-            ${['S级','A级','B级','C级','D级'].map(l => `<option value="${l}" ${imFilters.level===l?'selected':''}>${l}</option>`).join('')}
+            ${LEVEL_OPTIONS.map(o => `<option value="${o.v}" ${imFilters.level===o.v?'selected':''}>${o.label}</option>`).join('')}
           </select>
         </div>
         <div class="filter-item">
@@ -5246,7 +5271,7 @@ function renderImRow(inf) {
 
   return `
     <div class="im-row">
-      <div class="im-cell"><span class="level-badge" style="background:${levelColor}">${inf.level || '-'}</span></div>
+      <div class="im-cell"><span class="level-badge" style="background:${levelColor}">${levelLabel(inf.level)}</span></div>
       <div class="im-cell im-cell-name">
         <div class="im-name-main">${escapeHtml(inf.video_account_name || '-')}</div>
         ${inf.official_account_name ? `<div class="im-name-sub">${escapeHtml(inf.official_account_name)}</div>` : ''}
@@ -6362,7 +6387,7 @@ function renderPlazaCard(item) {
         </div>
         <div class="plaza-card-title">${escapeHtml(item.title)}</div>
         <div class="plaza-card-publisher">
-          ${item.level ? `<span class="inf-level level-${item.level}">${item.level}级</span>` : ''}
+          ${item.level ? `<span class="inf-level level-${normalizeLevel(item.level) || 'D'}">${levelLabel(item.level)}</span>` : ''}
           ${item.fans_count ? `<span class="plaza-meta">粉丝 ${formatBigNumber(item.fans_count)}</span>` : ''}
           ${item.region ? `<span class="plaza-meta">${item.region}</span>` : ''}
         </div>
@@ -7236,7 +7261,7 @@ function renderRankInfList(list, unit) {
       <span class="rank-no rank-no-${i<3?i+1:'rest'}">${i+1}</span>
       <div class="rank-name" title="${escapeHtml(inf.name || '')}">
         ${escapeHtml(inf.name || '未命名')}
-        ${inf.level ? `<span class="rank-level rank-level-${(inf.level||'').replace('级','')}">${inf.level}</span>` : ''}
+        ${inf.level ? `<span class="rank-level rank-level-${normalizeLevel(inf.level) || 'D'}">${levelLabel(inf.level)}</span>` : ''}
       </div>
       <div class="rank-stat"><span class="rank-num">${inf.count || 0}</span><span class="rank-unit">${unit}</span></div>
     </div>
