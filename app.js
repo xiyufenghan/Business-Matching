@@ -117,8 +117,11 @@ app.post('/api/login', (req, res) => {
     return res.status(400).json({ success: false, error: '请输入账号和密码' });
   }
 
-  // 1. 优先匹配管理员
-  const admin = db.prepare('SELECT * FROM admins WHERE username = ? AND password = ?').get(username, password);
+  // 1. 优先匹配管理员（手机号优先 → 用户名兜底）
+  let admin = db.prepare('SELECT * FROM admins WHERE phone = ? AND password = ?').get(username, password);
+  if (!admin) {
+    admin = db.prepare('SELECT * FROM admins WHERE username = ? AND password = ?').get(username, password);
+  }
   if (admin) {
     if (admin.status === 'disabled') {
       return res.status(403).json({ success: false, error: '账号已停用' });
