@@ -1144,8 +1144,8 @@ async function renderMerchantDemands(page = 1, pageSize = 20) {
   
   const isInfluencer = currentUser.role === 'influencer';
   const isMerchant = currentUser.role === 'merchant';
-  // 仅超级管理员可见"归属销售"列与筛选项（普通销售管理员只看到自己负责的需求，无需再筛销售）
-  const showSales = currentUser.role === 'admin' && currentUser.is_super === true;
+  // 「归属销售」对所有 admin（含销售普管）可见，商家/达人不可见
+  const showSales = currentUser.role === 'admin';
   const title = isMerchant ? '我的需求' : '商家需求';
   
   let url = `/demands?page=${page}&pageSize=${pageSize}`;
@@ -1439,8 +1439,8 @@ function searchMerchantDemands() {
 function renderMerchantDemandCard(d, isInfluencer) {
   const typeLabel = d.demand_type === 'book' ? '图书' : '课程';
   const typeColor = d.demand_type === 'book' ? '#3b82f6' : '#8b5cf6';
-  // 仅超级管理员可见归属销售字段（商家、达人、销售管理员均不外显）
-  const showSales = currentUser.role === 'admin' && currentUser.is_super === true;
+  // 「归属销售」对所有 admin（含销售普管）可见，商家/达人不可见
+  const showSales = currentUser.role === 'admin';
   
   return `
     <div class="demand-card-v2">
@@ -1549,7 +1549,6 @@ async function editMerchantDemand(refId, demandType) {
         <div class="form-group"><label>物流</label><input id="edm-logistics" value="${escapeHtml(row.logistics || '')}"></div>
         <div class="form-group"><label>库存</label><input type="number" id="edm-stock" value="${row.stock || 0}"></div>
         <div class="form-group"><label>图书图片URL</label><input id="edm-book-image" value="${escapeHtml(row.book_image || '')}"></div>
-        <div class="form-group"><label>商品图片URL</label><input id="edm-product-image" value="${escapeHtml(row.product_image || '')}"></div>
         <div class="form-group" style="grid-column:1/-1"><label>视频号小店链接</label><input id="edm-wechat-shop-link" value="${escapeHtml(row.wechat_shop_link || '')}"></div>
         <div class="form-group" style="grid-column:1/-1"><label>图书介绍</label><textarea id="edm-book-intro" rows="3">${escapeHtml(row.book_introduction || '')}</textarea></div>
       </div>
@@ -1595,7 +1594,6 @@ async function saveMerchantDemandEdit(refId, demandType) {
       logistics: document.getElementById('edm-logistics').value.trim(),
       stock: document.getElementById('edm-stock').value,
       book_image: document.getElementById('edm-book-image').value.trim(),
-      product_image: document.getElementById('edm-product-image').value.trim(),
       wechat_shop_link: document.getElementById('edm-wechat-shop-link').value.trim(),
       book_introduction: document.getElementById('edm-book-intro').value.trim()
     };
@@ -2763,7 +2761,8 @@ function formatSalesAmount(n) {
 function renderInfCardV2(inf, isMerchant, isSuperAdmin) {
   const totalSales = (inf.monthly_short_video_sales || 0) + (inf.monthly_live_sales || 0);
   const region = (inf.region || '').replace(/,/, '·').replace(/，/, '·');
-  const showSales = isSuperAdmin;
+  // 「归属销售」对所有 admin（含销售普管）可见，商家/达人不可见
+  const showSales = currentUser.role === 'admin';
   // 销售徽章兜底（id关联优先；否则文本匹配）
   const salesNameSet = window.__salesNameSet || new Set();
   const textMatched = inf.sales_owner && salesNameSet.has(String(inf.sales_owner).trim());
@@ -2822,6 +2821,8 @@ function renderInfCardV2(inf, isMerchant, isSuperAdmin) {
 
 // 列表视图表头
 function renderInfListHeader(isSuperAdmin) {
+  // 「归属销售」对所有 admin 可见
+  const showSales = currentUser.role === 'admin';
   const sortable = (label, field, align = 'left') => {
     const active = infSortField === field;
     const arrow = active ? (infSortOrder === 'asc' ? '↑' : '↓') : '↕';
@@ -2833,7 +2834,7 @@ function renderInfListHeader(isSuperAdmin) {
     return `<div class="inf-th ${cls}">${label}</div>`;
   };
   return `
-    <div class="inf-row inf-row-header ${isSuperAdmin?'has-sales':''}">
+    <div class="inf-row inf-row-header ${showSales?'has-sales':''}">
       ${plain('', 'center')}
       ${sortable('等级', 'level', 'center')}
       ${plain('达人账号')}
@@ -2843,7 +2844,7 @@ function renderInfListHeader(isSuperAdmin) {
       ${plain('更新频率', 'right')}
       ${plain('地区')}
       ${plain('MCN')}
-      ${isSuperAdmin ? plain('归属销售', 'center') : ''}
+      ${showSales ? plain('归属销售', 'center') : ''}
       ${plain('操作', 'right')}
     </div>`;
 }
@@ -2852,12 +2853,14 @@ function renderInfListHeader(isSuperAdmin) {
 function renderInfRow(inf, isMerchant, isSuperAdmin) {
   const totalSales = (inf.monthly_short_video_sales || 0) + (inf.monthly_live_sales || 0);
   const region = (inf.region || '').replace(/,/, '·').replace(/，/, '·');
+  // 「归属销售」对所有 admin 可见
+  const showSales = currentUser.role === 'admin';
   const salesNameSet = window.__salesNameSet || new Set();
   const textMatched = inf.sales_owner && salesNameSet.has(String(inf.sales_owner).trim());
   const displayName = inf.sales_owner_name || (textMatched ? inf.sales_owner : '');
   const mainCategory = (inf.video_category_track || '').split(/[,，、]/)[0] || '-';
   return `
-    <div class="inf-row ${isSuperAdmin?'has-sales':''}" data-id="${inf.id}">
+    <div class="inf-row ${showSales?'has-sales':''}" data-id="${inf.id}">
       <input type="checkbox" class="inf-checkbox">
       <span class="level-badge-mini ${getLevelClass(inf.level)}">${inf.level || '-'}</span>
       <div class="inf-row-name">
@@ -2873,7 +2876,7 @@ function renderInfRow(inf, isMerchant, isSuperAdmin) {
       </div>
       <div class="inf-row-region">${region || '-'}</div>
       <div class="inf-row-mcn">${inf.has_mcn === '是' ? (inf.mcn_name || 'MCN') : '-'}</div>
-      ${isSuperAdmin ? `<div class="inf-row-sales">${displayName ? `<span style="color:#16a34a;font-weight:600">${displayName}</span>` : '<span style="color:#cbd5e1">-</span>'}</div>` : ''}
+      ${showSales ? `<div class="inf-row-sales">${displayName ? `<span style="color:#16a34a;font-weight:600">${displayName}</span>` : '<span style="color:#cbd5e1">-</span>'}</div>` : ''}
       <div class="inf-row-actions">
         ${isMerchant ? `<button class="btn btn-xs btn-primary" onclick="inviteInfluencer('${inf.id}','')">邀请</button>` : ''}
         <button class="btn btn-xs btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
@@ -3000,7 +3003,7 @@ async function showInfDetailModal(id) {
         <div><span class="dl">合作类型</span><div class="dv" style="font-size:12px;">${inf.cooperation_type || '-'}</div></div>
         <div><span class="dl">短视频频率</span><div class="dv">${inf.short_video_frequency || '-'}</div></div>
         <div><span class="dl">直播频率</span><div class="dv">${inf.live_frequency || '-'}</div></div>
-        ${isSuperAdmin ? `<div><span class="dl">归属销售</span><div class="dv">${inf.sales_owner_name || inf.sales_owner || '<span style="color:#cbd5e1">未分配</span>'}</div></div>` : ''}
+        ${currentUser.role === 'admin' ? `<div><span class="dl">归属销售</span><div class="dv">${inf.sales_owner_name || inf.sales_owner || '<span style="color:#cbd5e1">未分配</span>'}</div></div>` : ''}
         ${inf.official_account_name ? `<div><span class="dl">公众号</span><div class="dv">${inf.official_account_name}</div></div>` : ''}
         <div><span class="dl">公众号可接单</span><div class="dv">${inf.has_official_account || '否'}</div></div>
       </div>
@@ -3053,7 +3056,13 @@ async function editInfluencer(id) {
   if (!inf) { showToast('未找到该达人', 'error'); return; }
   const salesList = salesRes.success ? salesRes.data : [];
 
-  const levelOpts = ['S','A','B','C','D'].map(l => `<option ${inf.level === l ? 'selected' : ''}>${l}</option>`).join('');
+  // 规范化 level：兼容老库可能存在的"S级"格式，回显时和选项匹配
+  const normLevel = (v) => {
+    const s = String(v || '').toUpperCase().replace(/级$/, '').trim();
+    return ['S','A','B','C','D'].includes(s) ? s : '';
+  };
+  const curLevel = normLevel(inf.level);
+  const levelOpts = ['S','A','B','C','D'].map(l => `<option value="${l}" ${curLevel === l ? 'selected' : ''}>${l}级</option>`).join('');
   const willOpts = (v) => ['高','中','低','无'].map(x => `<option ${v === x ? 'selected' : ''}>${x}</option>`).join('');
   const yesNo = (v) => ['是','否'].map(x => `<option ${v === x ? 'selected' : ''}>${x}</option>`).join('');
   const salesOpts = `<option value="">-- 未分配 --</option>` + salesList.map(s =>
@@ -3179,7 +3188,7 @@ async function showAddInfluencerModal() {
       <div class="modal-body">
         <form onsubmit="submitAddInfluencer(event)">
           <div class="form-row">
-            <div class="form-group"><label>达人等级</label><select id="add-inf-level"><option value="S">S</option><option value="A">A</option><option value="B" selected>B</option><option value="C">C</option></select></div>
+            <div class="form-group"><label>达人等级</label><select id="add-inf-level"><option value="S">S级</option><option value="A">A级</option><option value="B" selected>B级</option><option value="C">C级</option><option value="D">D级</option></select></div>
             <div class="form-group"><label>视频号账号名称 *</label><input id="add-inf-name" required placeholder="达人视频号名称"></div>
           </div>
           <div class="form-row">
@@ -7168,6 +7177,10 @@ async function onBatchImportFile(tab, uploadUrl) {
   try {
     const fd = new FormData();
     fd.append('file', f);
+    // 商家需求批量导入：管理员视角，按 Excel 中"图书商家"自动建商家
+    if (tab === 'merchant_demand') {
+      fd.append('merchant_id', 'admin');
+    }
     const token = getAuthToken();
     const resp = await fetch(API_BASE + uploadUrl, {
       method: 'POST', body: fd,
@@ -7175,8 +7188,11 @@ async function onBatchImportFile(tab, uploadUrl) {
     });
     const data = await resp.json();
     if (data.success) {
-      result.innerHTML = `<span style="color:#10b981">✓ 导入成功</span><br><span style="color:#64748b;font-size:12px">${data.message || '已写入数据库'}${data.data && data.data.imported ? ' · ' + data.data.imported + ' 条' : ''}</span>`;
-      showToast('导入成功');
+      const r = data.data || {};
+      const msg = data.message || '已写入数据库';
+      const errs = (r.errors && r.errors.length) ? '<br><span style="color:#f59e0b;font-size:12px">部分行失败：<br>' + r.errors.slice(0, 5).map(e => '• ' + e).join('<br>') + (r.errors.length > 5 ? `<br>... 共 ${r.errors.length} 条错误` : '') + '</span>' : '';
+      result.innerHTML = `<span style="color:#10b981">✓ ${msg}</span>${errs}`;
+      showToast('导入完成');
     } else {
       result.innerHTML = `<span style="color:#ef4444">× 导入失败</span><br><span style="color:#64748b;font-size:12px">${data.error || '未知错误'}</span>`;
     }

@@ -5,7 +5,7 @@ const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { parseChineseNumber, normalizeText, normalizeYesNo } = require('../utils/chineseParser');
+const { parseChineseNumber, normalizeText, normalizeYesNo, normalizeLevel } = require('../utils/chineseParser');
 
 // 配置文件上传
 const uploadDir = path.join(__dirname, '..', 'uploads');
@@ -189,7 +189,7 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
           const salesOwnerId = salesNameToId[salesOwnerText] || null;
 
           const fields = {
-            level: normalizeText(mapped.level),
+            level: normalizeLevel(mapped.level),
             phone: normalizeText(mapped.phone),
             video_category_track: normalizeText(mapped.video_category_track),
             monthly_short_video_sales: parseChineseNumber(mapped.monthly_short_video_sales) || 0,
@@ -742,7 +742,10 @@ router.put('/:id', (req, res) => {
     }
     
     const fields = ['level', 'video_account_name', 'phone', 'video_category_track', 'monthly_short_video_sales', 'monthly_live_sales', 'fans_count', 'cooperation_type', 'book_willingness', 'course_willingness', 'short_video_frequency', 'live_frequency', 'has_mcn', 'mcn_name', 'region', 'has_joined_mutual_select', 'sales_owner', 'official_account_name', 'sales_owner_id'];
-    
+
+    // 写入前对 level 做规范化，避免存入"S级"导致编辑回显匹配不上 S/A/B/C/D 选项
+    if (body.level !== undefined) body.level = normalizeLevel(body.level);
+
     const updates = [];
     const params = [];
     for (const field of fields) {
@@ -821,7 +824,7 @@ router.post('/add', (req, res) => {
         invite_code, invite_status, invited_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      id, level || '', video_account_name, phone || '',
+      id, normalizeLevel(level), video_account_name, phone || '',
       video_category_track || '',
       parseFloat(monthly_short_video_sales) || 0,
       parseFloat(monthly_live_sales) || 0,

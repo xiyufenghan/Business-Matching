@@ -56,4 +56,19 @@ function normalizeYesNo(value, defaultValue = '否') {
   return s;  // 其他原样返回
 }
 
-module.exports = { parseChineseNumber, normalizeText, normalizeYesNo };
+/**
+ * 标准化达人等级：去掉"级"后缀、转大写，仅保留 S/A/B/C/D
+ *   "S级" / "s级" / "S" / "s" → "S"
+ *   "其他" / "" → ""
+ */
+function normalizeLevel(value) {
+  const s = normalizeText(value);
+  if (!s) return '';
+  const upper = s.toUpperCase().replace(/\s+/g, '');
+  // 去掉"级"后缀
+  const base = upper.replace(/级$/, '');
+  if (['S', 'A', 'B', 'C', 'D'].includes(base)) return base;
+  return '';
+}
+
+module.exports = { parseChineseNumber, normalizeText, normalizeYesNo, normalizeLevel };

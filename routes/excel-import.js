@@ -102,8 +102,8 @@ router.get('/template/:type', (req, res) => {
       const headers = BOOK_FIELDS_ORDER;
       const sampleData = [
         headers,
-        ['', '知行图书出版社', '趣味数学思维训练', '小学生,家长', '教育图书', '', '适合6-12岁儿童的数学思维训练', 'https://shop.weixin.qq.com/xxx', '单本', 39.9, 25, 35, '中通快递', 5000, '销售小王'],
-        ['', '启明文化传媒', '经典绘本套装', '幼儿,宝妈,教师', '儿童绘本', '', '获奖绘本合集，3-6岁适读', 'https://shop.weixin.qq.com/yyy', '套组', 128, 30, 40, '顺丰快递', 3000, '销售小李']
+        ['', '知行图书出版社', '趣味数学思维训练', '小学生,家长', '教育图书', '适合6-12岁儿童的数学思维训练', 'https://shop.weixin.qq.com/xxx', '单本', 39.9, 25, 35, '中通快递', 5000, '销售小王'],
+        ['', '启明文化传媒', '经典绘本套装', '幼儿,宝妈,教师', '儿童绘本', '获奖绘本合集，3-6岁适读', 'https://shop.weixin.qq.com/yyy', '套组', 128, 30, 40, '顺丰快递', 3000, '销售小李']
       ];
       const ws = XLSX.utils.aoa_to_sheet(sampleData);
       ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 12) }));
@@ -156,12 +156,40 @@ router.get('/template/:type', (req, res) => {
       const noteWs = XLSX.utils.aoa_to_sheet(noteData);
       noteWs['!cols'] = [{ wch: 18 }, { wch: 50 }, { wch: 10 }];
       XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
+    } else if (type === 'influencer-demand' || type === 'influencer_demand') {
+      // 达人需求批量导入模板（V4.1 新增）
+      const headers = ['视频号账号名称', '需求类型', '图书品类', '图书价格区间', '课程价格区间', '粉丝数', '需求描述'];
+      const sampleData = [
+        headers,
+        ['读书小达人', '图书需求', '科普百科', '20-60', '', 500000, '想找适合6-10岁的科普类图书带货'],
+        ['亲子阅读馆', '图书需求,课程需求', '儿童绘本', '30-80', '500-2000', 800000, '寻找高质量的亲子互动绘本和早教课程']
+      ];
+      const ws = XLSX.utils.aoa_to_sheet(sampleData);
+      ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 14) }));
+      XLSX.utils.book_append_sheet(wb, ws, '达人需求');
+
+      const noteData = [
+        ['字段', '说明', '是否必填'],
+        ['视频号账号名称', '需对应平台已存在的达人，不存在将跳过', '是'],
+        ['需求类型', '可填：图书需求 / 课程需求 / 图书需求,课程需求', '是'],
+        ['图书品类', '如：科普百科 / 儿童绘本 / 文学经典', '否'],
+        ['图书价格区间', '格式：最低-最高，如 20-60', '否'],
+        ['课程价格区间', '格式：最低-最高，如 500-2000', '否'],
+        ['粉丝数', '数值', '否'],
+        ['需求描述', '一句话描述需求', '否']
+      ];
+      const noteWs = XLSX.utils.aoa_to_sheet(noteData);
+      noteWs['!cols'] = [{ wch: 18 }, { wch: 50 }, { wch: 10 }];
+      XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
     } else {
-      return res.status(400).json({ success: false, error: '类型仅支持 book 或 course' });
+      return res.status(400).json({ success: false, error: '类型仅支持 book / course / influencer-demand' });
     }
     
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    const filename = type === 'book' ? '图书需求批量导入模板.xlsx' : '课程需求批量导入模板.xlsx';
+    let filename = '需求批量导入模板.xlsx';
+    if (type === 'book') filename = '图书需求批量导入模板.xlsx';
+    else if (type === 'course') filename = '课程需求批量导入模板.xlsx';
+    else if (type === 'influencer-demand' || type === 'influencer_demand') filename = '达人需求批量导入模板.xlsx';
     
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -399,6 +427,95 @@ router.post('/import/course', upload.single('file'), (req, res) => {
     
     fs.unlinkSync(req.file.path);
     
+    res.json({
+      success: true,
+      data: results,
+      message: `导入完成：成功 ${results.success} 条，失败 ${results.failed} 条`
+    });
+  } catch (err) {
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 上传 Excel - 达人需求（V4.1 新增）
+const INF_DEMAND_FIELD_MAP = {
+  '视频号账号名称': 'video_account_name',
+  '视频号': 'video_account_name',
+  '账号名称': 'video_account_name',
+  '需求类型': 'demand_category',
+  '图书品类': 'book_category',
+  '图书价格区间': 'book_price_range',
+  '课程价格区间': 'course_price_range',
+  '粉丝数': 'fans_count',
+  '粉丝量': 'fans_count',
+  '需求描述': 'description',
+};
+function parsePriceRange(s) {
+  if (!s) return [0, 0];
+  const m = String(s).trim().match(/^([\d.]+)\s*[-~到]\s*([\d.]+)/);
+  if (m) return [parseFloat(m[1]) || 0, parseFloat(m[2]) || 0];
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? [n, n] : [0, 0];
+}
+router.post('/import/influencer-demand', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: '请上传 Excel 文件' });
+    const wb = XLSX.readFile(req.file.path);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (jsonData.length === 0) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ success: false, error: 'Excel 文件为空或格式不正确' });
+    }
+
+    const results = { success: 0, failed: 0, errors: [] };
+    const insertStmt = req.db.prepare(`
+      INSERT INTO influencer_demands (id, influencer_id, video_account_name, demand_category,
+        book_category, book_price_min, book_price_max, course_price_min, course_price_max,
+        description, fans_count, status, operator_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'published', ?)
+    `);
+
+    const importTransaction = req.db.transaction((rows) => {
+      rows.forEach((row, idx) => {
+        try {
+          const mapped = {};
+          for (const [cnKey, enKey] of Object.entries(INF_DEMAND_FIELD_MAP)) {
+            if (row[cnKey] !== undefined && row[cnKey] !== '') mapped[enKey] = row[cnKey];
+          }
+          const accountName = String(mapped.video_account_name || '').trim();
+          if (!accountName) {
+            results.errors.push(`第${idx + 2}行：视频号账号名称为必填`);
+            results.failed++;
+            return;
+          }
+          const inf = req.db.prepare('SELECT id FROM influencers WHERE video_account_name = ?').get(accountName);
+          if (!inf) {
+            results.errors.push(`第${idx + 2}行：达人「${accountName}」不存在，请先导入达人`);
+            results.failed++;
+            return;
+          }
+          const [bMin, bMax] = parsePriceRange(mapped.book_price_range);
+          const [cMin, cMax] = parsePriceRange(mapped.course_price_range);
+          insertStmt.run(uuidv4(), inf.id, accountName,
+            String(mapped.demand_category || '图书需求').trim(),
+            String(mapped.book_category || '').trim(),
+            bMin, bMax, cMin, cMax,
+            String(mapped.description || '').trim(),
+            parseInt(mapped.fans_count) || 0,
+            req.user && req.user.role === 'admin' ? req.user.id : null
+          );
+          results.success++;
+        } catch (e) {
+          results.errors.push(`第${idx + 2}行：${e.message}`);
+          results.failed++;
+        }
+      });
+    });
+    importTransaction(jsonData);
+    fs.unlinkSync(req.file.path);
+
     res.json({
       success: true,
       data: results,
