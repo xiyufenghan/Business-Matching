@@ -144,10 +144,10 @@ function authMiddleware(req, res, next) {
       user = { ...admin, is_super: admin.is_super === 1, role: 'admin' };
     }
   } else if (session.user_type === 'merchant') {
-    const m = db.prepare("SELECT id, name, company, phone, email, industry FROM merchants WHERE id = ? AND status != 'deleted'").get(session.user_id);
+    const m = db.prepare("SELECT id, name, company, phone, email, industry, privacy_consented FROM merchants WHERE id = ? AND status != 'deleted'").get(session.user_id);
     if (m) { user = { ...m, role: 'merchant' }; }
   } else if (session.user_type === 'influencer') {
-    const inf = db.prepare("SELECT id, video_account_name, level, fans_count, invite_status FROM influencers WHERE id = ?").get(session.user_id);
+    const inf = db.prepare("SELECT id, video_account_name, level, fans_count, invite_status, privacy_consented FROM influencers WHERE id = ?").get(session.user_id);
     if (inf) { user = { ...inf, role: 'influencer' }; }
   }
 

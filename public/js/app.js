@@ -1400,6 +1400,7 @@ function renderMerchantDemandRow(d, isInfluencer, showSales) {
       <span class="demand-row-date">${formatDate(d.created_at)}</span>
       <div class="demand-row-actions">
         ${isInfluencer ? `<button class="btn btn-xs btn-primary" onclick="applyCooperation('${d.id}','${d.merchant_id}')">申请合作</button>` : ''}
+        ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-xs btn-outline" onclick="showDemandImagesModal('${d.demand_type}','${d.ref_demand_id}','${escapeHtml(d.title || d.book_name || d.course_name || '')}')">📷 图片(${getImageCount(d)}/3)</button>` : ''}
         ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-xs btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">编辑</button>` : ''}
         ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? renderArchiveBtns(d.demand_type, d.ref_demand_id, d.status) : ''}
         ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-xs btn-danger-outline" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
@@ -6249,11 +6250,11 @@ async function renderDemandPlaza() {
     categoryFromData.unshift(demandPlazaState.category);
   }
 
-  // 角色对应的引导语
+  // 角色对应的引导语（V5：明确告知"广场不展示自己发的需求"，避免误判为空）
   const hints = {
-    admin: '你可以在此发布平台代发需求（归为「腾讯营销」），也可管理全部需求',
-    merchant: '这里展示 达人发布的带货意向 + 腾讯营销代发需求，对感兴趣的点"响应"即可发起合作',
-    influencer: '这里展示 商家发布的需求 + 腾讯营销代发需求，对感兴趣的点"有意向"即可发起合作'
+    admin: '管理员视角，可查看全部需求 · 也可点右上角"+代发需求"代商家发布',
+    merchant: '🔍 仅展示「达人带货意向」+「腾讯营销代发需求」<br>👉 <strong>你自己发布的需求请到「我的需求」查看与管理</strong>',
+    influencer: '🔍 仅展示「商家发布的需求」+「腾讯营销代发需求」<br>👉 <strong>你自己发布的带货意向请到「我的需求」查看</strong>'
   };
 
   const canPublish = (role === 'admin' || role === 'merchant' || role === 'influencer');
@@ -6271,7 +6272,7 @@ async function renderDemandPlaza() {
       <div class="plaza-header">
         <div>
           <h2 style="font-size:22px;margin:0;color:#1e293b">需求广场</h2>
-          <p style="font-size:13px;color:#64748b;margin:6px 0 0">${hints[role]}</p>
+          <div style="font-size:13px;color:#64748b;margin:8px 0 0;line-height:1.7;background:#f8fafc;padding:10px 14px;border-radius:8px;border-left:3px solid #2563eb">${hints[role]}</div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <input type="text" id="plaza-kw" placeholder="搜索标题/描述" value="${escapeHtml(demandPlazaState.keyword)}" onkeydown="if(event.key==='Enter')plazaSearch()" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;width:220px;">
@@ -6320,7 +6321,16 @@ async function renderDemandPlaza() {
       </div>
 
       <div class="plaza-grid">
-        ${list.length === 0 ? '<div class="empty-state" style="grid-column:1/-1;padding:60px"><p>暂无需求</p></div>' :
+        ${list.length === 0 ? `<div class="empty-state" style="grid-column:1/-1;padding:60px;text-align:center">
+          <p style="font-size:15px;color:#64748b;margin-bottom:8px">${activeCnt > 0 ? '当前筛选条件下没有匹配的需求' : '暂无符合条件的需求'}</p>
+          <p style="font-size:13px;color:#94a3b8;line-height:1.6">${role === 'merchant'
+            ? '此处仅展示<strong style="color:#475569">达人发布的带货意向</strong>和<strong style="color:#475569">腾讯营销代发的需求</strong>，<br>你自己的需求可在「我的需求」中查看与管理。'
+            : (role === 'influencer'
+              ? '此处仅展示<strong style="color:#475569">商家发布的需求</strong>和<strong style="color:#475569">腾讯营销代发的需求</strong>，<br>你自己的带货意向可在「我的需求」中查看。'
+              : '可点击右上角"代发需求"为商家代发，或等待商家/达人主动发布。')}
+          </p>
+          ${activeCnt > 0 ? '<button class="btn btn-sm btn-outline" style="margin-top:14px" onclick="resetPlazaFilter()">清除筛选</button>' : ''}
+        </div>` :
           list.map(item => renderPlazaCard(item)).join('')}
       </div>
 
