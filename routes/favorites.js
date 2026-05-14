@@ -77,7 +77,7 @@ router.get('/', (req, res) => {
     res.json({ success: true, data: { entities, demands, total: favs.length } });
   } catch (err) {
     console.error('[favorites/get]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -107,7 +107,7 @@ router.post('/', (req, res) => {
     res.status(201).json({ success: true, message: '收藏成功', data: { id } });
   } catch (err) {
     console.error('[favorites/post]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -125,7 +125,7 @@ router.delete('/', (req, res) => {
     res.json({ success: true, message: r.changes > 0 ? '已取消收藏' : '本就未收藏', data: { changes: r.changes } });
   } catch (err) {
     console.error('[favorites/delete]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -140,7 +140,8 @@ router.get('/check', (req, res) => {
     `).get(req.user.role, req.user.id, target_type, target_id);
     res.json({ success: true, data: { favorited: !!r } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/favorites.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -155,7 +156,8 @@ router.get('/ids', (req, res) => {
     `).all(req.user.role, req.user.id);
     res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/favorites.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

@@ -387,9 +387,38 @@ function initDatabase() {
       token TEXT UNIQUE NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME,
       client_info TEXT
     )
   `);
+  // V5 兼容老库：sessions 表补 expires_at 字段
+  try {
+    const sCols = db.prepare('PRAGMA table_info(sessions)').all().map(c => c.name);
+    if (!sCols.includes('expires_at')) {
+      db.exec('ALTER TABLE sessions ADD COLUMN expires_at DATETIME');
+      // 为已有 session 设置 30 天后过期（避免立即全员退出）
+      db.exec("UPDATE sessions SET expires_at = datetime('now', '+30 days') WHERE expires_at IS NULL");
+    }
+  } catch (e) { console.error('[DB sessions.expires_at]', e.message); }
+
+  // V5 安全加固：admins/merchants/influencers 加 password_hash 字段
+  try {
+    for (const t of ['admins', 'merchants', 'influencers']) {
+      const cols = db.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name);
+      if (!cols.includes('password_hash')) {
+        db.exec(`ALTER TABLE ${t} ADD COLUMN password_hash TEXT`);
+      }
+    }
+  } catch (e) { console.error('[DB password_hash]', e.message); }
+
+  // V5 索引加固
+  try {
+    db.exec('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_type, user_id, is_read)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_type, user_id)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_demands_ref ON demands(ref_demand_id, demand_type, status)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)');
+  } catch (e) { console.error('[DB indexes]', e.message); }
 
   // 撮合历史记录表
   db.exec(`

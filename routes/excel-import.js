@@ -196,7 +196,8 @@ router.get('/template/:type', (req, res) => {
     });
     res.send(buf);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/excel-import.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -315,7 +316,7 @@ router.post('/import/book', upload.single('file'), (req, res) => {
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -432,7 +433,7 @@ router.post('/import/course', upload.single('file'), (req, res) => {
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -521,7 +522,7 @@ router.post('/import/influencer-demand', upload.single('file'), (req, res) => {
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -542,7 +543,8 @@ router.get('/book', (req, res) => {
     const data = req.db.prepare(sql).all(...params);
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/excel-import.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -563,7 +565,8 @@ router.get('/course', (req, res) => {
     const data = req.db.prepare(sql).all(...params);
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/excel-import.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -577,7 +580,8 @@ router.delete('/book/:id', (req, res) => {
     cleanupDemandImages(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/excel-import.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -589,7 +593,8 @@ router.delete('/course/:id', (req, res) => {
     cleanupDemandImages(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/excel-import.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

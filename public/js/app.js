@@ -3185,7 +3185,7 @@ async function handleInfluencerExcelUpload(e) {
     if (data.success) {
       resultDiv.innerHTML = `<div class="import-result-box success">
         V ${data.message}
-        ${data.data.errors && data.data.errors.length> 0 ? `<div class="result-errors">${data.data.errors.slice(0, 5).join('<br>')}</div>` : ''}
+        ${data.data.errors && data.data.errors.length> 0 ? `<div class="result-errors">${data.data.errors.slice(0, 5).map(escapeHtml).join('<br>')}</div>` : ''}
       </div>`;
       showToast(`达人导入成功！成功${data.data.success}条`);
       // 根据当前所在模块决定刷新哪个页面
@@ -3199,7 +3199,7 @@ async function handleInfluencerExcelUpload(e) {
       showToast(data.error || '导入失败', 'error');
     }
   } catch (err) {
-    resultDiv.innerHTML = `<div class="import-result-box error">上传失败：${err.message}</div>`;
+    resultDiv.innerHTML = `<div class="import-result-box error">上传失败：${escapeHtml(err.message)}</div>`;
     showToast('上传失败: ' + err.message, 'error');
   }
   e.target.value = '';
@@ -4076,7 +4076,7 @@ async function handleExcelUpload(e) {
       const failed = data.data?.failed || 0;
       let html = `<div class="import-result-box success">V ${data.message || '导入成功！共导入 ' + count + ' 条记录'}</div>`;
       if (data.data?.errors && data.data.errors.length> 0) {
-        html += `<div class="result-errors" style="margin-top:8px;font-size:12px;color:#991b1b">${data.data.errors.slice(0, 5).join('<br>')}</div>`;
+        html += `<div class="result-errors" style="margin-top:8px;font-size:12px;color:#991b1b">${data.data.errors.slice(0, 5).map(escapeHtml).join('<br>')}</div>`;
       }
       resultDiv.innerHTML = html;
       showToast(`导入成功！成功${count}条${failed> 0 ? '，失败' + failed + '条' : ''}`);
@@ -4085,7 +4085,7 @@ async function handleExcelUpload(e) {
       showToast(data.error || '导入失败', 'error');
     }
   } catch (err) {
-    resultDiv.innerHTML = `<div class="import-result-box error">上传失败：${err.message}</div>`;
+    resultDiv.innerHTML = `<div class="import-result-box error">上传失败：${escapeHtml(err.message)}</div>`;
     showToast('上传失败: ' + err.message, 'error');
   }
   e.target.value = '';
@@ -5638,7 +5638,7 @@ async function handleMerchantExcelUpload(e) {
     });
     const data = await res.json();
     if (!data.success) {
-      resultEl.innerHTML = `<div style="padding:12px;background:#fee2e2;color:#b91c1c;border-radius:6px;font-size:13px">${data.error || '导入失败'}</div>`;
+      resultEl.innerHTML = `<div style="padding:12px;background:#fee2e2;color:#b91c1c;border-radius:6px;font-size:13px">${escapeHtml(data.error || '导入失败')}</div>`;
       return;
     }
     const r = data.data;
@@ -5666,7 +5666,7 @@ async function handleMerchantExcelUpload(e) {
     // 刷新列表
     renderMerchantManage();
   } catch (err) {
-    resultEl.innerHTML = `<div style="padding:12px;background:#fee2e2;color:#b91c1c;border-radius:6px;font-size:13px">网络错误：${err.message}</div>`;
+    resultEl.innerHTML = `<div style="padding:12px;background:#fee2e2;color:#b91c1c;border-radius:6px;font-size:13px">网络错误：${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -6233,7 +6233,7 @@ async function renderDemandPlaza() {
   if (demandPlazaState.category) qs.append('category', demandPlazaState.category);
   const res = await fetchAPI('/demands/plaza?' + qs.toString());
   if (!res.success) {
-    container.innerHTML = `<div class="empty-state"><p>加载失败：${res.error || '未知错误'}</p></div>`;
+    container.innerHTML = `<div class="empty-state"><p>加载失败：${escapeHtml(res.error || '未知错误')}</p></div>`;
     return;
   }
   const list = res.data || [];
@@ -6699,7 +6699,7 @@ async function renderCooperationManage() {
   const endpoint = role === 'merchant' ? `/cooperation/merchant/${currentUser.id}` : `/cooperation/influencer/${currentUser.id}`;
   const res = await fetchAPI(endpoint);
   if (!res.success) {
-    container.innerHTML = `<div class="empty-state"><p>加载失败：${res.error || '未知'}</p></div>`;
+    container.innerHTML = `<div class="empty-state"><p>加载失败：${escapeHtml(res.error || '未知')}</p></div>`;
     return;
   }
   let list = res.data || [];
@@ -7019,7 +7019,7 @@ async function renderFavorites() {
   const container = document.getElementById('page-container');
   await loadFavoriteIds();
   const r = await fetchAPI('/favorites');
-  if (!r.success) { container.innerHTML = `<div class="error-tip">${r.error}</div>`; return; }
+  if (!r.success) { container.innerHTML = `<div class="error-tip">${escapeHtml(r.error)}</div>`; return; }
   const { entities, demands, total } = r.data;
   const tab = window.__favTab || 'demands';
 
@@ -7225,14 +7225,14 @@ async function onBatchImportFile(tab, uploadUrl) {
     if (data.success) {
       const r = data.data || {};
       const msg = data.message || '已写入数据库';
-      const errs = (r.errors && r.errors.length) ? '<br><span style="color:#f59e0b;font-size:12px">部分行失败：<br>' + r.errors.slice(0, 5).map(e => '• ' + e).join('<br>') + (r.errors.length > 5 ? `<br>... 共 ${r.errors.length} 条错误` : '') + '</span>' : '';
+      const errs = (r.errors && r.errors.length) ? '<br><span style="color:#f59e0b;font-size:12px">部分行失败：<br>' + r.errors.slice(0, 5).map(e => '• ' + escapeHtml(e)).join('<br>') + (r.errors.length > 5 ? `<br>... 共 ${r.errors.length} 条错误` : '') + '</span>' : '';
       result.innerHTML = `<span style="color:#10b981">✓ ${msg}</span>${errs}`;
       showToast('导入完成');
     } else {
-      result.innerHTML = `<span style="color:#ef4444">× 导入失败</span><br><span style="color:#64748b;font-size:12px">${data.error || '未知错误'}</span>`;
+      result.innerHTML = `<span style="color:#ef4444">× 导入失败</span><br><span style="color:#64748b;font-size:12px">${escapeHtml(data.error || '未知错误')}</span>`;
     }
   } catch (e) {
-    result.innerHTML = `<span style="color:#ef4444">× 上传出错：${e.message}</span>`;
+    result.innerHTML = `<span style="color:#ef4444">× 上传出错：${escapeHtml(e.message)}</span>`;
   }
   fileInput.value = '';
 }

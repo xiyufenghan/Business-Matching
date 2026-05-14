@@ -147,7 +147,8 @@ router.get('/', (req, res) => {
       pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -257,7 +258,8 @@ router.get('/influencer-demands', (req, res) => {
       pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -281,7 +283,8 @@ router.post('/influencer-demands', (req, res) => {
     const demand = req.db.prepare('SELECT * FROM influencer_demands WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: demand, message: '达人需求发布成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -291,7 +294,8 @@ router.delete('/influencer-demands/:id', (req, res) => {
     req.db.prepare('DELETE FROM influencer_demands WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -312,7 +316,8 @@ router.get('/filter-options', (req, res) => {
     const salesRows = req.db.prepare(`SELECT id, name FROM admins WHERE admin_role = '销售' ORDER BY name`).all();
     res.json({ success: true, data: { book_categories: bookCategories, grade_levels: gradeLevels, sales_list: salesRows } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -340,7 +345,8 @@ router.get('/:id', (req, res, next) => {
     
     res.json({ success: true, data: { ...demand, detail } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -390,7 +396,8 @@ router.post('/recommend', (req, res) => {
     
     res.json({ success: true, data: scored });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -415,7 +422,8 @@ router.post('/book', (req, res) => {
     
     res.status(201).json({ success: true, message: '图书需求发布成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -441,7 +449,8 @@ router.post('/course', (req, res) => {
     
     res.status(201).json({ success: true, message: '课程需求发布成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -488,7 +497,8 @@ router.post('/', (req, res) => {
       res.status(201).json({ success: true, data: demand });
     }
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -519,7 +529,8 @@ router.post('/order', (req, res) => {
     
     res.status(201).json({ success: true, message: '接单成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -537,7 +548,8 @@ router.post('/batch-delete', (req, res) => {
     req.db.prepare(`DELETE FROM demands WHERE id IN (${placeholders})`).run(...ids);
     res.json({ success: true, message: `成功删除 ${ids.length} 条需求` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -559,7 +571,8 @@ router.delete('/all/clear', (req, res) => {
     }
     res.json({ success: true, message: '所有需求已清空' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -577,7 +590,8 @@ router.post('/influencer-demands/batch-delete', (req, res) => {
     req.db.prepare(`DELETE FROM influencer_demands WHERE id IN (${placeholders})`).run(...ids);
     res.json({ success: true, message: `成功删除 ${ids.length} 条达人需求` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -595,7 +609,8 @@ router.delete('/influencer-demands/all/clear', (req, res) => {
     }
     res.json({ success: true, message: '所有达人需求已清空' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -605,7 +620,8 @@ router.delete('/:id', (req, res) => {
     req.db.prepare('DELETE FROM demands WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -637,7 +653,8 @@ router.put('/book/:id', (req, res) => {
     const updated = req.db.prepare('SELECT * FROM book_demands WHERE id = ?').get(id);
     res.json({ success: true, data: updated, message: '图书需求更新成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -669,7 +686,8 @@ router.put('/course/:id', (req, res) => {
     const updated = req.db.prepare('SELECT * FROM course_demands WHERE id = ?').get(id);
     res.json({ success: true, data: updated, message: '课程需求更新成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -700,7 +718,8 @@ router.put('/influencer-demands/:id', (req, res) => {
     const updated = req.db.prepare('SELECT * FROM influencer_demands WHERE id = ?').get(id);
     res.json({ success: true, data: updated, message: '达人需求更新成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -866,7 +885,8 @@ router.get('/plaza', (req, res) => {
       pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -901,7 +921,8 @@ router.put('/influencer-demands/:id/pin', (req, res) => {
     req.db.prepare("UPDATE influencer_demands SET pinned_at = datetime('now') WHERE id = ?").run(id);
     res.json({ success: true, message: '置顶成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -911,7 +932,8 @@ router.put('/influencer-demands/:id/unpin', (req, res) => {
     req.db.prepare('UPDATE influencer_demands SET pinned_at = NULL WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '已取消置顶' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -938,7 +960,7 @@ router.put('/:type/:id/pin', (req, res) => {
     res.json({ success: true, message: '置顶成功' });
   } catch (err) {
     console.error('[demands/pin]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -952,7 +974,8 @@ router.put('/:type/:id/unpin', (req, res) => {
     req.db.prepare(`UPDATE ${tbl} SET pinned_at = NULL WHERE id = ?`).run(id);
     res.json({ success: true, message: '已取消置顶' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -975,7 +998,7 @@ router.put('/:type/:id/archive', (req, res) => {
     res.json({ success: true, message: '已下架' });
   } catch (err) {
     console.error('[demands/archive]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -995,7 +1018,8 @@ router.put('/:type/:id/unarchive', (req, res) => {
     }
     res.json({ success: true, message: '已恢复上架' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demands.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -1028,7 +1052,7 @@ router.post('/:type/:id/duplicate', (req, res) => {
     res.status(201).json({ success: true, message: '复制成功', data: { id: newId } });
   } catch (err) {
     console.error('[demands/duplicate]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

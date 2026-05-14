@@ -131,7 +131,8 @@ router.get('/excel/template', (req, res) => {
     });
     res.send(buf);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -253,7 +254,7 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -459,7 +460,8 @@ router.get('/', (req, res) => {
       pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -560,7 +562,8 @@ router.get('/filter-options', (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -621,7 +624,8 @@ router.get('/export', (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -650,7 +654,8 @@ router.get('/hero-stats', (req, res) => {
       data: { total, levels, mcnCount, mutualCount, newCount, highSales }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -697,7 +702,8 @@ router.post('/recommend', (req, res) => {
     
     res.json({ success: true, data: scored });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -708,7 +714,8 @@ router.get('/:id', (req, res) => {
     if (!influencer) return res.status(404).json({ success: false, error: '达人不存在' });
     res.json({ success: true, data: influencer });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -767,7 +774,8 @@ router.put('/:id', (req, res) => {
     const updated = req.db.prepare('SELECT * FROM influencers WHERE id = ?').get(id);
     res.json({ success: true, data: updated, message: '更新成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -842,7 +850,8 @@ router.post('/add', (req, res) => {
     const newInf = req.db.prepare('SELECT * FROM influencers WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: newInf, invite_code: inviteCode });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -863,7 +872,8 @@ router.post('/batch-delete', (req, res) => {
     req.db.prepare(`DELETE FROM influencers WHERE id IN (${placeholders})`).run(...ids);
     res.json({ success: true, message: `成功删除 ${ids.length} 位达人` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -882,7 +892,8 @@ router.delete('/:id', (req, res) => {
     req.db.prepare("UPDATE influencers SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
     res.json({ success: true, message: '达人已删除（软删除，可恢复）' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -892,7 +903,8 @@ router.put('/:id/restore', (req, res) => {
     req.db.prepare("UPDATE influencers SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
     res.json({ success: true, message: '达人已恢复' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -909,7 +921,8 @@ router.get('/:id/invite-code', (req, res) => {
     }
     res.json({ success: true, data: { code, video_account_name: inf.video_account_name } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -923,7 +936,8 @@ router.put('/:id/invite-status', (req, res) => {
     req.db.prepare('UPDATE influencers SET invite_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(invite_status, req.params.id);
     res.json({ success: true, message: invite_status === 'active' ? '已启用' : '已停用' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -931,10 +945,13 @@ router.put('/:id/invite-status', (req, res) => {
 router.put('/:id/reset-password', (req, res) => {
   try {
     const newPwd = req.body.password || '123456';
-    req.db.prepare('UPDATE influencers SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newPwd, req.params.id);
+    const bcrypt = require('bcryptjs');
+    const hash = bcrypt.hashSync(newPwd, 10);
+    req.db.prepare("UPDATE influencers SET password_hash = ?, password = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(hash, req.params.id);
     res.json({ success: true, message: `密码已重置为 ${newPwd}` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[influencers/reset-password]', err);
+    res.status(500).json({ success: false, error: '操作失败' });
   }
 });
 
@@ -979,7 +996,8 @@ router.get('/plaza', (req, res) => {
     const data = req.db.prepare(sql).all(...params);
     res.json({ success: true, data, pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/influencers.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

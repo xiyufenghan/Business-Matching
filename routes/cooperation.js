@@ -87,7 +87,8 @@ router.post('/invite', (req, res) => {
 
     res.status(201).json({ success: true, message: '邀请已发送', data: { id } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -131,7 +132,8 @@ router.post('/apply', (req, res) => {
 
     res.status(201).json({ success: true, message: '申请已发送', data: { id } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -180,7 +182,8 @@ router.put('/confirm/:id', (req, res) => {
       data: { matchmaking_id: incubateResult.matchmaking_id || null, incubated: !!incubateResult.incubated }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -191,7 +194,8 @@ router.put('/reject/:id', (req, res) => {
     req.db.prepare("UPDATE cooperation SET status = 'rejected', updated_at = datetime('now') WHERE id = ?").run(id);
     res.json({ success: true, message: '已拒绝合作' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -241,7 +245,8 @@ router.get('/merchant/:merchantId', (req, res) => {
     }
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -287,7 +292,8 @@ router.get('/influencer/:influencerId', (req, res) => {
     }
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -411,7 +417,8 @@ router.get('/matchmaking', (req, res) => {
       pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -466,7 +473,8 @@ router.get('/matchmaking/stats', (req, res) => {
 
     res.json({ success: true, data: { stages, sources, sourceTypes, total, totalGmv, dealCount } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -524,7 +532,8 @@ router.post('/matchmaking', (req, res) => {
     `).get(id);
     res.status(201).json({ success: true, data: record, message: '撮合记录创建成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -546,7 +555,8 @@ router.put('/matchmaking/:id/stage', (req, res) => {
     
     res.json({ success: true, message: `已流转到「${stage}」阶段` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -635,7 +645,8 @@ router.put('/matchmaking/:id', (req, res) => {
     
     res.json({ success: true, data: updated, message: '撮合记录已更新' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -678,7 +689,8 @@ router.get('/matchmaking/:id', (req, res) => {
 
     res.json({ success: true, data: { ...record, history, cooperation } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -689,7 +701,8 @@ router.delete('/matchmaking/:id', (req, res) => {
     req.db.prepare('DELETE FROM matchmaking WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -779,7 +792,8 @@ router.get('/matchmaking/suggest/products', (req, res) => {
     }
     res.json({ success: true, data: dedup });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -829,7 +843,8 @@ router.get('/matchmaking/suggest/influencers', (req, res) => {
 
     res.json({ success: true, data: list });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/cooperation.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

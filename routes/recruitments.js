@@ -93,7 +93,8 @@ router.get('/', (req, res) => {
       pagination: { page: currentPage, pageSize: size, total, totalPages: Math.ceil(total / size) }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/recruitments.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -111,7 +112,8 @@ router.get('/:id', (req, res) => {
     if (!r) return res.status(404).json({ success: false, error: '招募需求不存在' });
     res.json({ success: true, data: r });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/recruitments.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -147,7 +149,8 @@ router.post('/', (req, res) => {
     const created = req.db.prepare('SELECT * FROM merchant_recruitments WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: created, message: '招募需求发布成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/recruitments.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -182,7 +185,8 @@ router.put('/:id', (req, res) => {
     const updated = req.db.prepare('SELECT * FROM merchant_recruitments WHERE id = ?').get(id);
     res.json({ success: true, data: updated, message: '招募需求已更新' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/recruitments.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -192,7 +196,8 @@ router.delete('/:id', (req, res) => {
     req.db.prepare('DELETE FROM merchant_recruitments WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/recruitments.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -210,7 +215,8 @@ router.delete('/all/clear', (req, res) => {
     }
     res.json({ success: true, message: '已清空' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/recruitments.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

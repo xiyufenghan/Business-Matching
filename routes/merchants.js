@@ -92,7 +92,8 @@ router.get('/manage-stats', (req, res) => {
       data: { total, withSales, newCount, activeCount, industries }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -166,7 +167,8 @@ router.get('/', (req, res) => {
       res.json({ success: true, data: rows });
     }
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -216,7 +218,8 @@ router.get('/export', (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -256,7 +259,8 @@ router.get('/excel/template', (req, res) => {
     });
     res.send(buf);
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -349,7 +353,7 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
     });
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -368,7 +372,8 @@ router.get('/:id', (req, res) => {
     if (!merchant) return res.status(404).json({ success: false, error: '商家不存在' });
     res.json({ success: true, data: merchant });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -405,7 +410,8 @@ router.post('/', (req, res) => {
     const merchant = req.db.prepare('SELECT * FROM merchants WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: merchant, invite_code: inviteCode });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -446,7 +452,8 @@ router.put('/:id', (req, res) => {
     const updated = req.db.prepare('SELECT * FROM merchants WHERE id = ?').get(id);
     res.json({ success: true, data: updated, message: '商家信息已更新' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -479,7 +486,8 @@ router.delete('/:id', (req, res) => {
     req.db.prepare("UPDATE merchants SET status = 'deleted', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(id);
     res.json({ success: true, message: '商家已删除（软删除，可恢复）' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -489,7 +497,8 @@ router.put('/:id/restore', (req, res) => {
     req.db.prepare("UPDATE merchants SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(req.params.id);
     res.json({ success: true, message: '商家已恢复' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -497,10 +506,13 @@ router.put('/:id/restore', (req, res) => {
 router.put('/:id/reset-password', (req, res) => {
   try {
     const newPwd = req.body.password || '123456';
-    req.db.prepare('UPDATE merchants SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newPwd, req.params.id);
+    const bcrypt = require('bcryptjs');
+    const hash = bcrypt.hashSync(newPwd, 10);
+    req.db.prepare("UPDATE merchants SET password_hash = ?, password = '', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(hash, req.params.id);
     res.json({ success: true, message: `密码已重置为 ${newPwd}` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[merchants/reset-password]', err);
+    res.status(500).json({ success: false, error: '操作失败' });
   }
 });
 
@@ -518,7 +530,8 @@ router.get('/:id/invite-code', (req, res) => {
     }
     res.json({ success: true, data: { code, company: m.company, name: m.name, phone: m.phone } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -532,7 +545,8 @@ router.put('/:id/invite-status', (req, res) => {
     req.db.prepare('UPDATE merchants SET invite_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(invite_status, req.params.id);
     res.json({ success: true, message: invite_status === 'active' ? '已启用' : '已停用' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/merchants.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

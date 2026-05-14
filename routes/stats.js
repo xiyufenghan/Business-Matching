@@ -114,7 +114,8 @@ router.get('/', (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/stats.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -183,7 +184,7 @@ router.get('/dashboard', (req, res) => {
     });
   } catch (err) {
     console.error('[stats/dashboard]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -222,7 +223,7 @@ router.get('/funnel', (req, res) => {
     res.json({ success: true, data: funnel });
   } catch (err) {
     console.error('[stats/funnel]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -276,7 +277,7 @@ router.get('/trend', (req, res) => {
     res.json({ success: true, data: trend });
   } catch (err) {
     console.error('[stats/trend]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -325,7 +326,7 @@ router.get('/distribution', (req, res) => {
     res.json({ success: true, data: { typeStats, categoryStats, levelStats, fansBuckets } });
   } catch (err) {
     console.error('[stats/distribution]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -351,7 +352,7 @@ router.get('/sales-ranking', (req, res) => {
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error('[stats/sales-ranking]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -420,7 +421,7 @@ router.get('/top-entities', (req, res) => {
     });
   } catch (err) {
     console.error('[stats/top-entities]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -456,7 +457,7 @@ router.get('/timeline', (req, res) => {
     res.json({ success: true, data: events });
   } catch (err) {
     console.error('[stats/timeline]', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -478,7 +479,8 @@ router.get('/influencer-levels', (req, res) => {
     const total = req.db.prepare(`SELECT COUNT(*) as count FROM influencers WHERE 1=1${opFilter}`).get(...opParams).count;
     res.json({ success: true, data: { levelStats, total } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/stats.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -529,7 +531,8 @@ router.get('/matchmaking-overview', (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/stats.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -578,7 +581,8 @@ router.get('/matchmaking-detail', (req, res) => {
     const data = req.db.prepare(sql).all();
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/stats.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

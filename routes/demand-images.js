@@ -70,7 +70,8 @@ router.get('/:type/:id/images', (req, res) => {
     const images = parseImages(demand.images);
     res.json({ success: true, data: { images, max: MAX_IMAGES } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demand-images.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -120,7 +121,8 @@ router.post('/:type/:id/images', upload.array('files', MAX_IMAGES), (req, res) =
 
     res.json({ success: true, data: { images: merged }, message: `成功上传 ${files.length} 张图片` });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demand-images.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -153,7 +155,8 @@ router.delete('/:type/:id/images/:idx', (req, res) => {
 
     res.json({ success: true, data: { images }, message: '已删除' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/demand-images.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

@@ -21,7 +21,8 @@ router.get('/stats', (req, res) => {
 
     res.json({ success: true, data: { total, active, roles, perEmployee } });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/admins.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -55,7 +56,8 @@ router.get('/', (req, res) => {
 
     res.json({ success: true, data: enriched });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/admins.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -102,7 +104,8 @@ router.post('/', (req, res) => {
 
     res.json({ success: true, data: { id, username, name }, message: '员工创建成功' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/admins.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -151,7 +154,8 @@ router.put('/:id', (req, res) => {
 
     res.json({ success: true, message: '员工信息已更新' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/admins.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -176,18 +180,22 @@ router.delete('/:id', (req, res) => {
     req.db.prepare('DELETE FROM admins WHERE id = ?').run(req.params.id);
     res.json({ success: true, message: '员工已删除' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/admins.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
 // 重置密码
 router.post('/:id/reset-password', (req, res) => {
   try {
-    const { password } = req.body;
-    req.db.prepare("UPDATE admins SET password = ?, updated_at = datetime('now') WHERE id = ?").run(password || '123456', req.params.id);
+    const newPwd = req.body.password || '123456';
+    const bcrypt = require('bcryptjs');
+    const hash = bcrypt.hashSync(newPwd, 10);
+    req.db.prepare("UPDATE admins SET password_hash = ?, password = '', updated_at = datetime('now') WHERE id = ?").run(hash, req.params.id);
     res.json({ success: true, message: '密码已重置' });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[admins/reset-password]', err);
+    res.status(500).json({ success: false, error: '操作失败' });
   }
 });
 

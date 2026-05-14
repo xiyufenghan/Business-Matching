@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
+const BCRYPT_COST = 10;
 
 // 工具：脱敏显示名字（张三 → 张*；人民邮电出版社 → 人民**出版社）
 function maskName(name) {
@@ -45,7 +47,8 @@ router.get('/validate', (req, res) => {
     }
     res.json({ success: true, data });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/invitations.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 
@@ -66,6 +69,9 @@ router.post('/activate', (req, res) => {
       return res.status(400).json({ success: false, error: '该邀请已失效（账号可能已激活或停用）' });
     }
 
+    // V5: 密码哈希存储（不再写明文）
+    const pwdHash = bcrypt.hashSync(password, BCRYPT_COST);
+
     // 身份验证：公司名/达人账号名必须完全匹配
     const trimVal = verify_value.trim();
     let loginUsername = '';
@@ -75,10 +81,10 @@ router.post('/activate', (req, res) => {
       }
       req.db.prepare(`
         UPDATE merchants
-        SET password = ?, invite_status = 'active', activated_at = datetime('now'),
+        SET password_hash = ?, password = '', invite_status = 'active', activated_at = datetime('now'),
             status = 'active', updated_at = datetime('now')
         WHERE id = ?
-      `).run(password, rec.id);
+      `).run(pwdHash, rec.id);
       loginUsername = rec.phone || '';
     } else {
       if (trimVal !== (rec.video_account_name || '').trim()) {
@@ -86,10 +92,10 @@ router.post('/activate', (req, res) => {
       }
       req.db.prepare(`
         UPDATE influencers
-        SET password = ?, invite_status = 'active', activated_at = datetime('now'),
+        SET password_hash = ?, password = '', invite_status = 'active', activated_at = datetime('now'),
             updated_at = datetime('now')
         WHERE id = ?
-      `).run(password, rec.id);
+      `).run(pwdHash, rec.id);
       loginUsername = rec.video_account_name || '';
     }
 
@@ -99,7 +105,8 @@ router.post('/activate', (req, res) => {
       data: { login_username: loginUsername, kind: rec.kind }
     });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[' + "routes/invitations.js" + ']', err);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

@@ -1,18 +1,66 @@
 const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
+const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
 const { initDatabase } = require('./db/init');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SESSION_TTL_DAYS = 7;
+const BCRYPT_COST = 10;
 
 // 初始化数据库
 const db = initDatabase();
+
+// 启动定时清理：每小时一次过期 session 清理
+setInterval(() => {
+  try {
+    const r = db.prepare("DELETE FROM sessions WHERE expires_at IS NOT NULL AND datetime(expires_at) < datetime('now')").run();
+    if (r.changes > 0) console.log('[sessions cleanup] 清理过期会话:', r.changes);
+  } catch (e) { console.error('[sessions cleanup]', e.message); }
+}, 3600 * 1000);
 
 // ====== 工具函数 ======
 function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
+
+/**
+ * 密码验证：兼容老明文 + 新 bcrypt 哈希
+ * 首次匹配明文成功后自动升级为 bcrypt hash
+ * @returns {boolean} 是否验证通过
+ */
+function verifyPassword(input, row, table) {
+  if (!row || !input) return false;
+  // 优先比较 password_hash（已升级）
+  if (row.password_hash) {
+    try { return bcrypt.compareSync(input, row.password_hash); } catch (e) { return false; }
+  }
+  // 兼容老明文
+  if (row.password && row.password === input) {
+    // 自动升级：写 hash，清掉明文
+    try {
+      const hash = bcrypt.hashSync(input, BCRYPT_COST);
+      db.prepare(`UPDATE ${table} SET password_hash = ?, password = '' WHERE id = ?`).run(hash, row.id);
+    } catch (e) { /* 升级失败不影响本次登录 */ }
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 将密码哈希后写入指定表/行（用于注册、激活、改密码）
+ */
+function setPasswordHash(table, id, plainPwd) {
+  const hash = bcrypt.hashSync(plainPwd, BCRYPT_COST);
+  db.prepare(`UPDATE ${table} SET password_hash = ?, password = '' WHERE id = ?`).run(hash, id);
+}
+
+// 暴露给路由使用
+app.locals.bcrypt = bcrypt;
+app.locals.setPasswordHash = setPasswordHash;
+app.locals.BCRYPT_COST = BCRYPT_COST;
 
 function generateId() {
   return crypto.randomUUID();
@@ -49,14 +97,20 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ success: false, error: '未登录，请重新登录', code: 'UNAUTHORIZED' });
   }
 
-  // 在 sessions 表中查找 token
-  const session = db.prepare("SELECT * FROM sessions WHERE token = ?").get(token);
+  // 在 sessions 表中查找 token（V5：含过期判定）
+  const session = db.prepare(`
+    SELECT * FROM sessions
+    WHERE token = ?
+      AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))
+  `).get(token);
   if (!session) {
     return res.status(401).json({ success: false, error: '登录已过期，请重新登录', code: 'TOKEN_INVALID' });
   }
 
-  // 更新最后活跃时间
-  try { db.prepare("UPDATE sessions SET last_active_at = datetime('now') WHERE id = ?").run(session.id); } catch(e) {}
+  // 更新最后活跃时间 + 滑动续期（每次访问延长到 7 天后过期）
+  try {
+    db.prepare(`UPDATE sessions SET last_active_at = datetime('now'), expires_at = datetime('now', '+${SESSION_TTL_DAYS} days') WHERE id = ?`).run(session.id);
+  } catch(e) {}
 
   // 根据 user_type 查出用户完整信息
   let user = null;
@@ -115,26 +169,45 @@ app.use((req, res, next) => {
 // 应用认证中间件到所有 /api 路由（login/logout 除外）
 app.use(authMiddleware);
 
+// V5: 登录限频（防暴力撞库）：单 IP 15 分钟内最多 10 次失败
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { success: false, error: '尝试次数过多，请 15 分钟后再试', code: 'TOO_MANY_REQUESTS' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  // 仅对失败请求计数（成功登录不算）
+  skipSuccessfulRequests: true,
+});
+
 // 登录接口：统一账号密码，后端自动识别用户类型 + 签发 token（多端并发，不踢人）
-app.post('/api/login', (req, res) => {
+app.post('/api/login', loginLimiter, (req, res) => {
   const { username, password } = req.body;
   
   if (!username || !password) {
     return res.status(400).json({ success: false, error: '请输入账号和密码' });
   }
 
+  // session 写入辅助（含过期时间）
+  const insertSession = (userType, userId) => {
+    const token = generateToken();
+    db.prepare(
+      `INSERT INTO sessions (id, user_type, user_id, token, expires_at) VALUES (?, ?, ?, ?, datetime('now','+${SESSION_TTL_DAYS} days'))`
+    ).run(generateId(), userType, userId, token);
+    return token;
+  };
+
   // 1. 优先匹配管理员（手机号优先 → 用户名兜底）
-  let admin = db.prepare('SELECT * FROM admins WHERE phone = ? AND password = ?').get(username, password);
+  let admin = db.prepare('SELECT * FROM admins WHERE phone = ?').get(username);
   if (!admin) {
-    admin = db.prepare('SELECT * FROM admins WHERE username = ? AND password = ?').get(username, password);
+    admin = db.prepare('SELECT * FROM admins WHERE username = ?').get(username);
   }
-  if (admin) {
+  if (admin && verifyPassword(password, admin, 'admins')) {
     if (admin.status === 'disabled') {
       return res.status(403).json({ success: false, error: '账号已停用' });
     }
     db.prepare("UPDATE admins SET last_login_at = datetime('now') WHERE id = ?").run(admin.id);
-    const token = generateToken();
-    db.prepare("INSERT INTO sessions (id, user_type, user_id, token) VALUES (?, ?, ?, ?)").run(generateId(), 'admin', admin.id, token);
+    const token = insertSession('admin', admin.id);
     return res.json({ success: true, data: { 
       token,
       id: admin.id, 
@@ -146,37 +219,35 @@ app.post('/api/login', (req, res) => {
     }});
   }
 
-  // 2. 匹配商家
+  // 2. 匹配商家（phone / name / company）
   let merchant = db.prepare("SELECT * FROM merchants WHERE phone = ? AND status != 'deleted'").get(username);
   if (!merchant) {
     merchant = db.prepare("SELECT * FROM merchants WHERE (name = ? OR company = ?) AND status != 'deleted'").get(username, username);
   }
-  if (merchant && merchant.password === password) {
+  if (merchant && verifyPassword(password, merchant, 'merchants')) {
     if (merchant.invite_status === 'pending') {
       return res.status(403).json({ success: false, error: '账号尚未激活，请先使用邀请链接完成激活' });
     }
     if (merchant.invite_status === 'disabled') {
       return res.status(403).json({ success: false, error: '账号已停用，请联系管理员' });
     }
-    const token = generateToken();
-    db.prepare("INSERT INTO sessions (id, user_type, user_id, token) VALUES (?, ?, ?, ?)").run(generateId(), 'merchant', merchant.id, token);
+    const token = insertSession('merchant', merchant.id);
     return res.json({ success: true, data: { token, id: merchant.id, name: merchant.name, company: merchant.company, role: 'merchant', phone: merchant.phone, email: merchant.email, industry: merchant.industry, privacy_consented: merchant.privacy_consented === 1 }});
   }
 
   // 3. 匹配达人（手机号优先 → 视频号账号名兜底）
-  let inf = db.prepare('SELECT * FROM influencers WHERE phone = ? AND password = ?').get(username, password);
+  let inf = db.prepare('SELECT * FROM influencers WHERE phone = ?').get(username);
   if (!inf) {
-    inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ? AND password = ?').get(username, password);
+    inf = db.prepare('SELECT * FROM influencers WHERE video_account_name = ?').get(username);
   }
-  if (inf) {
+  if (inf && verifyPassword(password, inf, 'influencers')) {
     if (inf.invite_status === 'pending') {
       return res.status(403).json({ success: false, error: '账号尚未激活，请先使用邀请链接完成激活' });
     }
     if (inf.invite_status === 'disabled') {
       return res.status(403).json({ success: false, error: '账号已停用，请联系管理员' });
     }
-    const token = generateToken();
-    db.prepare("INSERT INTO sessions (id, user_type, user_id, token) VALUES (?, ?, ?, ?)").run(generateId(), 'influencer', inf.id, token);
+    const token = insertSession('influencer', inf.id);
     return res.json({ success: true, data: { token, id: inf.id, name: inf.video_account_name, role: 'influencer', video_account_name: inf.video_account_name, level: inf.level, fans_count: inf.fans_count, invite_status: inf.invite_status, privacy_consented: inf.privacy_consented === 1 }});
   }
 
@@ -239,7 +310,8 @@ app.post('/api/auth/consent', (req, res) => {
     ).run(u.id);
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
+    console.eor('[' + "app.js" + ']', e);
+    res.status(500).json({ success: false, eor: '操作失败，请稍后重试' });
   }
 });
 
@@ -263,10 +335,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 错误处理
+// 错误处理（V5：不再向客户端泄漏内部错误信息）
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: '服务器内部错误', message: err.message });
+  console.error('[unhandled]', err.stack || err);
+  res.status(500).json({ success: false, error: '服务器内部错误' });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
