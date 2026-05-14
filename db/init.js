@@ -420,6 +420,18 @@ function initDatabase() {
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)');
   } catch (e) { console.error('[DB indexes]', e.message); }
 
+  // V5 邀请码过期：merchants/influencers 表加 invite_code_expires_at 字段
+  try {
+    for (const t of ['merchants', 'influencers']) {
+      const cols = db.prepare(`PRAGMA table_info(${t})`).all().map(c => c.name);
+      if (!cols.includes('invite_code_expires_at')) {
+        db.exec(`ALTER TABLE ${t} ADD COLUMN invite_code_expires_at DATETIME`);
+        // 已有 invite_code 但 pending 状态的，给 7 天过期
+        db.exec(`UPDATE ${t} SET invite_code_expires_at = datetime('now', '+7 days') WHERE invite_status = 'pending' AND invite_code IS NOT NULL AND invite_code_expires_at IS NULL`);
+      }
+    }
+  } catch (e) { console.error('[DB invite_code_expires_at]', e.message); }
+
   // 撮合历史记录表
   db.exec(`
     CREATE TABLE IF NOT EXISTS matchmaking_history (

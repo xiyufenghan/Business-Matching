@@ -11,11 +11,21 @@ function maskName(name) {
   return name.substring(0, 2) + '**' + name.substring(name.length - 2);
 }
 
-// 根据 code 在 merchants / influencers 表里找
+// 根据 code 在 merchants / influencers 表里找（V5 加过期校验）
 function findInvite(db, code) {
-  const m = db.prepare("SELECT 'merchant' as kind, id, name, company, phone, invite_status FROM merchants WHERE invite_code = ?").get(code);
+  const m = db.prepare(`
+    SELECT 'merchant' as kind, id, name, company, phone, invite_status, invite_code_expires_at
+    FROM merchants
+    WHERE invite_code = ?
+      AND (invite_code_expires_at IS NULL OR datetime(invite_code_expires_at) > datetime('now'))
+  `).get(code);
   if (m) return m;
-  const i = db.prepare("SELECT 'influencer' as kind, id, video_account_name, invite_status FROM influencers WHERE invite_code = ?").get(code);
+  const i = db.prepare(`
+    SELECT 'influencer' as kind, id, video_account_name, invite_status, invite_code_expires_at
+    FROM influencers
+    WHERE invite_code = ?
+      AND (invite_code_expires_at IS NULL OR datetime(invite_code_expires_at) > datetime('now'))
+  `).get(code);
   return i || null;
 }
 
@@ -79,10 +89,12 @@ router.post('/activate', (req, res) => {
       if (trimVal !== (rec.company || '').trim() && trimVal !== (rec.name || '').trim()) {
         return res.status(400).json({ success: false, error: '公司名称不匹配，请核对后重试' });
       }
+      // V5: 激活成功后清空 invite_code 实现一次性使用
       req.db.prepare(`
         UPDATE merchants
         SET password_hash = ?, password = '', invite_status = 'active', activated_at = datetime('now'),
-            status = 'active', updated_at = datetime('now')
+            status = 'active', invite_code = NULL, invite_code_expires_at = NULL,
+            updated_at = datetime('now')
         WHERE id = ?
       `).run(pwdHash, rec.id);
       loginUsername = rec.phone || '';
@@ -93,6 +105,7 @@ router.post('/activate', (req, res) => {
       req.db.prepare(`
         UPDATE influencers
         SET password_hash = ?, password = '', invite_status = 'active', activated_at = datetime('now'),
+            invite_code = NULL, invite_code_expires_at = NULL,
             updated_at = datetime('now')
         WHERE id = ?
       `).run(pwdHash, rec.id);

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 const { initDatabase } = require('./db/init');
 
 const app = express();
@@ -10,8 +11,28 @@ const PORT = process.env.PORT || 3000;
 const SESSION_TTL_DAYS = 7;
 const BCRYPT_COST = 10;
 
+// V5: 允许的 Origin 列表（生产域名 + 本地开发）
+const ALLOWED_ORIGINS = new Set([
+  'https://bizmatch.dacongming.chat',
+  'http://localhost:3000',
+  'http://localhost:3099',
+  'http://127.0.0.1:3000',
+]);
+
 // 初始化数据库
 const db = initDatabase();
+
+// V5: 开启 SQLite WAL 模式，提升并发读写性能
+try {
+  db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');
+  console.log('[DB] WAL mode enabled');
+} catch (e) { console.error('[DB pragma]', e.message); }
+
+// V5: 定时 WAL checkpoint，防止 -wal 文件无限膨胀
+setInterval(() => {
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch (e) { /* ignore */ }
+}, 3600 * 1000);
 
 // 启动定时清理：每小时一次过期 session 清理
 setInterval(() => {
@@ -142,6 +163,42 @@ function authMiddleware(req, res, next) {
 }
 
 // 中间件
+
+// V5: helmet 安全响应头（CSP 暂不开，避免拦截已有 inline 脚本）
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  // 微信内置浏览器需要 frameguard 但允许同域
+  frameguard: { action: 'sameorigin' },
+}));
+
+// V5: CORS Origin 白名单 + 跨站写入校验（防 CSRF）
+app.use((req, res, next) => {
+  const origin = req.get('origin');
+  // GET 类请求不强制（避免静态资源被错误拦）
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    if (origin && ALLOWED_ORIGINS.has(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    }
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+      return res.sendStatus(204);
+    }
+    return next();
+  }
+  // 写请求：必须没有 origin（同站调用如 fetch 会带 origin），或在白名单内
+  if (origin && !ALLOWED_ORIGINS.has(origin)) {
+    return res.status(403).json({ success: false, error: '跨域请求被拒绝', code: 'ORIGIN_REJECTED' });
+  }
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public'), {

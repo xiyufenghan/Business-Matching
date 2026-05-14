@@ -14,9 +14,10 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
-    // 处理中文文件名
-    const safeName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-    cb(null, Date.now() + '-' + safeName);
+    // V5 安全：完全弃用 originalname，仅保留扩展名（防路径遍历）
+    const ext = path.extname(file.originalname || '').toLowerCase().slice(0, 10);
+    const safeExt = /^\.(xlsx|xls)$/.test(ext) ? ext : '.xlsx';
+    cb(null, `inf_${Date.now()}_${require('crypto').randomBytes(6).toString('hex')}${safeExt}`);
   }
 });
 

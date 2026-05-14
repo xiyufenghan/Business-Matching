@@ -144,10 +144,17 @@ router.delete('/:type/:id/images/:idx', (req, res) => {
     }
 
     const removed = images.splice(index, 1)[0];
-    // 删除磁盘文件
+    // V5 安全：删除磁盘文件前严格校验路径是否在 UPLOAD_BASE 下
     try {
-      const abs = path.join(__dirname, '..', removed);
-      if (fs.existsSync(abs)) fs.unlinkSync(abs);
+      if (typeof removed === 'string' && removed.length < 200) {
+        const abs = path.resolve(path.join(__dirname, '..', removed));
+        // 必须以 UPLOAD_BASE 为前缀，否则拒绝删除（防 ../db/xxx 之类的路径遍历）
+        if (abs.startsWith(UPLOAD_BASE + path.sep) && fs.existsSync(abs)) {
+          fs.unlinkSync(abs);
+        } else if (!abs.startsWith(UPLOAD_BASE + path.sep)) {
+          console.warn('[demand-images delete] 拒绝删除非 uploads 目录文件:', abs);
+        }
+      }
     } catch (e) { /* 文件不存在不影响 DB 更新 */ }
 
     req.db.prepare(`UPDATE ${table} SET images = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)

@@ -42,6 +42,14 @@ function prompt(q) {
 }
 
 async function main() {
+  // V5 安全守卫：必须显式设置环境变量才能运行（防止 systemd/cron 误触发）
+  if (process.env.BIZMATCH_ALLOW_RESET !== 'YES_I_KNOW') {
+    console.error('\n❌ 拒绝执行：此脚本会清空所有业务数据。');
+    console.error('   如需运行，请设置环境变量后再执行：');
+    console.error('   BIZMATCH_ALLOW_RESET=YES_I_KNOW node db/reset-to-production.js\n');
+    process.exit(1);
+  }
+
   console.log('\n======================================');
   console.log('  商达撮合系统 · 生产数据重置');
   console.log('======================================\n');
