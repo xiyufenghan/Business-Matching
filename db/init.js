@@ -186,6 +186,10 @@ function initDatabase() {
     if (!cdCols.includes('pinned_at')) {
       db.exec('ALTER TABLE course_demands ADD COLUMN pinned_at DATETIME');
     }
+    // operator_id：发布需求时的代发管理员 ID
+    if (!cdCols.includes('operator_id')) {
+      db.exec('ALTER TABLE course_demands ADD COLUMN operator_id TEXT');
+    }
     // V5 新增：images 字段（JSON 数组，最多3张图片相对路径），与导入解耦
     if (!cdCols.includes('images')) {
       db.exec('ALTER TABLE course_demands ADD COLUMN images TEXT');
@@ -207,6 +211,10 @@ function initDatabase() {
     // V5 新增：images 字段（JSON 数组，最多3张图片相对路径），与导入解耦
     if (!bdCols.includes('images')) {
       db.exec('ALTER TABLE book_demands ADD COLUMN images TEXT');
+    }
+    // operator_id：发布需求时的代发管理员 ID
+    if (!bdCols.includes('operator_id')) {
+      db.exec('ALTER TABLE book_demands ADD COLUMN operator_id TEXT');
     }
   } catch (e) { /* ignore */ }
 

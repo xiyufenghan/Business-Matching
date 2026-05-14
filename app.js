@@ -164,6 +164,9 @@ function authMiddleware(req, res, next) {
 
 // 中间件
 
+// V5: 信任 nginx 反代（让 rate-limit 能正确识别真实客户端 IP）
+app.set('trust proxy', 1);
+
 // V5: helmet 安全响应头（CSP 暂不开，避免拦截已有 inline 脚本）
 app.use(helmet({
   contentSecurityPolicy: false,
