@@ -186,6 +186,10 @@ function initDatabase() {
     if (!cdCols.includes('pinned_at')) {
       db.exec('ALTER TABLE course_demands ADD COLUMN pinned_at DATETIME');
     }
+    // V5 新增：images 字段（JSON 数组，最多3张图片相对路径），与导入解耦
+    if (!cdCols.includes('images')) {
+      db.exec('ALTER TABLE course_demands ADD COLUMN images TEXT');
+    }
   } catch (e) { /* ignore */ }
 
   // 兼容已有库：补齐 book_demands 的 V4 新增字段
@@ -199,6 +203,10 @@ function initDatabase() {
     }
     if (!bdCols.includes('pinned_at')) {
       db.exec('ALTER TABLE book_demands ADD COLUMN pinned_at DATETIME');
+    }
+    // V5 新增：images 字段（JSON 数组，最多3张图片相对路径），与导入解耦
+    if (!bdCols.includes('images')) {
+      db.exec('ALTER TABLE book_demands ADD COLUMN images TEXT');
     }
   } catch (e) { /* ignore */ }
 

@@ -13,7 +13,8 @@ router.get('/', (req, res) => {
         bd.book_category, bd.product_image, bd.book_introduction, bd.wechat_shop_link, 
         bd.specification, bd.selling_price, bd.pure_commission, bd.ad_commission, bd.logistics, bd.stock,
         cd.course_image, cd.course_name, cd.unit_price, cd.grade_level, cd.subject, cd.course_introduction, cd.course_link,
-        cd.pure_commission as course_pure_commission, cd.ad_commission as course_ad_commission
+        cd.pure_commission as course_pure_commission, cd.ad_commission as course_ad_commission,
+        COALESCE(bd.images, cd.images) as images
       FROM demands d
       LEFT JOIN merchants m ON d.merchant_id = m.id
       LEFT JOIN admins sa ON m.sales_owner_id = sa.id AND sa.admin_role = '销售'
@@ -735,6 +736,7 @@ router.get('/plaza', (req, res) => {
           d.fans_requirement, d.cooperation_type, d.description, d.deadline, d.created_at,
           d.publisher_role, d.merchant_id, d.ref_demand_id,
           COALESCE(bd.pinned_at, cd.pinned_at) as pinned_at,
+          COALESCE(bd.images, cd.images) as images,
           m.company as merchant_company, m.industry as merchant_industry,
           'merchant_or_admin' as source_kind
         FROM demands d
@@ -764,6 +766,7 @@ router.get('/plaza', (req, res) => {
           d.fans_requirement, d.cooperation_type, d.description, d.deadline, d.created_at,
           d.publisher_role, d.merchant_id, d.ref_demand_id,
           COALESCE(bd.pinned_at, cd.pinned_at) as pinned_at,
+          COALESCE(bd.images, cd.images) as images,
           m.company as merchant_company, m.industry as merchant_industry,
           'merchant_or_admin' as source_kind
         FROM demands d
@@ -823,6 +826,7 @@ router.get('/plaza', (req, res) => {
         ref_demand_id: r.ref_demand_id,
         demand_type: r.demand_type,
         pinned_at: r.pinned_at,
+        images: r.images,
         created_at: r.created_at,
       })),
       ...influencerRows.map(r => ({

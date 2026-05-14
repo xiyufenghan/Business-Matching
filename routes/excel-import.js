@@ -28,14 +28,12 @@ const upload = multer({
   }
 });
 
-// 图书需求字段映射
+// 图书需求字段映射（V5：图片字段已剥离，需上传后单独管理）
 const BOOK_FIELD_MAP = {
-  '图书图片': 'book_image',
   '图书商家': 'book_merchant',
   '图书名称': 'book_name',
   '目标人群': 'target_audience',
   '图书分类': 'book_category',
-  '产品图片': 'product_image',
   '图书介绍': 'book_introduction',
   '微信小店商品链接': 'wechat_shop_link',
   '图书规格': 'specification',
@@ -48,14 +46,13 @@ const BOOK_FIELD_MAP = {
 };
 
 const BOOK_FIELDS_ORDER = [
-  '图书图片', '图书商家', '图书名称', '目标人群', '图书分类', '产品图片',
+  '图书商家', '图书名称', '目标人群', '图书分类',
   '图书介绍', '微信小店商品链接', '图书规格', '售价',
   '纯佣金', '投流佣金', '物流快递', '库存', '归属销售'
 ];
 
-// 课程需求字段映射
+// 课程需求字段映射（V5：图片字段已剥离）
 const COURSE_FIELD_MAP = {
-  '课程图片': 'course_image',
   '课程商家': 'course_merchant',
   '课程名称': 'course_name',
   '课程价格': 'unit_price',
@@ -67,7 +64,7 @@ const COURSE_FIELD_MAP = {
 };
 
 const COURSE_FIELDS_ORDER = [
-  '课程图片', '课程商家', '课程名称', '课程价格',
+  '课程商家', '课程名称', '课程价格',
   '学段', '学科', '课程介绍', '课程链接', '归属销售'
 ];
 
@@ -102,8 +99,8 @@ router.get('/template/:type', (req, res) => {
       const headers = BOOK_FIELDS_ORDER;
       const sampleData = [
         headers,
-        ['', '知行图书出版社', '趣味数学思维训练', '小学生,家长', '教育图书', '适合6-12岁儿童的数学思维训练', 'https://shop.weixin.qq.com/xxx', '单本', 39.9, 25, 35, '中通快递', 5000, '销售小王'],
-        ['', '启明文化传媒', '经典绘本套装', '幼儿,宝妈,教师', '儿童绘本', '获奖绘本合集，3-6岁适读', 'https://shop.weixin.qq.com/yyy', '套组', 128, 30, 40, '顺丰快递', 3000, '销售小李']
+        ['知行图书出版社', '趣味数学思维训练', '小学生,家长', '教育图书', '适合6-12岁儿童的数学思维训练', 'https://shop.weixin.qq.com/xxx', '单本', 39.9, 25, 35, '中通快递', 5000, '销售小王'],
+        ['启明文化传媒', '经典绘本套装', '幼儿,宝妈,教师', '儿童绘本', '获奖绘本合集，3-6岁适读', 'https://shop.weixin.qq.com/yyy', '套组', 128, 30, 40, '顺丰快递', 3000, '销售小李']
       ];
       const ws = XLSX.utils.aoa_to_sheet(sampleData);
       ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 12) }));
@@ -111,12 +108,10 @@ router.get('/template/:type', (req, res) => {
       
       const noteData = [
         ['字段', '说明', '是否必填'],
-        ['图书图片', '图书封面图片URL（PNG/JPG，≤200K，正方形）', '否'],
         ['图书商家', '商家/出版社名称（不存在将自动创建商家）', '是'],
         ['图书名称', '图书名称', '是'],
         ['目标人群', '多值输入，逗号分隔，如：小学生,家长', '否'],
         ['图书分类', '多值输入，逗号分隔，如：教育图书,儿童绘本', '是'],
-        ['产品图片', '产品详情图片URL（PNG/JPG，≤200K，正方形）', '否'],
         ['图书介绍', '简要介绍', '否'],
         ['微信小店商品链接', '商品URL', '否'],
         ['图书规格', '可选：单本 或 套组', '否'],
@@ -125,17 +120,19 @@ router.get('/template/:type', (req, res) => {
         ['投流佣金', '数值，百分比', '否'],
         ['物流快递', '快递公司', '否'],
         ['库存', '数值', '否'],
-        ['归属销售', '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', '否']
+        ['归属销售', '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', '否'],
+        ['', '', ''],
+        ['⚠️ 图片说明', '本模板已剥离图片字段。请先上传文字数据，导入完成后到「商家管理 → 商家需求」逐条点"上传图片"按钮添加（每条最多 3 张，单张 ≤500KB，仅 PNG/JPG）', '']
       ];
       const noteWs = XLSX.utils.aoa_to_sheet(noteData);
-      noteWs['!cols'] = [{ wch: 18 }, { wch: 50 }, { wch: 10 }];
+      noteWs['!cols'] = [{ wch: 18 }, { wch: 60 }, { wch: 10 }];
       XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
     } else if (type === 'course') {
       const headers = COURSE_FIELDS_ORDER;
       const sampleData = [
         headers,
-        ['', '少儿编程学院', '少儿编程入门班', 1999, '小学,初中', '编程,信息技术', 'Scratch+Python双轨课程', 'https://edu.example.com/course1', '销售小王'],
-        ['', '外语教育集团', '英语自然拼读', 899, '幼儿园,小学', '英语', '外教自然拼读课程', 'https://edu.example.com/course2', '销售小李']
+        ['少儿编程学院', '少儿编程入门班', 1999, '小学,初中', '编程,信息技术', 'Scratch+Python双轨课程', 'https://edu.example.com/course1', '销售小王'],
+        ['外语教育集团', '英语自然拼读', 899, '幼儿园,小学', '英语', '外教自然拼读课程', 'https://edu.example.com/course2', '销售小李']
       ];
       const ws = XLSX.utils.aoa_to_sheet(sampleData);
       ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 12) }));
@@ -143,7 +140,6 @@ router.get('/template/:type', (req, res) => {
       
       const noteData = [
         ['字段', '说明', '是否必填'],
-        ['课程图片', '课程封面图片URL（PNG/JPG，≤200K，正方形）', '否'],
         ['课程商家', '商家/机构名称（不存在将自动创建商家）', '是'],
         ['课程名称', '课程名称', '是'],
         ['课程价格', '数值，单位元', '是'],
@@ -151,10 +147,12 @@ router.get('/template/:type', (req, res) => {
         ['学科', '多值，逗号分隔，如：数学,英语', '否'],
         ['课程介绍', '简要介绍', '否'],
         ['课程链接', '课程URL', '否'],
-        ['归属销售', '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', '否']
+        ['归属销售', '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', '否'],
+        ['', '', ''],
+        ['⚠️ 图片说明', '本模板已剥离图片字段。请先上传文字数据，导入完成后到「商家管理 → 商家需求」逐条点"上传图片"按钮添加（每条最多 3 张，单张 ≤500KB，仅 PNG/JPG）', '']
       ];
       const noteWs = XLSX.utils.aoa_to_sheet(noteData);
-      noteWs['!cols'] = [{ wch: 18 }, { wch: 50 }, { wch: 10 }];
+      noteWs['!cols'] = [{ wch: 18 }, { wch: 60 }, { wch: 10 }];
       XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
     } else if (type === 'influencer-demand' || type === 'influencer_demand') {
       // 达人需求批量导入模板（V4.1 新增）
@@ -238,8 +236,8 @@ router.post('/import/book', upload.single('file'), (req, res) => {
     if (isAdmin) req.db.pragma('foreign_keys = OFF');
     
     const insertBook = req.db.prepare(`
-      INSERT INTO book_demands (id, merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO book_demands (id, merchant_id, book_merchant, book_name, target_audience, book_category, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertDemand = req.db.prepare(`
@@ -277,10 +275,10 @@ router.post('/import/book', upload.single('file'), (req, res) => {
           
           const bookId = uuidv4();
           insertBook.run(bookId, rowMerchantId,
-            mapped.book_image || '', mapped.book_merchant || '',
+            mapped.book_merchant || '',
             mapped.book_name, mapped.target_audience || '',
             mapped.book_category,
-            mapped.product_image || '', mapped.book_introduction || '',
+            mapped.book_introduction || '',
             mapped.wechat_shop_link || '', mapped.specification || '',
             parseFloat(mapped.selling_price) || 0,
             parseFloat(mapped.pure_commission) || 0,
@@ -356,8 +354,8 @@ router.post('/import/course', upload.single('file'), (req, res) => {
     if (isAdmin) req.db.pragma('foreign_keys = OFF');
     
     const insertCourse = req.db.prepare(`
-      INSERT INTO course_demands (id, merchant_id, course_image, course_name, unit_price, grade_level, subject, course_introduction, course_link)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO course_demands (id, merchant_id, course_name, unit_price, grade_level, subject, course_introduction, course_link)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const insertDemand = req.db.prepare(`
@@ -397,7 +395,7 @@ router.post('/import/course', upload.single('file'), (req, res) => {
           
           const courseId = uuidv4();
           insertCourse.run(courseId, rowMerchantId,
-            mapped.course_image || '', mapped.course_name,
+            mapped.course_name,
             parseFloat(mapped.unit_price) || 0,
             mapped.grade_level || '',
             mapped.subject || '', mapped.course_introduction || '',
@@ -569,11 +567,14 @@ router.get('/course', (req, res) => {
   }
 });
 
+const { cleanupDemandImages } = require('./demand-images');
+
 // 删除图书需求
 router.delete('/book/:id', (req, res) => {
   try {
     req.db.prepare('DELETE FROM book_demands WHERE id = ?').run(req.params.id);
     req.db.prepare('DELETE FROM demands WHERE ref_demand_id = ?').run(req.params.id);
+    cleanupDemandImages(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -585,6 +586,7 @@ router.delete('/course/:id', (req, res) => {
   try {
     req.db.prepare('DELETE FROM course_demands WHERE id = ?').run(req.params.id);
     req.db.prepare('DELETE FROM demands WHERE ref_demand_id = ?').run(req.params.id);
+    cleanupDemandImages(req.params.id);
     res.json({ success: true, message: '删除成功' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

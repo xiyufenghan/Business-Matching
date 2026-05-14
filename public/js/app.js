@@ -1504,12 +1504,22 @@ function renderMerchantDemandCard(d, isInfluencer) {
         <span class="demand-meta">${d.merchant_company || ''} · ${formatDate(d.created_at)}</span>
         <div class="demand-actions">
           ${isInfluencer ? `<button class="btn btn-sm btn-primary" onclick="applyCooperation('${d.id}','${d.merchant_id}')">申请合作</button>` : ''}
+          ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-sm btn-outline" onclick="showDemandImagesModal('${d.demand_type}','${d.ref_demand_id}','${escapeHtml(d.title || d.book_name || d.course_name || '')}')">📷 图片(${getImageCount(d)}/3)</button>` : ''}
           ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? `<button class="btn btn-sm btn-outline" onclick="editMerchantDemand('${d.ref_demand_id}','${d.demand_type}')">编辑</button>` : ''}
           ${(currentUser.role === 'admin' || currentUser.role === 'merchant') && d.ref_demand_id ? renderArchiveBtns(d.demand_type, d.ref_demand_id, d.status) : ''}
           ${currentUser.role === 'admin' || currentUser.role === 'merchant' ? `<button class="btn btn-sm btn-danger-outline" onclick="deleteMerchantDemand('${d.id}')">删除</button>` : ''}
         </div>
       </div>
     </div>`;
+}
+
+// V5: 解析卡片中的 images 数量（兼容字段缺失/JSON错误）
+function getImageCount(d) {
+  if (!d.images) return 0;
+  try {
+    const arr = typeof d.images === 'string' ? JSON.parse(d.images) : d.images;
+    return Array.isArray(arr) ? arr.length : 0;
+  } catch (e) { return 0; }
 }
 
 async function deleteMerchantDemand(id) {
@@ -7313,4 +7323,138 @@ async function duplicateDemand(type, id) {
     const cur = navigationHistory[navigationHistory.length - 1];
     navigateTo(cur, true);
   } else showToast(r.error || '操作失败', 'error');
+}
+
+// =====================================================
+// V5: 商家需求图片管理弹窗（与 Excel 批量导入解耦）
+// =====================================================
+async function showDemandImagesModal(type, refId, title) {
+  if (!type || !refId) return showToast('参数错误', 'error');
+  if (type !== 'book' && type !== 'course') return showToast('类型错误', 'error');
+
+  // 拉取当前图片列表
+  const res = await fetchAPI(`/demand-images/${type}/${refId}/images`);
+  if (!res.success) return showToast(res.error || '加载失败', 'error');
+  const images = res.data.images || [];
+  const max = res.data.max || 3;
+
+  document.getElementById('modal-title').textContent = `图片管理 · ${title || '需求'}`;
+  document.getElementById('modal-body').innerHTML = renderDemandImagesPanel(type, refId, images, max);
+  document.getElementById('modal-footer').innerHTML = `
+    <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+  `;
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+function renderDemandImagesPanel(type, refId, images, max) {
+  const remain = max - images.length;
+  const slots = [];
+  for (let i = 0; i < images.length; i++) {
+    slots.push(`
+      <div class="demand-img-slot">
+        <img src="/${images[i]}" alt="图片${i + 1}" onerror="this.parentNode.innerHTML='<div class=&quot;demand-img-broken&quot;>图片丢失</div>'" />
+        <button class="demand-img-del" onclick="deleteDemandImage('${type}','${refId}',${i})" title="删除">✕</button>
+      </div>
+    `);
+  }
+  for (let i = 0; i < remain; i++) {
+    if (i === 0) {
+      slots.push(`
+        <label class="demand-img-add" id="demand-img-uploader">
+          <input type="file" accept="image/png,image/jpeg" multiple style="display:none" onchange="uploadDemandImages(event,'${type}','${refId}',${remain})" />
+          <span class="demand-img-add-icon">+</span>
+          <span class="demand-img-add-text">添加图片</span>
+        </label>
+      `);
+    } else {
+      slots.push(`<div class="demand-img-empty"></div>`);
+    }
+  }
+
+  return `
+    <div class="demand-img-panel">
+      <div class="demand-img-tip">
+        已上传 <strong style="color:${images.length === max ? '#dc2626' : '#2563eb'}">${images.length}/${max}</strong> 张　·　
+        单张限制 500KB　·　仅支持 PNG / JPG
+      </div>
+      <div class="demand-img-grid">
+        ${slots.join('')}
+      </div>
+      <div class="demand-img-progress" id="demand-img-progress" style="display:none">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-text" id="progress-text">上传中...</div>
+      </div>
+    </div>
+  `;
+}
+
+async function uploadDemandImages(e, type, refId, remain) {
+  const files = Array.from(e.target.files || []);
+  if (files.length === 0) return;
+  if (files.length > remain) return showToast(`最多还能上传 ${remain} 张`, 'error');
+
+  // 前端校验大小
+  for (const f of files) {
+    if (f.size > 500 * 1024) {
+      return showToast(`「${f.name}」超过 500KB 限制`, 'error');
+    }
+    if (!/\.(png|jpg|jpeg)$/i.test(f.name)) {
+      return showToast(`「${f.name}」格式不支持，仅支持 PNG / JPG`, 'error');
+    }
+  }
+
+  const fd = new FormData();
+  files.forEach(f => fd.append('files', f));
+
+  const progressEl = document.getElementById('demand-img-progress');
+  if (progressEl) {
+    progressEl.style.display = 'block';
+    document.getElementById('progress-text').textContent = `上传中 0/${files.length}...`;
+  }
+
+  try {
+    const token = getAuthToken();
+    const resp = await fetch(`${API_BASE}/demand-images/${type}/${refId}/images`, {
+      method: 'POST',
+      body: fd,
+      headers: token ? { 'Authorization': 'Bearer ' + token } : {}
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToast(data.message || '上传成功');
+      // 刷新弹窗
+      const titleEl = document.getElementById('modal-title');
+      const titleText = titleEl ? titleEl.textContent.replace('图片管理 · ', '') : '';
+      showDemandImagesModal(type, refId, titleText);
+      // 触发列表刷新（卡片上的图片计数）
+      if (typeof renderMerchantDemands === 'function') {
+        const m = document.getElementById('page-container')?.getAttribute('data-module');
+        // 只在当前是商家需求页时刷新
+        if (m === 'merchant-demands') renderMerchantDemands();
+      }
+    } else {
+      showToast(data.error || '上传失败', 'error');
+    }
+  } catch (err) {
+    showToast(err.message || '网络错误', 'error');
+  } finally {
+    if (progressEl) progressEl.style.display = 'none';
+  }
+}
+
+async function deleteDemandImage(type, refId, index) {
+  if (!confirm('确认删除这张图片？')) return;
+  const res = await fetchAPI(`/demand-images/${type}/${refId}/images/${index}`, { method: 'DELETE' });
+  if (res.success) {
+    showToast('已删除');
+    const titleEl = document.getElementById('modal-title');
+    const titleText = titleEl ? titleEl.textContent.replace('图片管理 · ', '') : '';
+    showDemandImagesModal(type, refId, titleText);
+    if (typeof renderMerchantDemands === 'function') {
+      const m = document.getElementById('page-container')?.getAttribute('data-module');
+      if (m === 'merchant-demands') renderMerchantDemands();
+    }
+  } else {
+    showToast(res.error || '删除失败', 'error');
+  }
 }

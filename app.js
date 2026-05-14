@@ -100,6 +100,12 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
+// V5: 上传图片的静态托管（需求图片落盘到 uploads/demands/）
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  maxAge: '1d',
+  setHeaders: (res) => res.setHeader('Cache-Control', 'public, max-age=86400')
+}));
+
 // 将db注入到请求对象
 app.use((req, res, next) => {
   req.db = db;
@@ -250,6 +256,7 @@ app.use('/api/invitations', require('./routes/invitations'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/favorites', require('./routes/favorites'));
+app.use('/api/demand-images', require('./routes/demand-images').router);
 
 // 首页
 app.get('/', (req, res) => {
