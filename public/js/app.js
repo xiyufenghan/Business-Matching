@@ -6975,7 +6975,7 @@ async function renderSettingsManage() {
         <h3>📡 企业微信 Webhook 推送</h3>
         <p style="font-size:13px;color:#64748b;line-height:1.7">
           配置后，撮合关键事件会自动推送到企微群（markdown 格式）。<br>
-          @归属销售：消息中会自动 @ 关联商家/达人的归属销售（销售手机号必须已维护）。
+          下方 10 个事件可独立开关，仅 admin 超管可配置。
         </p>
         <div class="form-group">
           <label>Webhook URL</label>

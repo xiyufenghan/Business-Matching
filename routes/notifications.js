@@ -111,23 +111,22 @@ function isEventEnabled(db, eventKey) {
 }
 
 /**
- * V5 升级版：企微 Webhook 推送（支持 markdown + 事件开关 + @归属销售）
+ * V5 升级版：企微 Webhook 推送（markdown 格式，不 @人）
  * @param {object} db
  * @param {object} payload
  *   - eventKey: string|null  事件键，用于查开关；null 跳过开关（如测试推送）
  *   - type: 'markdown' | 'text'
  *   - content: string  消息正文
- *   - mentionedMobiles: string[]  @谁（手机号）
- *   - mentionedAll: boolean
  *
  * 兼容旧调用方式：notifyWework(db, '纯文本消息')
+ * 注意：按业务约定不做 @人，mentionedMobiles/mentionedAll 参数已弃用（向后兼容但不会执行）
  */
 async function notifyWework(db, payload) {
   // 兼容旧签名：第二个参数是字符串
   if (typeof payload === 'string') {
     payload = { eventKey: null, type: 'text', content: payload };
   }
-  const { eventKey, type = 'markdown', content, mentionedMobiles = [], mentionedAll = false } = payload;
+  const { eventKey, type = 'markdown', content } = payload;
 
   // 事件开关
   if (!isEventEnabled(db, eventKey)) return;
@@ -137,40 +136,12 @@ async function notifyWework(db, payload) {
     const webhookUrl = row && row.value;
     if (!webhookUrl) return;
 
-    // 构造消息体
-    let body;
-    if (type === 'markdown') {
-      body = {
-        msgtype: 'markdown',
-        markdown: { content }
-      };
-      // markdown 类型支持的 @ 方式（写在 content 里：<@手机号>）
-      // 企微 markdown 实际不支持 mentioned_mobile_list，需要把 @人 写到正文里
-      // 但仍可同时发一条 text 的 @ 触达
-    } else {
-      body = { msgtype: 'text', text: { content } };
-      if (mentionedMobiles && mentionedMobiles.length > 0) {
-        body.text.mentioned_mobile_list = mentionedMobiles;
-      }
-      if (mentionedAll) {
-        body.text.mentioned_mobile_list = ['@all'];
-      }
-    }
+    // 构造消息体（按业务要求：不 @人，只发内容）
+    const body = type === 'markdown'
+      ? { msgtype: 'markdown', markdown: { content } }
+      : { msgtype: 'text', text: { content } };
 
     await postWebhook(webhookUrl, body);
-
-    // markdown + 需要 @ 人时，额外发一条 text 触发 @ 通知
-    if (type === 'markdown' && (mentionedMobiles.length > 0 || mentionedAll)) {
-      const mentionBody = {
-        msgtype: 'text',
-        text: {
-          content: '↑ 请上述同事关注',
-          mentioned_mobile_list: mentionedAll ? ['@all'] : mentionedMobiles
-        }
-      };
-      // 异步发，不等
-      postWebhook(webhookUrl, mentionBody).catch(() => {});
-    }
   } catch (e) {
     console.error('[WeWork Webhook] failed:', e.message);
   }
