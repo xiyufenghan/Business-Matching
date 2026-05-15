@@ -452,6 +452,27 @@ function initDatabase() {
     } catch (e) { console.error('[DB A2 merchants.company unique]', e.message); }
   } catch (e) { console.error('[DB indexes]', e.message); }
 
+  // V5 B2: matchmaking / matchmaking_history 表 stage 中文→英文统一迁移
+  try {
+    const STAGE_MIGRATE = {
+      '需求发布': 'published',
+      '合作匹配': 'connected',
+      '达成意向': 'connected',
+      '样品寄送': 'sample_sent',
+      '开始合作': 'cooperating',
+      '已拒绝': 'rejected',
+    };
+    let totalMigrated = 0;
+    for (const [zh, en] of Object.entries(STAGE_MIGRATE)) {
+      const r1 = db.prepare("UPDATE matchmaking SET stage = ? WHERE stage = ?").run(en, zh);
+      const r2 = db.prepare("UPDATE matchmaking_history SET stage = ? WHERE stage = ?").run(en, zh);
+      totalMigrated += (r1.changes + r2.changes);
+    }
+    if (totalMigrated > 0) {
+      console.log('[DB B2] matchmaking stage 中文→英文迁移:', totalMigrated, '条');
+    }
+  } catch (e) { console.error('[DB B2 stage migrate]', e.message); }
+
   // V5 邀请码过期：merchants/influencers 表加 invite_code_expires_at 字段
   try {
     for (const t of ['merchants', 'influencers']) {

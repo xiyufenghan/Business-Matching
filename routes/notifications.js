@@ -41,20 +41,24 @@ router.put('/read-all', (req, res) => {
   res.json({ success: true });
 });
 
-// POST /api/notifications/test-wework — 超管测试企微推送
+// POST /api/notifications/test-wework — 超管测试企微推送（同步等待结果）
 router.post('/test-wework', async (req, res) => {
   if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
     return res.status(403).json({ success: false, error: '无权限' });
   }
   try {
-    await notifyWework(req.db, {
-      eventKey: null, // 测试推送跳过开关
-      type: 'markdown',
-      content: `**🔔 企微推送测试**\n` +
-               `> 来源：商达撮合系统\n` +
-               `> 时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
-               `如果你看到这条消息，说明 Webhook 配置成功！`
-    });
+    const row = req.db.prepare("SELECT value FROM settings WHERE key = 'wework_webhook_url'").get();
+    const webhookUrl = row && row.value;
+    if (!webhookUrl) {
+      return res.status(400).json({ success: false, error: '请先在「系统设置」配置 Webhook URL' });
+    }
+
+    const content = `**🔔 企微推送测试**\n` +
+                    `> 来源：商达撮合系统\n` +
+                    `> 时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
+                    `如果你看到这条消息，说明 Webhook 配置成功！`;
+    // 测试推送直接同步等待 postWebhook 结果
+    await postWebhook(webhookUrl, { msgtype: 'markdown', markdown: { content } });
     res.json({ success: true, message: '测试消息已发送，请查看企微群' });
   } catch (e) {
     console.error('[notifications/test-wework]', e);
@@ -121,30 +125,50 @@ function isEventEnabled(db, eventKey) {
  * 兼容旧调用方式：notifyWework(db, '纯文本消息')
  * 注意：按业务约定不做 @人，mentionedMobiles/mentionedAll 参数已弃用（向后兼容但不会执行）
  */
-async function notifyWework(db, payload) {
+/**
+ * V5 升级版：企微 Webhook 推送（markdown 格式，不 @人）
+ *
+ * V5 B4: 完全异步化（fire-and-forget）
+ * - 调用方不需要 await，立即返回
+ * - 实际 webhook 发送通过 setImmediate 推到下个事件循环
+ * - 所以业务路由不会因为企微推送阻塞响应（HTTPS 请求 + 5s 超时）
+ *
+ * @param {object} db
+ * @param {object} payload
+ *   - eventKey: string|null  事件键，用于查开关；null 跳过开关
+ *   - type: 'markdown' | 'text'
+ *   - content: string  消息正文
+ *
+ * 兼容旧调用方式：notifyWework(db, '纯文本消息')
+ */
+function notifyWework(db, payload) {
   // 兼容旧签名：第二个参数是字符串
   if (typeof payload === 'string') {
     payload = { eventKey: null, type: 'text', content: payload };
   }
   const { eventKey, type = 'markdown', content } = payload;
 
-  // 事件开关
+  // 事件开关（同步检查 - 极快）
   if (!isEventEnabled(db, eventKey)) return;
 
+  let webhookUrl;
   try {
     const row = db.prepare("SELECT value FROM settings WHERE key = 'wework_webhook_url'").get();
-    const webhookUrl = row && row.value;
-    if (!webhookUrl) return;
+    webhookUrl = row && row.value;
+  } catch (e) { return; }
+  if (!webhookUrl) return;
 
-    // 构造消息体（按业务要求：不 @人，只发内容）
-    const body = type === 'markdown'
-      ? { msgtype: 'markdown', markdown: { content } }
-      : { msgtype: 'text', text: { content } };
+  // 构造消息体（按业务要求：不 @人，只发内容）
+  const body = type === 'markdown'
+    ? { msgtype: 'markdown', markdown: { content } }
+    : { msgtype: 'text', text: { content } };
 
-    await postWebhook(webhookUrl, body);
-  } catch (e) {
-    console.error('[WeWork Webhook] failed:', e.message);
-  }
+  // 异步发送：推到下个事件循环，不阻塞当前请求
+  setImmediate(() => {
+    postWebhook(webhookUrl, body).catch(e => {
+      console.error('[WeWork Webhook] async post failed:', e.message);
+    });
+  });
 }
 
 /**

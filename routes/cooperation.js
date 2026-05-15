@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { writeNotification, notifyWework, WEWORK_EVENTS, getOwnerSalesMobiles } = require('./notifications');
+const { normalizeStage } = require('../utils/stages');
 
 // V5: markdown 推送辅助
 function escapeMd(s) {
@@ -694,7 +695,7 @@ router.post('/matchmaking', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
     `).run(
       id, merchant_id, influencer_id, demand_id || null, demand_type || '',
-      source || '手动创建', stage || 'published', notes || '', operator_id || null,
+      source || '手动创建', normalizeStage(stage || 'published'), notes || '', operator_id || null,
       product_name || null, influencer_account || null,
       priceNum,
       cooperation_mode || null,
@@ -709,7 +710,7 @@ router.post('/matchmaking', (req, res) => {
     req.db.prepare(`
       INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
-    `).run(uuidv4(), id, stage || 'published', '管理员', notes || '手动创建撮合记录');
+    `).run(uuidv4(), id, normalizeStage(stage || 'published'), '管理员', notes || '手动创建撮合记录');
     
     const record = req.db.prepare(`
       SELECT mm.*, m.name as merchant_name, m.company as merchant_company,
@@ -730,8 +731,11 @@ router.post('/matchmaking', (req, res) => {
 router.put('/matchmaking/:id/stage', (req, res) => {
   try {
     const { id } = req.params;
-    const { stage, notes } = req.body;
+    let { stage } = req.body;
+    const { notes } = req.body;
     if (!stage) return res.status(400).json({ success: false, error: '环节为必填' });
+    // V5 B2: 防御性规范化，避免中文写入
+    stage = normalizeStage(stage);
     
     req.db.prepare("UPDATE matchmaking SET stage = ?, notes = COALESCE(?, notes), updated_at = datetime('now') WHERE id = ?")
       .run(stage, notes || null, id);
@@ -807,7 +811,7 @@ router.put('/matchmaking/:id', (req, res) => {
     if (influencer_id !== undefined) { updates.push('influencer_id = ?'); params.push(influencer_id); }
     if (demand_id !== undefined) { updates.push('demand_id = ?'); params.push(demand_id); }
     if (source !== undefined) { updates.push('source = ?'); params.push(source); }
-    if (stage !== undefined) { updates.push('stage = ?'); params.push(stage); }
+    if (stage !== undefined) { updates.push('stage = ?'); params.push(normalizeStage(stage)); }
     if (notes !== undefined) { updates.push('notes = ?'); params.push(notes); }
     if (sample_info !== undefined) { updates.push('sample_info = ?'); params.push(sample_info); }
     if (cooperation_details !== undefined) { updates.push('cooperation_details = ?'); params.push(cooperation_details); }
@@ -853,11 +857,12 @@ router.put('/matchmaking/:id', (req, res) => {
     req.db.prepare(`UPDATE matchmaking SET ${updates.join(', ')} WHERE id = ?`).run(...params);
     
     // 如果环节变更，记录历史
-    if (stage && stage !== record.stage) {
+    if (stage && normalizeStage(stage) !== record.stage) {
+      const newStage = normalizeStage(stage);
       req.db.prepare(`
         INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
         VALUES (?, ?, ?, ?, ?, datetime('now'))
-      `).run(uuidv4(), id, stage, '管理员', notes || `更新到${stage}阶段`);
+      `).run(uuidv4(), id, newStage, '管理员', notes || `更新到${newStage}阶段`);
     }
     
     const updated = req.db.prepare(`
