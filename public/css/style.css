@@ -3828,3 +3828,35 @@ a:hover, .link-text:hover { color: #1e3a8a; }
   box-shadow: 0 6px 20px rgba(37, 99, 235, 0.15);
   transform: translateY(-2px);
 }
+
+/* ============================================== */
+/* V5: 合作管理 - 下一步指引                       */
+/* ============================================== */
+.coop-hint {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.coop-hint strong { font-weight: 600; }
+.coop-hint-action {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border-left: 3px solid #f59e0b;
+}
+.coop-hint-wait {
+  background: #f0f9ff;
+  color: #0c4a6e;
+  border-left: 3px solid #0ea5e9;
+}
+.coop-hint-ok {
+  background: #ecfdf5;
+  color: #065f46;
+  border-left: 3px solid #10b981;
+}
+.coop-hint-rej {
+  background: #fef2f2;
+  color: #991b1b;
+  border-left: 3px solid #ef4444;
+}

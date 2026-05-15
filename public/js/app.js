@@ -6557,7 +6557,7 @@ async function respondToInfluencerDemand(infDemandId, influencerId) {
       demand_type: 'respond_inf_demand'
     })
   });
-  if (res.success) { showToast('响应已发送，等待达人确认'); renderDemandPlaza(); }
+  if (res.success) { showToast('✅ 响应已发送！请到「合作管理」查看后续动态'); renderDemandPlaza(); }
   else { showToast(res.error || '响应失败', 'error'); }
 }
 
@@ -6575,7 +6575,7 @@ async function respondToMerchantDemand(demandId, merchantId) {
       demand_type: 'interest'
     })
   });
-  if (res.success) { showToast('意向已发送，等待发布方回复'); renderDemandPlaza(); }
+  if (res.success) { showToast('✅ 申请已发送！请到「合作管理」查看后续动态'); renderDemandPlaza(); }
   else { showToast(res.error || '操作失败', 'error'); }
 }
 
@@ -6833,6 +6833,22 @@ function renderCoopList(list, tab) {
     // V4 链回原需求：如果有 demand_id 和 demand_title，加跳转链接
     const linkBack = (c.demand_id && c.demand_title) ?
       `<span class="coop-link-back" onclick="navigateToPlaza()" title="点击跳转需求广场">📎 关联需求：${escapeHtml(c.demand_title)}</span>` : '';
+
+    // V5: 下一步指引（不同角色 + 不同状态显示不同提示）
+    let nextHint = '';
+    if (tab === 'pending') {
+      if (canAct) {
+        nextHint = `<div class="coop-hint coop-hint-action">⚡ <strong>请你处理</strong>：点击下方"接受/拒绝"按钮</div>`;
+      } else {
+        nextHint = `<div class="coop-hint coop-hint-wait">⏳ <strong>等待对方处理</strong>：${escapeHtml(otherName)} 会收到通知，请耐心等待</div>`;
+      }
+    } else if (tab === 'confirmed') {
+      nextHint = `<div class="coop-hint coop-hint-ok">✅ <strong>已达成意向 · 撮合工单已生成</strong><br>` +
+                 `<span style="color:#64748b">销售/运营会主动联系你推进后续：寄样、开播、结算等。如长时间无消息，可联系归属销售。</span></div>`;
+    } else if (tab === 'rejected') {
+      nextHint = `<div class="coop-hint coop-hint-rej">❌ 此合作已被拒绝</div>`;
+    }
+
     return `
       <div class="coop-item">
         <div class="coop-item-header">
@@ -6841,6 +6857,7 @@ function renderCoopList(list, tab) {
         </div>
         <div class="coop-item-msg">${escapeHtml(c.message || '（无留言）')}</div>
         ${linkBack}
+        ${nextHint}
         <div class="coop-item-meta">
           <span>${formatTimeAgo(c.created_at)}</span>
           ${tab === 'confirmed' ? '<span class="coop-badge coop-badge-ok">已达成意向</span>' : ''}
@@ -6884,8 +6901,36 @@ async function rejectCoop(id) {
 // ============ 个人中心 ============
 async function renderProfile() {
   const container = document.getElementById('page-container');
-  const u = currentUser;
+  // V5: 拉取最新的用户资料（数据库里的，不是登录态缓存）
+  let u = currentUser;
+  try {
+    const me = await fetchAPI('/auth/me');
+    if (me.success) u = { ...currentUser, ...me.data };
+  } catch (e) { /* 兜底用 currentUser */ }
   const role = u.role;
+
+  // V5: 商家/达人独有信息（个人中心额外展示）
+  let extraInfo = '';
+  if (role === 'influencer') {
+    // 拉取达人完整资料（含 4 个 V4 字段）
+    try {
+      const detailRes = await fetchAPI(`/influencers/${u.id}`);
+      if (detailRes.success) Object.assign(u, detailRes.data);
+    } catch (e) {}
+    extraInfo = `
+      ${u.video_category_track ? `<div class="profile-field"><label>带货品类</label><div>${escapeHtml(u.video_category_track)}</div></div>` : ''}
+      ${u.region ? `<div class="profile-field"><label>地区</label><div>${escapeHtml(u.region)}</div></div>` : ''}
+      ${u.cooperation_type ? `<div class="profile-field"><label>合作类型</label><div>${escapeHtml(u.cooperation_type)}</div></div>` : ''}
+      ${u.introduction ? `<div class="profile-field"><label>账号介绍</label><div style="white-space:pre-wrap">${escapeHtml(u.introduction)}</div></div>` : ''}
+      ${u.audience_profile ? `<div class="profile-field"><label>粉丝画像</label><div>${escapeHtml(u.audience_profile)}</div></div>` : ''}
+      ${u.representative_works ? `<div class="profile-field"><label>代表作品</label><div style="word-break:break-all">${escapeHtml(u.representative_works)}</div></div>` : ''}
+      ${u.has_official_account ? `<div class="profile-field"><label>公众号可接单</label><div>${escapeHtml(u.has_official_account)}</div></div>` : ''}
+    `;
+  } else if (role === 'merchant') {
+    extraInfo = `
+      ${u.industry ? `<div class="profile-field"><label>行业</label><div>${escapeHtml(u.industry)}</div></div>` : ''}
+    `;
+  }
 
   container.innerHTML = `
     ${renderBackButton()}
@@ -6896,23 +6941,23 @@ async function renderProfile() {
       <div class="profile-card">
         <div class="profile-header">
           <div class="profile-avatar">${(u.name || '?').charAt(0)}</div>
-          <div>
+          <div style="flex:1">
             <div class="profile-name">${escapeHtml(u.name || '')}</div>
             <div class="profile-role">${role === 'merchant' ? '商家' : (role === 'influencer' ? '达人' : '管理员')}${u.company ? ' · ' + escapeHtml(u.company) : ''}</div>
           </div>
+          ${role === 'merchant' || role === 'influencer' ? `<button class="btn btn-primary btn-sm" onclick="showEditProfileModal()">✏️ 编辑资料</button>` : ''}
         </div>
 
         <div class="profile-section">
           <h3>基础信息</h3>
-          <div class="profile-field"><label>ID</label><div>${escapeHtml(u.id || '')}</div></div>
           <div class="profile-field"><label>姓名/账号</label><div>${escapeHtml(u.name || u.video_account_name || '')}</div></div>
-          ${u.phone ? `<div class="profile-field"><label>手机号</label><div>${escapeHtml(u.phone)}</div></div>` : ''}
-          ${u.email ? `<div class="profile-field"><label>邮箱</label><div>${escapeHtml(u.email)}</div></div>` : ''}
+          ${u.phone ? `<div class="profile-field"><label>手机号</label><div>${escapeHtml(u.phone)}</div></div>` : '<div class="profile-field"><label>手机号</label><div style="color:#cbd5e1">未填写</div></div>'}
+          ${u.email ? `<div class="profile-field"><label>邮箱</label><div>${escapeHtml(u.email)}</div></div>` : '<div class="profile-field"><label>邮箱</label><div style="color:#cbd5e1">未填写</div></div>'}
           ${role === 'merchant' ? `<div class="profile-field"><label>公司</label><div>${escapeHtml(u.company || '')}</div></div>` : ''}
-          ${role === 'merchant' && u.industry ? `<div class="profile-field"><label>行业</label><div>${escapeHtml(u.industry)}</div></div>` : ''}
           ${role === 'influencer' ? `<div class="profile-field"><label>视频号</label><div>${escapeHtml(u.video_account_name || '')}</div></div>` : ''}
-          ${role === 'influencer' && u.level ? `<div class="profile-field"><label>达人等级</label><div>${u.level}</div></div>` : ''}
+          ${role === 'influencer' && u.level ? `<div class="profile-field"><label>达人等级</label><div>${escapeHtml(u.level)}</div></div>` : ''}
           ${role === 'influencer' && u.fans_count ? `<div class="profile-field"><label>粉丝数</label><div>${formatBigNumber(u.fans_count)}</div></div>` : ''}
+          ${extraInfo}
         </div>
 
         <div class="profile-section">
@@ -6922,6 +6967,142 @@ async function renderProfile() {
       </div>
     </div>
   `;
+  // 缓存当前用户的完整资料（用于编辑弹窗回填）
+  window.__profileFullData = u;
+}
+
+// V5: 个人中心 - 编辑资料弹窗
+function showEditProfileModal() {
+  const u = window.__profileFullData || currentUser;
+  const role = u.role;
+  document.getElementById('modal-title').textContent = '编辑个人资料';
+
+  let formHtml = '';
+  if (role === 'merchant') {
+    formHtml = `
+      <form onsubmit="submitEditProfile(event)">
+        <div class="form-group"><label>联系人姓名 *</label><input id="ep-name" required value="${escapeHtml(u.name || '')}"></div>
+        <div class="form-group"><label>公司名称 *</label><input id="ep-company" required value="${escapeHtml(u.company || '')}"></div>
+        <div class="form-row" style="display:flex;gap:12px">
+          <div class="form-group" style="flex:1"><label>手机号</label><input id="ep-phone" value="${escapeHtml(u.phone || '')}" placeholder="11位手机号"></div>
+          <div class="form-group" style="flex:1"><label>邮箱</label><input id="ep-email" type="email" value="${escapeHtml(u.email || '')}"></div>
+        </div>
+        <div class="form-group"><label>行业</label>
+          <select id="ep-industry">
+            <option value="">请选择</option>
+            ${['图书出版','在线教育','教辅出版','数字内容','课程平台','MCN代理','其他'].map(i => `<option value="${i}" ${u.industry===i?'selected':''}>${i}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group"><label>简介</label><textarea id="ep-description" rows="3" placeholder="公司/品牌简介">${escapeHtml(u.description || '')}</textarea></div>
+        <div style="text-align:right;margin-top:20px">
+          <button type="button" class="btn btn-outline" onclick="closeModal()">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    `;
+  } else if (role === 'influencer') {
+    const COOP_TYPES = ['纯佣金','商家投流+低佣金','话题素材发布','内容素材授权'];
+    const cur_coop = (u.cooperation_type || '').split(/[,，]/);
+    formHtml = `
+      <form onsubmit="submitEditProfile(event)">
+        <div class="form-group"><label>视频号账号名 *</label><input id="ep-video_account_name" required value="${escapeHtml(u.video_account_name || '')}"></div>
+        <div class="form-row" style="display:flex;gap:12px">
+          <div class="form-group" style="flex:1"><label>手机号</label><input id="ep-phone" value="${escapeHtml(u.phone || '')}"></div>
+          <div class="form-group" style="flex:1"><label>邮箱</label><input id="ep-email" type="email" value="${escapeHtml(u.email || '')}"></div>
+        </div>
+        <div class="form-row" style="display:flex;gap:12px">
+          <div class="form-group" style="flex:1"><label>带货品类</label><input id="ep-video_category_track" value="${escapeHtml(u.video_category_track || '')}" placeholder="如：图书,教育"></div>
+          <div class="form-group" style="flex:1"><label>地区</label><input id="ep-region" value="${escapeHtml(u.region || '')}" placeholder="如：北京"></div>
+        </div>
+        <div class="form-row" style="display:flex;gap:12px">
+          <div class="form-group" style="flex:1"><label>粉丝数</label><input id="ep-fans_count" type="number" min="0" value="${u.fans_count || 0}"></div>
+          <div class="form-group" style="flex:1"><label>公众号可接单</label>
+            <select id="ep-has_official_account">
+              <option value="">未填</option>
+              <option value="是" ${u.has_official_account==='是'?'selected':''}>是</option>
+              <option value="否" ${u.has_official_account==='否'?'selected':''}>否</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>合作类型（多选）</label>
+          <div class="chip-check-row">
+            ${COOP_TYPES.map(c => `<label class="chip-check"><input type="checkbox" name="ep_coop" value="${c}" ${cur_coop.includes(c)?'checked':''}><span>${c}</span></label>`).join('')}
+          </div>
+        </div>
+        <div class="form-group"><label>账号介绍 <span style="color:#94a3b8;font-size:12px">(100-200字，方便商家了解你)</span></label>
+          <textarea id="ep-introduction" rows="3" placeholder="介绍你的账号定位、内容方向、过往合作案例等">${escapeHtml(u.introduction || '')}</textarea>
+        </div>
+        <div class="form-group"><label>粉丝画像</label>
+          <textarea id="ep-audience_profile" rows="2" placeholder="如：女性70% / 25-35岁 / 华东60%">${escapeHtml(u.audience_profile || '')}</textarea>
+        </div>
+        <div class="form-group"><label>代表作品 <span style="color:#94a3b8;font-size:12px">(最多3条链接，用分号 ; 分隔)</span></label>
+          <textarea id="ep-representative_works" rows="2" placeholder="https://channels.weixin.qq.com/...; https://...">${escapeHtml(u.representative_works || '')}</textarea>
+        </div>
+        <div style="text-align:right;margin-top:20px">
+          <button type="button" class="btn btn-outline" onclick="closeModal()">取消</button>
+          <button type="submit" class="btn btn-primary">保存</button>
+        </div>
+      </form>
+    `;
+  }
+
+  document.getElementById('modal-body').innerHTML = formHtml;
+  document.getElementById('modal-footer').innerHTML = '';
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+async function submitEditProfile(e) {
+  e.preventDefault();
+  const form = e.target;
+  const u = currentUser;
+  const role = u.role;
+  const get = id => (document.getElementById(id) || {}).value || '';
+  const getNum = id => parseInt(get(id)) || 0;
+
+  let endpoint, payload;
+  if (role === 'merchant') {
+    payload = {
+      name: get('ep-name'),
+      company: get('ep-company'),
+      phone: get('ep-phone'),
+      email: get('ep-email'),
+      industry: get('ep-industry'),
+      description: get('ep-description'),
+    };
+    endpoint = `/merchants/${u.id}`;
+  } else if (role === 'influencer') {
+    const coopChecks = Array.from(form.querySelectorAll('input[name="ep_coop"]:checked')).map(x => x.value);
+    payload = {
+      video_account_name: get('ep-video_account_name'),
+      phone: get('ep-phone'),
+      email: get('ep-email'),
+      video_category_track: get('ep-video_category_track'),
+      region: get('ep-region'),
+      fans_count: getNum('ep-fans_count'),
+      cooperation_type: coopChecks.join(','),
+      has_official_account: get('ep-has_official_account'),
+      introduction: get('ep-introduction'),
+      audience_profile: get('ep-audience_profile'),
+      representative_works: get('ep-representative_works'),
+    };
+    endpoint = `/influencers/${u.id}`;
+  }
+
+  const res = await fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(payload) });
+  if (res.success) {
+    showToast('资料已更新');
+    closeModal();
+    // 同步更新 currentUser 缓存
+    Object.assign(currentUser, payload);
+    try {
+      const stored = JSON.parse(localStorage.getItem('bizmatch_user') || '{}');
+      Object.assign(stored, payload);
+      localStorage.setItem('bizmatch_user', JSON.stringify(stored));
+    } catch (e) {}
+    renderProfile();
+  } else {
+    showToast(res.error || '保存失败', 'error');
+  }
 }
 
 function showChangePasswordModal() {

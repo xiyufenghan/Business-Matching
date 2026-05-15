@@ -422,7 +422,19 @@ router.put('/:id', (req, res) => {
     const existing = req.db.prepare('SELECT * FROM merchants WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ success: false, error: '商家不存在' });
 
-    const fields = ['name', 'company', 'phone', 'email', 'industry', 'description', 'sales_owner_id', 'status', 'password'];
+    // V5: 权限控制
+    // - admin：可改全部字段
+    // - merchant 本人：只能改自己 + 仅限基础资料字段
+    // - 其他：拒绝
+    const isAdmin = req.user && req.user.role === 'admin';
+    const isSelf = req.user && req.user.role === 'merchant' && req.user.id === id;
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ success: false, error: '无权限修改' });
+    }
+    const allowedFields = isAdmin
+      ? ['name', 'company', 'phone', 'email', 'industry', 'description', 'sales_owner_id', 'status', 'password']
+      : ['name', 'company', 'phone', 'email', 'industry', 'description'];
+    const fields = allowedFields;
     const updates = [];
     const params = [];
 

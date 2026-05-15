@@ -726,6 +726,13 @@ router.put('/:id', (req, res) => {
     const id = req.params.id;
     const existing = req.db.prepare('SELECT * FROM influencers WHERE id = ?').get(id);
     if (!existing) return res.status(404).json({ success: false, error: '达人不存在' });
+
+    // V5: 权限控制
+    const isAdmin = req.user && req.user.role === 'admin';
+    const isSelf = req.user && req.user.role === 'influencer' && req.user.id === id;
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ success: false, error: '无权限修改' });
+    }
     
     // 联动处理：若传入 sales_owner_id，则用管理员当前 name 覆盖 sales_owner 文本；若仅传 sales_owner 文本，则尝试反查 id
     const body = { ...req.body };
@@ -749,7 +756,17 @@ router.put('/:id', (req, res) => {
       }
     }
     
-    const fields = ['level', 'video_account_name', 'phone', 'video_category_track', 'monthly_short_video_sales', 'monthly_live_sales', 'fans_count', 'cooperation_type', 'book_willingness', 'course_willingness', 'short_video_frequency', 'live_frequency', 'has_mcn', 'mcn_name', 'region', 'has_joined_mutual_select', 'sales_owner', 'official_account_name', 'sales_owner_id'];
+    // V5: 字段白名单按角色区分
+    const adminFields = ['level', 'video_account_name', 'phone', 'email', 'video_category_track',
+      'monthly_short_video_sales', 'monthly_live_sales', 'fans_count', 'cooperation_type',
+      'book_willingness', 'course_willingness', 'short_video_frequency', 'live_frequency',
+      'has_mcn', 'mcn_name', 'region', 'has_joined_mutual_select', 'sales_owner',
+      'official_account_name', 'sales_owner_id',
+      'introduction', 'audience_profile', 'representative_works', 'has_official_account'];
+    const selfFields = ['video_account_name', 'phone', 'email', 'video_category_track',
+      'fans_count', 'cooperation_type', 'region',
+      'introduction', 'audience_profile', 'representative_works', 'has_official_account'];
+    const fields = isAdmin ? adminFields : selfFields;
 
     // 写入前对 level 做规范化，避免存入"S级"导致编辑回显匹配不上 S/A/B/C/D 选项
     if (body.level !== undefined) body.level = normalizeLevel(body.level);
