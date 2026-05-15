@@ -308,8 +308,80 @@ router.put('/confirm/:id', (req, res) => {
 router.put('/reject/:id', (req, res) => {
   try {
     const { id } = req.params;
+    const coop = req.db.prepare('SELECT * FROM cooperation WHERE id = ?').get(id);
+    if (!coop) return res.status(404).json({ success: false, error: '合作记录不存在' });
+    if (coop.status === 'rejected') {
+      return res.json({ success: true, message: '已拒绝过，无需重复操作' });
+    }
+
     req.db.prepare("UPDATE cooperation SET status = 'rejected', updated_at = datetime('now') WHERE id = ?").run(id);
-    res.json({ success: true, message: '已拒绝合作' });
+
+    // V5 A1: 数据一致性 - 如果该 cooperation 已孵化过 matchmaking 且没有其他活跃 cooperation 关联，
+    // 同步把对应的 matchmaking 记录关闭（软删）
+    let cleanedCount = 0;
+    try {
+      // 查找同一对 (merchant, influencer) 是否还有其他已确认/活跃的 cooperation
+      const otherActive = req.db.prepare(`
+        SELECT COUNT(*) as cnt FROM cooperation
+        WHERE merchant_id = ? AND influencer_id = ?
+          AND id != ?
+          AND status = 'confirmed'
+      `).get(coop.merchant_id, coop.influencer_id, id);
+
+      if (otherActive.cnt === 0) {
+        // 没有其他活跃合作 → 安全清理对应的 matchmaking（仅清理"未真正开始合作"的）
+        const result = req.db.prepare(`
+          UPDATE matchmaking
+          SET stage = 'rejected', notes = COALESCE(notes, '') || ' [自动关闭：合作已被拒绝]',
+              updated_at = datetime('now')
+          WHERE merchant_id = ? AND influencer_id = ?
+            AND stage IN ('published', 'responded', 'connected', 'sample_sent')
+        `).run(coop.merchant_id, coop.influencer_id);
+        cleanedCount = result.changes;
+
+        // 记录历史
+        if (cleanedCount > 0) {
+          const mmRows = req.db.prepare(`
+            SELECT id FROM matchmaking
+            WHERE merchant_id = ? AND influencer_id = ? AND stage = 'rejected'
+            ORDER BY updated_at DESC LIMIT ?
+          `).all(coop.merchant_id, coop.influencer_id, cleanedCount);
+          for (const mm of mmRows) {
+            req.db.prepare(`
+              INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
+              VALUES (?, ?, 'rejected', '系统', '合作被拒绝，自动关闭撮合工单', datetime('now'))
+            `).run(uuidv4(), mm.id);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[cooperation/reject] 清理 matchmaking 失败:', e.message);
+    }
+
+    // 站内通知发起方
+    try {
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(coop.merchant_id);
+      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(coop.influencer_id);
+      const mName = m ? m.company : '商家';
+      const infName = inf ? inf.video_account_name : '达人';
+
+      if (coop.initiative === 'merchant') {
+        // 商家发起 → 达人拒绝 → 通知商家
+        writeNotification(req.db, 'merchant', coop.merchant_id, 'rejected',
+          `达人「${infName}」拒绝了您的合作邀约`, id);
+      } else {
+        // 达人/对方发起 → 对方拒绝 → 通知发起方
+        writeNotification(req.db, 'influencer', coop.influencer_id, 'rejected',
+          `商家「${mName}」拒绝了您的合作申请`, id);
+      }
+    } catch (e) { /* 静默失败 */ }
+
+    res.json({
+      success: true,
+      message: cleanedCount > 0
+        ? `已拒绝合作，同步关闭 ${cleanedCount} 条相关撮合工单`
+        : '已拒绝合作'
+    });
   } catch (err) {
     console.error('[' + "routes/cooperation.js" + ']', err);
     res.status(500).json({ success: false, error: '操作失败，请稍后重试' });

@@ -426,6 +426,30 @@ function initDatabase() {
     db.exec('CREATE INDEX IF NOT EXISTS idx_demands_ref ON demands(ref_demand_id, demand_type, status)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)');
+
+    // V5 A2: merchants.company 唯一索引（防并发批量导入产生重复商家）
+    // 仅对 status != 'deleted' 的记录生效（PARTIAL UNIQUE INDEX）
+    try {
+      // 先清理潜在的重复数据：保留最早创建的，其余标记为 deleted
+      const dupGroups = db.prepare(`
+        SELECT company, MIN(created_at) as min_t
+        FROM merchants
+        WHERE status != 'deleted' AND company IS NOT NULL AND company != ''
+        GROUP BY company
+        HAVING COUNT(*) > 1
+      `).all();
+      for (const dg of dupGroups) {
+        db.prepare(`
+          UPDATE merchants SET status = 'deleted'
+          WHERE company = ? AND status != 'deleted' AND created_at != ?
+        `).run(dg.company, dg.min_t);
+      }
+      if (dupGroups.length > 0) {
+        console.log('[DB A2] 清理 merchants 重复 company:', dupGroups.length, '组');
+      }
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_merchants_company_unique
+               ON merchants(company) WHERE status != 'deleted' AND company IS NOT NULL AND company != ''`);
+    } catch (e) { console.error('[DB A2 merchants.company unique]', e.message); }
   } catch (e) { console.error('[DB indexes]', e.message); }
 
   // V5 邀请码过期：merchants/influencers 表加 invite_code_expires_at 字段

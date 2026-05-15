@@ -71,17 +71,35 @@ const COURSE_FIELDS_ORDER = [
 ];
 
 // 工具函数：根据商家名称查找或自动创建 merchant
+// V5 A2: 增加 UNIQUE 冲突保护，防并发导入重复创建
 function findOrCreateMerchant(db, merchantName, salesOwnerId) {
   if (!merchantName) return null;
-  // 先按 company 或 name 精确匹配
-  let merchant = db.prepare('SELECT id FROM merchants WHERE company = ? OR name = ? LIMIT 1').get(merchantName, merchantName);
+  const trimmed = String(merchantName).trim();
+  if (!trimmed) return null;
+
+  // 1) 先按 company 或 name 精确匹配（仅取未删除的）
+  let merchant = db.prepare(
+    "SELECT id FROM merchants WHERE (company = ? OR name = ?) AND status != 'deleted' LIMIT 1"
+  ).get(trimmed, trimmed);
   if (merchant) return merchant.id;
-  // 不存在则自动创建
+
+  // 2) 不存在则自动创建（捕获 UNIQUE 冲突回查）
   const id = uuidv4();
-  db.prepare(`INSERT INTO merchants (id, name, company, phone, email, industry, description, sales_owner_id)
-              VALUES (?, ?, ?, '', '', '图书/课程', '批量导入自动创建', ?)`)
-    .run(id, merchantName, merchantName, salesOwnerId || null);
-  return id;
+  try {
+    db.prepare(`INSERT INTO merchants (id, name, company, phone, email, industry, description, sales_owner_id)
+                VALUES (?, ?, ?, '', '', '图书/课程', '批量导入自动创建', ?)`)
+      .run(id, trimmed, trimmed, salesOwnerId || null);
+    return id;
+  } catch (e) {
+    // SQLITE_CONSTRAINT_UNIQUE：并发竞态时另一个事务已经写入
+    if (e && e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      const existed = db.prepare(
+        "SELECT id FROM merchants WHERE company = ? AND status != 'deleted' LIMIT 1"
+      ).get(trimmed);
+      if (existed) return existed.id;
+    }
+    throw e;
+  }
 }
 
 // 工具函数：根据销售姓名查找销售管理员ID

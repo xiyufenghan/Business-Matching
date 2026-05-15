@@ -370,7 +370,27 @@ router.get('/:id', (req, res) => {
       WHERE m.id = ?
     `).get(req.params.id);
     if (!merchant) return res.status(404).json({ success: false, error: '商家不存在' });
-    res.json({ success: true, data: merchant });
+
+    // V5 A3: 按角色过滤敏感字段
+    const role = req.user && req.user.role;
+    const isSelf = role === 'merchant' && req.user.id === req.params.id;
+    const isAdmin = role === 'admin';
+
+    if (isSelf || isAdmin) {
+      const { password, password_hash, ...safe } = merchant;
+      return res.json({ success: true, data: safe });
+    }
+
+    // 达人等其他角色：返回公开版（去掉联系方式、密码、邀请码、销售归属）
+    const publicFields = [
+      'id', 'company', 'industry', 'description', 'logo', 'brand_desc', 'website',
+      'invite_status', 'demand_count', 'recruitment_count', 'matchmaking_count', 'created_at'
+    ];
+    const publicData = {};
+    for (const f of publicFields) {
+      if (f in merchant) publicData[f] = merchant[f];
+    }
+    res.json({ success: true, data: publicData });
   } catch (err) {
     console.error('[' + "routes/merchants.js" + ']', err);
     res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
@@ -399,13 +419,21 @@ router.post('/', (req, res) => {
     const inviteStatus = isInviteMode ? 'pending' : 'active';
     const finalPassword = isInviteMode ? '' : (password || '123456');
 
-    req.db.prepare(`
-      INSERT INTO merchants (id, name, company, phone, email, industry, description, sales_owner_id, password, status,
-        invite_code, invite_status, invited_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
-    `).run(id, name, company, phone, email || null, industry || null, description || null,
-      sales_owner_id || null, finalPassword,
-      inviteCode, inviteStatus, invited_by || null);
+    try {
+      req.db.prepare(`
+        INSERT INTO merchants (id, name, company, phone, email, industry, description, sales_owner_id, password, status,
+          invite_code, invite_status, invited_by)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+      `).run(id, name, company, phone, email || null, industry || null, description || null,
+        sales_owner_id || null, finalPassword,
+        inviteCode, inviteStatus, invited_by || null);
+    } catch (e) {
+      // V5 A2: 捕获 UNIQUE 约束冲突（并发时两个请求都通过了 SELECT）
+      if (e && e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        return res.status(400).json({ success: false, error: '该公司名称已被其他商家使用，请换一个名称' });
+      }
+      throw e;
+    }
 
     const merchant = req.db.prepare('SELECT * FROM merchants WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: merchant, invite_code: inviteCode });

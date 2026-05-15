@@ -713,7 +713,34 @@ router.get('/:id', (req, res) => {
   try {
     const influencer = req.db.prepare('SELECT * FROM influencers WHERE id = ?').get(req.params.id);
     if (!influencer) return res.status(404).json({ success: false, error: '达人不存在' });
-    res.json({ success: true, data: influencer });
+
+    // V5 A3: 按角色过滤敏感字段，防止数据泄漏
+    const role = req.user && req.user.role;
+    const isSelf = role === 'influencer' && req.user.id === req.params.id;
+    const isAdmin = role === 'admin';
+
+    if (isSelf || isAdmin) {
+      // 本人或管理员：返回除密码字段以外的全部
+      const { password, password_hash, ...safe } = influencer;
+      return res.json({ success: true, data: safe });
+    }
+
+    // 其他角色（merchant 等）：返回公开版（剔除联系方式、密码、邀请码、归属销售id等）
+    const publicFields = [
+      'id', 'level', 'video_account_name', 'video_category_track',
+      'monthly_short_video_sales', 'monthly_live_sales', 'fans_count',
+      'cooperation_type', 'book_willingness', 'course_willingness',
+      'short_video_frequency', 'live_frequency',
+      'has_mcn', 'mcn_name', 'region', 'has_joined_mutual_select',
+      'official_account_name', 'introduction', 'audience_profile',
+      'representative_works', 'has_official_account',
+      'invite_status', 'created_at'
+    ];
+    const publicData = {};
+    for (const f of publicFields) {
+      if (f in influencer) publicData[f] = influencer[f];
+    }
+    res.json({ success: true, data: publicData });
   } catch (err) {
     console.error('[' + "routes/influencers.js" + ']', err);
     res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
