@@ -1,7 +1,16 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
+const { notifyWework, WEWORK_EVENTS } = require('./notifications');
 const BCRYPT_COST = 10;
+
+function escapeMd(s) {
+  if (s == null) return '';
+  return String(s).replace(/[<>]/g, '');
+}
+function nowCN() {
+  return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+}
 
 // 工具：脱敏显示名字（张三 → 张*；人民邮电出版社 → 人民**出版社）
 function maskName(name) {
@@ -117,6 +126,19 @@ router.post('/activate', (req, res) => {
       message: '账号激活成功',
       data: { login_username: loginUsername, kind: rec.kind }
     });
+
+    // 企微推送：场景#10 新用户激活入驻（异步，不阻塞响应）
+    try {
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.USER_ACTIVATED.key,
+        type: 'markdown',
+        content: `**👤 新用户激活入驻**\n` +
+                 `> 类型：${rec.kind === 'merchant' ? '🏢 商家' : '🎤 达人'}\n` +
+                 `> 名称：<font color="info">${escapeMd(rec.kind === 'merchant' ? (rec.company || rec.name) : rec.video_account_name)}</font>\n` +
+                 `> 登录账号：${escapeMd(loginUsername)}\n` +
+                 `> 时间：${nowCN()}`,
+      });
+    } catch (e) { /* fire-and-forget */ }
   } catch (err) {
     console.error('[' + "routes/invitations.js" + ']', err);
     res.status(500).json({ success: false, error: '操作失败，请稍后重试' });

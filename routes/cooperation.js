@@ -1,7 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { writeNotification, notifyWework } = require('./notifications');
+const { writeNotification, notifyWework, WEWORK_EVENTS, getOwnerSalesMobiles } = require('./notifications');
+
+// V5: markdown 推送辅助
+function escapeMd(s) {
+  if (s == null) return '';
+  return String(s).replace(/[<>]/g, '');
+}
+function formatFans(n) {
+  if (!n) return '';
+  if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + 'w';
+  return String(n);
+}
+function nowCN() {
+  return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+}
 
 // ===== 工具：从 cooperation 孵化 matchmaking =====
 // 在 cooperation 被 confirm 时调用。同一对 (merchant, influencer) 若已存在未关闭的撮合则不重复建。
@@ -76,13 +90,46 @@ router.post('/invite', (req, res) => {
     if (actualInitiative === 'merchant') {
       // 商家邀请达人 → 通知达人
       const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
+      const inf = req.db.prepare('SELECT video_account_name, level, fans_count FROM influencers WHERE id = ?').get(influencer_id);
       writeNotification(req.db, 'influencer', influencer_id, 'invite',
         `商家「${m ? m.company : '未知商家'}」向您发起了合作邀约，请查看并回复`, id);
+
+      // 企微推送：场景#4 商家邀约达人
+      const mobiles = getOwnerSalesMobiles(req.db, { merchantId: merchant_id, influencerId: influencer_id });
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.MERCHANT_INVITE.key,
+        type: 'markdown',
+        content: `**🤝 商家邀约达人**\n` +
+                 `> 商家：<font color="info">${escapeMd(m ? m.company : '未知商家')}</font>\n` +
+                 `> 达人：<font color="warning">${escapeMd(inf ? inf.video_account_name : '未知达人')}</font>` +
+                 `${inf && inf.level ? ` （${inf.level}）` : ''}` +
+                 `${inf && inf.fans_count ? ` · 粉丝 ${formatFans(inf.fans_count)}` : ''}\n` +
+                 (message ? `> 留言：${escapeMd(String(message).slice(0, 80))}\n` : '') +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请销售及时跟进～`,
+        mentionedMobiles: mobiles,
+      });
     } else {
       // 达人邀约商家 → 通知商家
-      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(influencer_id);
+      const inf = req.db.prepare('SELECT video_account_name, level, fans_count FROM influencers WHERE id = ?').get(influencer_id);
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
       writeNotification(req.db, 'merchant', merchant_id, 'invite',
         `达人「${inf ? inf.video_account_name : '未知达人'}」向您发起了合作邀约，请查看并回复`, id);
+
+      // 企微推送：达人主动邀约商家（沿用 MERCHANT_INVITE 开关）
+      const mobiles = getOwnerSalesMobiles(req.db, { merchantId: merchant_id, influencerId: influencer_id });
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.MERCHANT_INVITE.key,
+        type: 'markdown',
+        content: `**🤝 达人主动邀约商家**\n` +
+                 `> 达人：<font color="warning">${escapeMd(inf ? inf.video_account_name : '未知达人')}</font>` +
+                 `${inf && inf.level ? ` （${inf.level}）` : ''}\n` +
+                 `> 商家：<font color="info">${escapeMd(m ? m.company : '未知商家')}</font>\n` +
+                 (message ? `> 留言：${escapeMd(String(message).slice(0, 80))}\n` : '') +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请销售关注～`,
+        mentionedMobiles: mobiles,
+      });
     }
 
     res.status(201).json({ success: true, message: '邀请已发送', data: { id } });
@@ -115,19 +162,52 @@ router.post('/apply', (req, res) => {
     // 站内通知 + 企微推送（达人响应商家需求时触发）
     if (actualInitiative === 'influencer') {
       // 通知商家：达人对需求有意向
-      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(influencer_id);
+      const inf = req.db.prepare('SELECT video_account_name, level, fans_count FROM influencers WHERE id = ?').get(influencer_id);
       const d = demand_id ? req.db.prepare('SELECT title FROM demands WHERE id = ?').get(demand_id) : null;
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
       const infName = inf ? inf.video_account_name : '未知达人';
       const demTitle = d ? d.title : '您的需求';
       writeNotification(req.db, 'merchant', merchant_id, 'interest',
         `达人「${infName}」对「${demTitle}」表达了合作意向，请及时回复`, id);
-      // 企微推送
-      notifyWework(req.db, `【商达撮合】达人「${infName}」对「${demTitle}」表达了合作意向，请销售跟进！`);
+
+      // 企微推送：场景#3 达人响应商家需求
+      const mobiles = getOwnerSalesMobiles(req.db, { merchantId: merchant_id, influencerId: influencer_id });
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.INFLUENCER_APPLY.key,
+        type: 'markdown',
+        content: `**🎯 达人响应商家需求**\n` +
+                 `> 达人：<font color="warning">${escapeMd(infName)}</font>` +
+                 `${inf && inf.level ? ` （${inf.level}）` : ''}` +
+                 `${inf && inf.fans_count ? ` · 粉丝 ${formatFans(inf.fans_count)}` : ''}\n` +
+                 `> 商家：<font color="info">${escapeMd(m ? m.company : '未知商家')}</font>\n` +
+                 `> 需求：${escapeMd(demTitle)}\n` +
+                 (message ? `> 留言：${escapeMd(String(message).slice(0, 80))}\n` : '') +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请销售及时跟进～`,
+        mentionedMobiles: mobiles,
+      });
     } else {
       // 商家响应达人需求 → 通知达人
       const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
+      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(influencer_id);
+      const infDem = influencer_demand_id ? req.db.prepare('SELECT book_name, description FROM influencer_demands WHERE id = ?').get(influencer_demand_id) : null;
       writeNotification(req.db, 'influencer', influencer_id, 'response',
         `商家「${m ? m.company : '未知商家'}」对您的带货意向进行了响应，请查看`, id);
+
+      // 企微推送：商家响应达人意向（沿用 INFLUENCER_APPLY 同类事件开关）
+      const mobiles = getOwnerSalesMobiles(req.db, { merchantId: merchant_id, influencerId: influencer_id });
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.INFLUENCER_APPLY.key,
+        type: 'markdown',
+        content: `**🎯 商家响应达人意向**\n` +
+                 `> 商家：<font color="info">${escapeMd(m ? m.company : '未知商家')}</font>\n` +
+                 `> 达人：<font color="warning">${escapeMd(inf ? inf.video_account_name : '未知达人')}</font>\n` +
+                 (infDem ? `> 达人意向：${escapeMd(infDem.book_name || infDem.description || '').slice(0, 50)}\n` : '') +
+                 (message ? `> 留言：${escapeMd(String(message).slice(0, 80))}\n` : '') +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请销售及时跟进～`,
+        mentionedMobiles: mobiles,
+      });
     }
 
     res.status(201).json({ success: true, message: '申请已发送', data: { id } });
@@ -158,20 +238,57 @@ router.put('/confirm/:id', (req, res) => {
     // 站内通知：通知发起方已确认
     try {
       const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(coop.merchant_id);
-      const inf = req.db.prepare('SELECT video_account_name FROM influencers WHERE id = ?').get(coop.influencer_id);
+      const inf = req.db.prepare('SELECT video_account_name, level FROM influencers WHERE id = ?').get(coop.influencer_id);
       const mName = m ? m.company : '商家';
       const infName = inf ? inf.video_account_name : '达人';
+      const mobiles = getOwnerSalesMobiles(req.db, { merchantId: coop.merchant_id, influencerId: coop.influencer_id });
+
       if (coop.initiative === 'merchant') {
         // 商家发起 → 达人确认 → 通知商家
         writeNotification(req.db, 'merchant', coop.merchant_id, 'confirmed',
           `达人「${infName}」已接受您的合作邀约，撮合工单已生成！`, id);
+
+        // 企微推送：场景#6 达人接受商家邀约
+        notifyWework(req.db, {
+          eventKey: WEWORK_EVENTS.INFLUENCER_ACCEPT.key,
+          type: 'markdown',
+          content: `**✅ 达人接受商家邀约**\n` +
+                   `> 达人：<font color="warning">${escapeMd(infName)}</font>` +
+                   `${inf && inf.level ? ` （${inf.level}）` : ''}\n` +
+                   `> 商家：<font color="info">${escapeMd(mName)}</font>\n` +
+                   `> 时间：${nowCN()}\n\n` +
+                   `撮合工单已自动孵化，请销售推进～`,
+          mentionedMobiles: mobiles,
+        });
       } else {
         // 达人/商家发起 → 对方确认 → 通知发起方
         writeNotification(req.db, 'influencer', coop.influencer_id, 'confirmed',
           `商家「${mName}」已接受您的合作申请，撮合工单已生成！`, id);
+
+        // 企微推送：场景#5 商家接受达人申请
+        notifyWework(req.db, {
+          eventKey: WEWORK_EVENTS.MERCHANT_ACCEPT.key,
+          type: 'markdown',
+          content: `**✅ 商家接受达人申请**\n` +
+                   `> 商家：<font color="info">${escapeMd(mName)}</font>\n` +
+                   `> 达人：<font color="warning">${escapeMd(infName)}</font>\n` +
+                   `> 时间：${nowCN()}\n\n` +
+                   `撮合工单已自动孵化，请销售推进～`,
+          mentionedMobiles: mobiles,
+        });
       }
-      // 企微推送：意向达成
-      notifyWework(req.db, `【商达撮合·意向达成】商家「${mName}」× 达人「${infName}」已确认合作意向，请销售及时跟进！`);
+
+      // 企微推送：场景#7 双方意向达成（任何 confirm 都会触发，与 5/6 互补）
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.INTENT_CONFIRMED.key,
+        type: 'markdown',
+        content: `**🎉 双方意向达成**\n` +
+                 `> 商家：<font color="info">${escapeMd(mName)}</font>\n` +
+                 `> 达人：<font color="warning">${escapeMd(infName)}</font>\n` +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请销售跟进后续合作流程～`,
+        mentionedMobiles: mobiles,
+      });
     } catch (e) {
       console.error('[cooperation/confirm] 通知失败:', e.message);
     }
@@ -552,6 +669,43 @@ router.put('/matchmaking/:id/stage', (req, res) => {
       INSERT INTO matchmaking_history (id, matchmaking_id, stage, operator, notes, created_at)
       VALUES (?, ?, ?, ?, ?, datetime('now'))
     `).run(uuidv4(), id, stage, '管理员', notes || `流转到${stage}阶段`);
+
+    // 企微推送：场景#8/#9 撮合阶段推进
+    try {
+      const STAGE_EVENT_MAP = {
+        'sample_sent':  WEWORK_EVENTS.STAGE_SAMPLE_SENT.key,
+        '样品寄送':      WEWORK_EVENTS.STAGE_SAMPLE_SENT.key,
+        'cooperating':  WEWORK_EVENTS.STAGE_COOPERATING.key,
+        '开始合作':      WEWORK_EVENTS.STAGE_COOPERATING.key,
+      };
+      const STAGE_LABEL = {
+        'sample_sent': '📮 样品寄送', '样品寄送': '📮 样品寄送',
+        'cooperating': '🚀 开始合作', '开始合作': '🚀 开始合作',
+      };
+      const eventKey = STAGE_EVENT_MAP[stage];
+      if (eventKey) {
+        const mm = req.db.prepare(`
+          SELECT mm.merchant_id, mm.influencer_id, m.company as merchant_company, i.video_account_name
+          FROM matchmaking mm
+          LEFT JOIN merchants m ON mm.merchant_id = m.id
+          LEFT JOIN influencers i ON mm.influencer_id = i.id
+          WHERE mm.id = ?
+        `).get(id);
+        if (mm) {
+          const mobiles = getOwnerSalesMobiles(req.db, { merchantId: mm.merchant_id, influencerId: mm.influencer_id });
+          notifyWework(req.db, {
+            eventKey,
+            type: 'markdown',
+            content: `**${STAGE_LABEL[stage]}**\n` +
+                     `> 商家：<font color="info">${escapeMd(mm.merchant_company || '未知商家')}</font>\n` +
+                     `> 达人：<font color="warning">${escapeMd(mm.video_account_name || '未知达人')}</font>\n` +
+                     (notes ? `> 备注：${escapeMd(String(notes).slice(0, 80))}\n` : '') +
+                     `> 时间：${nowCN()}`,
+            mentionedMobiles: stage === 'cooperating' || stage === '开始合作' ? mobiles : [],
+          });
+        }
+      }
+    } catch (e) { /* fire-and-forget */ }
     
     res.json({ success: true, message: `已流转到「${stage}」阶段` });
   } catch (err) {

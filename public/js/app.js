@@ -6924,6 +6924,19 @@ async function submitChangePassword(e) {
 }
 
 // ============ 系统设置（超管专属） ============
+const WEWORK_EVENT_LIST = [
+  { key: 'wework_event_inf_publish',   label: '达人发布带货意向', desc: '达人在「我的需求」发布新意向时推送', defaultOn: false },
+  { key: 'wework_event_mer_publish',   label: '商家发布需求',     desc: '商家发布图书/课程需求时推送',         defaultOn: false },
+  { key: 'wework_event_inf_apply',     label: '达人响应商家需求', desc: '达人对商家需求点"申请合作"时推送',    defaultOn: true  },
+  { key: 'wework_event_mer_invite',    label: '商家邀约达人',     desc: '商家对达人点"邀请合作"时推送',        defaultOn: true  },
+  { key: 'wework_event_mer_accept',    label: '商家接受达人申请', desc: '商家接受达人合作申请时推送',          defaultOn: true  },
+  { key: 'wework_event_inf_accept',    label: '达人接受商家邀约', desc: '达人接受商家邀约时推送',              defaultOn: true  },
+  { key: 'wework_event_confirmed',     label: '双方意向达成',     desc: '任意一方确认合作后双方达成意向时推送',defaultOn: true  },
+  { key: 'wework_event_sample',        label: '撮合-样品寄送',    desc: '撮合工单推进到样品寄送阶段时推送',    defaultOn: false },
+  { key: 'wework_event_cooperating',   label: '撮合-开始合作',    desc: '撮合工单推进到开始合作阶段时推送',    defaultOn: true  },
+  { key: 'wework_event_activated',     label: '新用户激活入驻',   desc: '商家/达人通过邀请链接激活账号时推送', defaultOn: false },
+];
+
 async function renderSettingsManage() {
   const container = document.getElementById('page-container');
   if (currentUser.role !== 'admin' || !currentUser.is_super) {
@@ -6934,23 +6947,54 @@ async function renderSettingsManage() {
   const settings = res.success ? res.data : {};
   const webhook = settings.wework_webhook_url || '';
 
+  // 渲染事件开关列表
+  const eventToggles = WEWORK_EVENT_LIST.map(ev => {
+    const stored = settings[ev.key];
+    const isOn = stored ? stored === 'on' : ev.defaultOn;
+    return `
+      <div class="wework-event-row">
+        <label class="wework-event-switch">
+          <input type="checkbox" data-event="${ev.key}" ${isOn ? 'checked' : ''} onchange="saveWeworkEventToggle(this)">
+          <span class="wework-switch-slider"></span>
+        </label>
+        <div class="wework-event-meta">
+          <div class="wework-event-label">${escapeHtml(ev.label)}</div>
+          <div class="wework-event-desc">${escapeHtml(ev.desc)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
   container.innerHTML = `
-    ${renderBackButton()}
-    <div class="settings-page" style="max-width:760px">
+    ${renderBackButton ? renderBackButton() : ''}
+    <div class="settings-page" style="max-width:880px">
       <h2 style="font-size:22px;margin:0 0 6px;color:#1e293b">系统设置</h2>
       <p style="font-size:13px;color:#64748b;margin:0 0 24px">仅超级管理员可配置</p>
 
-      <div class="settings-card">
-        <h3>企业微信 Webhook 推送</h3>
-        <p style="font-size:13px;color:#64748b;line-height:1.6">配置后，当达人响应商家需求、双方达成合作意向时，系统会自动推送消息到指定企微群。</p>
+      <div class="settings-card" style="margin-bottom:20px">
+        <h3>📡 企业微信 Webhook 推送</h3>
+        <p style="font-size:13px;color:#64748b;line-height:1.7">
+          配置后，撮合关键事件会自动推送到企微群（markdown 格式）。<br>
+          @归属销售：消息中会自动 @ 关联商家/达人的归属销售（销售手机号必须已维护）。
+        </p>
         <div class="form-group">
           <label>Webhook URL</label>
           <input type="text" id="wework-webhook" value="${escapeHtml(webhook)}" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=...">
-          <div class="form-hint">留空则不推送。修改后立即生效。</div>
+          <div class="form-hint">留空则不推送任何事件</div>
         </div>
         <div style="display:flex;gap:10px;margin-top:16px">
-          <button class="btn btn-primary" onclick="saveWeworkWebhook()">保存</button>
-          <button class="btn btn-outline" onclick="testWeworkWebhook()">测试推送</button>
+          <button class="btn btn-primary" onclick="saveWeworkWebhook()">保存 URL</button>
+          <button class="btn btn-outline" onclick="testWeworkWebhook()">发送测试消息</button>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>🔔 事件推送开关</h3>
+        <p style="font-size:13px;color:#64748b;line-height:1.7;margin-bottom:14px">
+          下列 10 个事件可独立开关。点击右侧滑动开关即时生效。
+        </p>
+        <div class="wework-event-list">
+          ${eventToggles}
         </div>
       </div>
     </div>
@@ -6960,16 +7004,29 @@ async function renderSettingsManage() {
 async function saveWeworkWebhook() {
   const val = document.getElementById('wework-webhook').value.trim();
   const res = await fetchAPI('/settings', { method: 'PUT', body: JSON.stringify({ key: 'wework_webhook_url', value: val }) });
-  if (res.success) showToast('保存成功');
+  if (res.success) showToast('Webhook URL 已保存');
   else showToast(res.error || '保存失败', 'error');
+}
+
+async function saveWeworkEventToggle(checkbox) {
+  const key = checkbox.dataset.event;
+  const value = checkbox.checked ? 'on' : 'off';
+  const res = await fetchAPI('/settings', { method: 'PUT', body: JSON.stringify({ key, value }) });
+  if (!res.success) {
+    showToast(res.error || '保存失败', 'error');
+    checkbox.checked = !checkbox.checked; // 回滚
+  }
 }
 
 async function testWeworkWebhook() {
   const val = document.getElementById('wework-webhook').value.trim();
   if (!val) return showToast('请先填写 Webhook URL', 'error');
-  showToast('测试消息已发送，请查看企微群');
-  // 临时保存一下再通过后端确认式接口推送 — 这里直接复用保存逻辑并由后端测试
-  await saveWeworkWebhook();
+  // 先保存当前 URL（防止用户改了没保存）
+  await fetchAPI('/settings', { method: 'PUT', body: JSON.stringify({ key: 'wework_webhook_url', value: val }) });
+  // 触发后端真测试
+  const r = await fetchAPI('/notifications/test-wework', { method: 'POST' });
+  if (r.success) showToast(r.message || '测试消息已发送，请查看企微群');
+  else showToast(r.error || '发送失败', 'error');
 }
 
 // ============ 通用辅助 ============

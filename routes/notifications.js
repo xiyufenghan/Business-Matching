@@ -41,18 +41,50 @@ router.put('/read-all', (req, res) => {
   res.json({ success: true });
 });
 
+// POST /api/notifications/test-wework — 超管测试企微推送
+router.post('/test-wework', async (req, res) => {
+  if (!req.user || req.user.role !== 'admin' || !req.user.is_super) {
+    return res.status(403).json({ success: false, error: '无权限' });
+  }
+  try {
+    await notifyWework(req.db, {
+      eventKey: null, // 测试推送跳过开关
+      type: 'markdown',
+      content: `**🔔 企微推送测试**\n` +
+               `> 来源：商达撮合系统\n` +
+               `> 时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
+               `如果你看到这条消息，说明 Webhook 配置成功！`
+    });
+    res.json({ success: true, message: '测试消息已发送，请查看企微群' });
+  } catch (e) {
+    console.error('[notifications/test-wework]', e);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
+  }
+});
+
 module.exports = router;
 
 // ====== 工具函数（供其他路由引用）======
 
 /**
+ * V5: 企微推送事件键定义（用于配置开关）
+ * 每个事件可独立开关，存在 settings 表中：wework_event_<key> = 'on' | 'off'
+ */
+const WEWORK_EVENTS = {
+  INFLUENCER_DEMAND_PUBLISH: { key: 'wework_event_inf_publish',   label: '达人发布带货意向', defaultOn: false },
+  MERCHANT_DEMAND_PUBLISH:   { key: 'wework_event_mer_publish',   label: '商家发布需求',     defaultOn: false },
+  INFLUENCER_APPLY:          { key: 'wework_event_inf_apply',     label: '达人响应商家需求', defaultOn: true  },
+  MERCHANT_INVITE:           { key: 'wework_event_mer_invite',    label: '商家邀约达人',     defaultOn: true  },
+  MERCHANT_ACCEPT:           { key: 'wework_event_mer_accept',    label: '商家接受达人申请', defaultOn: true  },
+  INFLUENCER_ACCEPT:         { key: 'wework_event_inf_accept',    label: '达人接受商家邀约', defaultOn: true  },
+  INTENT_CONFIRMED:          { key: 'wework_event_confirmed',     label: '双方意向达成',     defaultOn: true  },
+  STAGE_SAMPLE_SENT:         { key: 'wework_event_sample',        label: '撮合-样品寄送',    defaultOn: false },
+  STAGE_COOPERATING:         { key: 'wework_event_cooperating',   label: '撮合-开始合作',    defaultOn: true  },
+  USER_ACTIVATED:            { key: 'wework_event_activated',     label: '新用户激活入驻',   defaultOn: false },
+};
+
+/**
  * 写入一条站内通知
- * @param {object} db - better-sqlite3 实例
- * @param {string} userType - 接收方角色：'admin'|'merchant'|'influencer'
- * @param {string} userId   - 接收方 ID
- * @param {string} type     - 通知类型：'interest'|'response'|'confirmed'|'invite'|'system'
- * @param {string} content  - 通知正文
- * @param {string} relatedId - 关联业务 ID（cooperation_id 等）
  */
 function writeNotification(db, userType, userId, type, content, relatedId = null) {
   try {
@@ -65,40 +97,149 @@ function writeNotification(db, userType, userId, type, content, relatedId = null
 }
 
 /**
- * 触发企微 Webhook（fire-and-forget，失败不阻塞主流程）
- * @param {object} db      - better-sqlite3 实例
- * @param {string} message - 推送正文
+ * 查询某个事件是否启用推送
  */
-async function notifyWework(db, message) {
+function isEventEnabled(db, eventKey) {
+  if (!eventKey) return true; // 测试推送等场景跳过开关
+  const ev = Object.values(WEWORK_EVENTS).find(e => e.key === eventKey);
+  if (!ev) return false;
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(eventKey);
+    if (row && row.value) return row.value === 'on';
+    return ev.defaultOn;
+  } catch (e) { return ev.defaultOn; }
+}
+
+/**
+ * V5 升级版：企微 Webhook 推送（支持 markdown + 事件开关 + @归属销售）
+ * @param {object} db
+ * @param {object} payload
+ *   - eventKey: string|null  事件键，用于查开关；null 跳过开关（如测试推送）
+ *   - type: 'markdown' | 'text'
+ *   - content: string  消息正文
+ *   - mentionedMobiles: string[]  @谁（手机号）
+ *   - mentionedAll: boolean
+ *
+ * 兼容旧调用方式：notifyWework(db, '纯文本消息')
+ */
+async function notifyWework(db, payload) {
+  // 兼容旧签名：第二个参数是字符串
+  if (typeof payload === 'string') {
+    payload = { eventKey: null, type: 'text', content: payload };
+  }
+  const { eventKey, type = 'markdown', content, mentionedMobiles = [], mentionedAll = false } = payload;
+
+  // 事件开关
+  if (!isEventEnabled(db, eventKey)) return;
+
   try {
     const row = db.prepare("SELECT value FROM settings WHERE key = 'wework_webhook_url'").get();
     const webhookUrl = row && row.value;
     if (!webhookUrl) return;
 
-    const https = require('https');
-    const http = require('http');
-    const body = JSON.stringify({ msgtype: 'text', text: { content: message } });
-    const url = new URL(webhookUrl);
-    const lib = url.protocol === 'https:' ? https : http;
+    // 构造消息体
+    let body;
+    if (type === 'markdown') {
+      body = {
+        msgtype: 'markdown',
+        markdown: { content }
+      };
+      // markdown 类型支持的 @ 方式（写在 content 里：<@手机号>）
+      // 企微 markdown 实际不支持 mentioned_mobile_list，需要把 @人 写到正文里
+      // 但仍可同时发一条 text 的 @ 触达
+    } else {
+      body = { msgtype: 'text', text: { content } };
+      if (mentionedMobiles && mentionedMobiles.length > 0) {
+        body.text.mentioned_mobile_list = mentionedMobiles;
+      }
+      if (mentionedAll) {
+        body.text.mentioned_mobile_list = ['@all'];
+      }
+    }
 
-    const options = {
-      hostname: url.hostname,
-      port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      path: url.pathname + url.search,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    };
+    await postWebhook(webhookUrl, body);
 
-    const req = lib.request(options, (resp) => {
-      resp.resume(); // 消费响应体防止内存泄漏
-    });
-    req.on('error', (e) => console.error('[WeWork Webhook] error:', e.message));
-    req.write(body);
-    req.end();
+    // markdown + 需要 @ 人时，额外发一条 text 触发 @ 通知
+    if (type === 'markdown' && (mentionedMobiles.length > 0 || mentionedAll)) {
+      const mentionBody = {
+        msgtype: 'text',
+        text: {
+          content: '↑ 请上述同事关注',
+          mentioned_mobile_list: mentionedAll ? ['@all'] : mentionedMobiles
+        }
+      };
+      // 异步发，不等
+      postWebhook(webhookUrl, mentionBody).catch(() => {});
+    }
   } catch (e) {
     console.error('[WeWork Webhook] failed:', e.message);
   }
 }
 
+/**
+ * 实际发起 HTTPS 请求（封装）
+ */
+function postWebhook(webhookUrl, body) {
+  return new Promise((resolve) => {
+    try {
+      const https = require('https');
+      const http = require('http');
+      const data = JSON.stringify(body);
+      const url = new URL(webhookUrl);
+      const lib = url.protocol === 'https:' ? https : http;
+
+      const options = {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === 'https:' ? 443 : 80),
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+        timeout: 5000,
+      };
+
+      const req = lib.request(options, (resp) => {
+        resp.resume();
+        resolve();
+      });
+      req.on('error', (e) => { console.error('[WeWork Webhook] error:', e.message); resolve(); });
+      req.on('timeout', () => { req.destroy(); resolve(); });
+      req.write(data);
+      req.end();
+    } catch (e) {
+      console.error('[WeWork Webhook] post failed:', e.message);
+      resolve();
+    }
+  });
+}
+
+/**
+ * 根据 merchant / influencer 找到归属销售的手机号（用于 @）
+ * 返回 string[] 销售手机号列表（已去重）
+ */
+function getOwnerSalesMobiles(db, { merchantId, influencerId }) {
+  const mobiles = new Set();
+  try {
+    if (merchantId) {
+      const row = db.prepare(`
+        SELECT a.phone FROM merchants m
+        LEFT JOIN admins a ON m.sales_owner_id = a.id
+        WHERE m.id = ? AND a.phone IS NOT NULL AND a.phone != ''
+      `).get(merchantId);
+      if (row && row.phone) mobiles.add(row.phone);
+    }
+    if (influencerId) {
+      const row = db.prepare(`
+        SELECT a.phone FROM influencers i
+        LEFT JOIN admins a ON i.sales_owner_id = a.id
+        WHERE i.id = ? AND a.phone IS NOT NULL AND a.phone != ''
+      `).get(influencerId);
+      if (row && row.phone) mobiles.add(row.phone);
+    }
+  } catch (e) { /* ignore */ }
+  return Array.from(mobiles);
+}
+
 module.exports.writeNotification = writeNotification;
 module.exports.notifyWework = notifyWework;
+module.exports.WEWORK_EVENTS = WEWORK_EVENTS;
+module.exports.getOwnerSalesMobiles = getOwnerSalesMobiles;

@@ -1,6 +1,21 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const { notifyWework, WEWORK_EVENTS, getOwnerSalesMobiles } = require('./notifications');
+
+// V5: markdown 推送辅助
+function escapeMd(s) {
+  if (s == null) return '';
+  return String(s).replace(/[<>]/g, '');
+}
+function formatFans(n) {
+  if (!n) return '';
+  if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + 'w';
+  return String(n);
+}
+function nowCN() {
+  return new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+}
 
 // 获取商家需求（支持筛选+搜索+分页）
 router.get('/', (req, res) => {
@@ -281,6 +296,27 @@ router.post('/influencer-demands', (req, res) => {
     );
     
     const demand = req.db.prepare('SELECT * FROM influencer_demands WHERE id = ?').get(id);
+
+    // 企微推送：场景#1 达人发布带货意向
+    try {
+      const inf = req.db.prepare('SELECT video_account_name, level, fans_count FROM influencers WHERE id = ?').get(influencer_id);
+      const mobiles = getOwnerSalesMobiles(req.db, { influencerId: influencer_id });
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.INFLUENCER_DEMAND_PUBLISH.key,
+        type: 'markdown',
+        content: `**📢 达人发布带货意向**\n` +
+                 `> 达人：<font color="warning">${escapeMd(inf ? inf.video_account_name : video_account_name || '未知达人')}</font>` +
+                 `${inf && inf.level ? ` （${inf.level}）` : ''}` +
+                 `${inf && inf.fans_count ? ` · 粉丝 ${formatFans(inf.fans_count)}` : ''}\n` +
+                 (book_name ? `> 标题：${escapeMd(book_name)}\n` : '') +
+                 (Array.isArray(content_formats) && content_formats.length ? `> 内容形式：${content_formats.join(' / ')}\n` : '') +
+                 (Array.isArray(cooperation_types) && cooperation_types.length ? `> 合作类型：${cooperation_types.join(' / ')}\n` : '') +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请关注新意向～`,
+        mentionedMobiles: mobiles,
+      });
+    } catch (e) { /* fire-and-forget */ }
+
     res.status(201).json({ success: true, data: demand, message: '达人需求发布成功' });
   } catch (err) {
     console.error('[' + "routes/demands.js" + ']', err);
@@ -420,6 +456,25 @@ router.post('/book', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(demandId, merchant_id, book_name + ' 推广', 'book', book_category.split(',')[0], '视频号', book_introduction || book_name, 'published', bookId, operator_id || null);
     
+    // 企微推送：场景#2 商家发布需求
+    try {
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
+      const mobiles = getOwnerSalesMobiles(req.db, { merchantId: merchant_id });
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.MERCHANT_DEMAND_PUBLISH.key,
+        type: 'markdown',
+        content: `**📦 商家发布图书需求**\n` +
+                 `> 商家：<font color="info">${escapeMd(m ? m.company : book_merchant)}</font>\n` +
+                 `> 标题：${escapeMd(book_name)}\n` +
+                 `> 分类：${escapeMd(book_category)}\n` +
+                 (selling_price ? `> 售价：¥${selling_price}\n` : '') +
+                 (pure_commission ? `> 纯佣金：${pure_commission}%\n` : '') +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请关注～`,
+        mentionedMobiles: mobiles,
+      });
+    } catch (e) { /* fire-and-forget */ }
+
     res.status(201).json({ success: true, message: '图书需求发布成功' });
   } catch (err) {
     console.error('[' + "routes/demands.js" + ']', err);
@@ -447,6 +502,25 @@ router.post('/course', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(demandId, merchant_id, course_name + ' 推广', 'course', category, '视频号', course_introduction || course_name, 'published', courseId, operator_id || null);
     
+    // 企微推送：场景#2 商家发布课程需求
+    try {
+      const m = req.db.prepare('SELECT company FROM merchants WHERE id = ?').get(merchant_id);
+      const mobiles = getOwnerSalesMobiles(req.db, { merchantId: merchant_id });
+      notifyWework(req.db, {
+        eventKey: WEWORK_EVENTS.MERCHANT_DEMAND_PUBLISH.key,
+        type: 'markdown',
+        content: `**📦 商家发布课程需求**\n` +
+                 `> 商家：<font color="info">${escapeMd(m ? m.company : '未知商家')}</font>\n` +
+                 `> 标题：${escapeMd(course_name)}\n` +
+                 (grade_level ? `> 学段：${escapeMd(grade_level)}\n` : '') +
+                 (subject ? `> 学科：${escapeMd(subject)}\n` : '') +
+                 (unit_price ? `> 单价：¥${unit_price}\n` : '') +
+                 `> 时间：${nowCN()}\n\n` +
+                 `请关注～`,
+        mentionedMobiles: mobiles,
+      });
+    } catch (e) { /* fire-and-forget */ }
+
     res.status(201).json({ success: true, message: '课程需求发布成功' });
   } catch (err) {
     console.error('[' + "routes/demands.js" + ']', err);

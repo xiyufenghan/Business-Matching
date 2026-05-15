@@ -3713,3 +3713,52 @@ a:hover, .link-text:hover { color: #1e3a8a; }
   color: #1d4ed8;
   margin-top: 6px;
 }
+
+/* ============================================== */
+/* V5: 企微推送事件开关样式                       */
+/* ============================================== */
+.wework-event-list { display: flex; flex-direction: column; gap: 4px; }
+.wework-event-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.wework-event-row:hover { background: #f8fafc; }
+.wework-event-meta { flex: 1; min-width: 0; }
+.wework-event-label { font-size: 14px; color: #0f172a; font-weight: 500; margin-bottom: 2px; }
+.wework-event-desc { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+
+/* 滑动开关 */
+.wework-event-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.wework-event-switch input { display: none; }
+.wework-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #e2e8f0;
+  border-radius: 24px;
+  transition: 0.2s;
+}
+.wework-switch-slider:before {
+  content: "";
+  position: absolute;
+  height: 18px; width: 18px;
+  left: 3px; top: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.wework-event-switch input:checked + .wework-switch-slider {
+  background-color: #2563eb;
+}
+.wework-event-switch input:checked + .wework-switch-slider:before {
+  transform: translateX(20px);
+}
