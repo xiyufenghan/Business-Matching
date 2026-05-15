@@ -2912,6 +2912,7 @@ function renderInfRow(inf, isMerchant, isSuperAdmin) {
       <div class="inf-row-actions">
         ${isMerchant ? `<button class="btn btn-xs btn-primary" onclick="inviteInfluencer('${inf.id}','')">邀请</button>` : ''}
         <button class="btn btn-xs btn-outline" onclick="showInfDetailModal('${inf.id}')">详情</button>
+        ${currentUser.role === 'admin' ? `<button class="btn btn-xs btn-outline" onclick="showContactModal('influencer','${inf.id}')">联络</button>` : ''}
         ${currentUser.role === 'admin' ? `<button class="btn btn-xs btn-outline" onclick="editInfluencer('${inf.id}')">编辑</button>` : ''}
       </div>
     </div>`;
@@ -5555,6 +5556,7 @@ function renderMmRow(m, isSuper) {
   } else {
     // active
     actions = `
+      <button class="btn btn-xs btn-outline" onclick="showContactModal('merchant','${m.id}')">联络</button>
       <button class="btn btn-xs btn-outline" onclick="editMerchant('${m.id}')">编辑</button>
       <button class="btn btn-xs btn-outline" onclick="resetMerchantPassword('${m.id}','${escapeHtml(m.company || '').replace(/'/g, '&apos;')}')">重置密码</button>
       <button class="btn btn-xs btn-outline" onclick="toggleMerchantEnabled('${m.id}', 'disabled')">停用</button>
@@ -6427,15 +6429,59 @@ function renderPlazaCard(item) {
   }
 
   // merchant_demand
-  const budget = (item.budget_min || item.budget_max) ? `${item.budget_min || 0}-${item.budget_max || '不限'} 元` : '面议';
   const isPinned = !!item.pinned_at;
   const pinBadge = isPinned ? '<span class="pin-badge">🔥 热推</span>' : '';
   // 管理员置顶按钮：商家需求要根据 demand_type 决定 type=book/course
   const pinType = item.demand_type === 'course' ? 'course' : 'book';
-  // 注意：置顶操作的是 ref_demand_id（book_demands/course_demands 的 id）
   const pinTargetId = item.ref_demand_id || item.id;
   const adminPinBtn = currentUser.role === 'admin' ?
     `<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();toggleDemandPin('${pinType}','${pinTargetId}',${isPinned})">${isPinned ? '取消置顶' : '📌 置顶'}</button>` : '';
+
+  // V5: 解析图片缩略图（取第一张）
+  const imgs = parseJsonArray(item.images);
+  const thumbnail = imgs.length > 0 ? `
+    <div class="plaza-card-thumb">
+      <img src="/${escapeHtml(imgs[0])}" alt="${escapeHtml(item.title)}" onerror="this.style.display='none'">
+      ${imgs.length > 1 ? `<span class="plaza-card-thumb-count">+${imgs.length - 1}</span>` : ''}
+    </div>
+  ` : '';
+
+  // V5: 类目/规格/品类多 chip
+  const tagChips = [];
+  if (item.demand_type === 'book') {
+    if (item.book_category) tagChips.push(`<span class="chip chip-blue">${escapeHtml(item.book_category)}</span>`);
+    if (item.specification) tagChips.push(`<span class="chip chip-gray">${escapeHtml(item.specification)}</span>`);
+    if (item.target_audience) tagChips.push(`<span class="chip chip-gray">${escapeHtml(item.target_audience)}</span>`);
+  } else if (item.demand_type === 'course') {
+    if (item.subject) tagChips.push(`<span class="chip chip-blue">${escapeHtml(item.subject)}</span>`);
+    if (item.grade_level) tagChips.push(`<span class="chip chip-gray">${escapeHtml(item.grade_level)}</span>`);
+  }
+  if (item.cooperation_type) tagChips.push(`<span class="chip chip-orange">${escapeHtml(item.cooperation_type)}</span>`);
+  if (item.fans_requirement) tagChips.push(`<span class="chip chip-gray">粉丝 ${escapeHtml(item.fans_requirement)}</span>`);
+
+  // V5: 价格/佣金 - 商品具体信息（这是达人最关心的）
+  const isBook = item.demand_type === 'book';
+  const price = isBook ? item.selling_price : item.unit_price;
+  const pureC = isBook ? item.pure_commission : item.course_pure_commission;
+  const adC = isBook ? item.ad_commission : item.course_ad_commission;
+  const goodsName = isBook ? (item.book_name || item.title) : (item.course_name || item.title);
+
+  const priceBox = (price || pureC || adC) ? `
+    <div class="plaza-price-box">
+      ${price ? `<div class="plaza-price-item"><span class="plaza-price-label">售价</span><span class="plaza-price-val plaza-price-red">¥${price}</span></div>` : ''}
+      ${pureC ? `<div class="plaza-price-item"><span class="plaza-price-label">纯佣</span><span class="plaza-price-val">${pureC}%</span></div>` : ''}
+      ${adC ? `<div class="plaza-price-item"><span class="plaza-price-label">投流佣</span><span class="plaza-price-val">${adC}%</span></div>` : ''}
+      ${isBook && item.stock ? `<div class="plaza-price-item"><span class="plaza-price-label">库存</span><span class="plaza-price-val">${item.stock}</span></div>` : ''}
+    </div>
+  ` : '';
+
+  const sellingPoints = item.selling_points ? `
+    <div class="plaza-selling-points">
+      <span class="plaza-sp-label">💡 卖点</span>
+      <span class="plaza-sp-text">${escapeHtml(item.selling_points)}</span>
+    </div>
+  ` : '';
+
   return `
     <div class="plaza-card" style="position:relative">
       ${pinBadge}
@@ -6443,17 +6489,17 @@ function renderPlazaCard(item) {
         ${tagHtml}
         <span class="plaza-card-time">${formatTimeAgo(item.created_at)}</span>
       </div>
-      <div class="plaza-card-title">${escapeHtml(item.title)}</div>
+      ${thumbnail}
+      <div class="plaza-card-title">${escapeHtml(goodsName || item.title)}</div>
       <div class="plaza-card-publisher">
-        <span class="plaza-meta">发布方：${escapeHtml(item.publisher_label)}</span>
+        <span class="plaza-meta">📍 ${escapeHtml(item.publisher_label)}</span>
       </div>
-      <div class="plaza-card-desc">${escapeHtml(item.description || '暂无描述')}</div>
+      ${priceBox}
       <div class="plaza-tags-row">
-        ${item.category ? `<span class="chip chip-blue">${escapeHtml(item.category)}</span>` : ''}
-        ${item.cooperation_type ? `<span class="chip chip-orange">${escapeHtml(item.cooperation_type)}</span>` : ''}
-        ${item.fans_requirement ? `<span class="chip chip-gray">粉丝要求：${escapeHtml(item.fans_requirement)}</span>` : ''}
+        ${tagChips.join('')}
       </div>
-      <div class="plaza-budget">预算：<strong>${budget}</strong></div>
+      ${sellingPoints}
+      ${item.book_introduction || item.course_introduction || item.description ? `<div class="plaza-card-desc">${escapeHtml(item.book_introduction || item.course_introduction || item.description || '')}</div>` : ''}
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
         ${renderFavStar('merchant_demand', item.id)}
         ${adminPinBtn}
@@ -7113,19 +7159,28 @@ function renderFavDemandsList(demands) {
   return `<div class="plaza-grid">${demands.map(d => {
     const isInf = d.target_type === 'influencer_demand';
     const title = d.title || d.book_name || d.video_account_name || '未命名';
+    // V5: 卡片整体可点 + 加"查看详情"按钮
     return `
-      <div class="plaza-card">
+      <div class="plaza-card fav-card-clickable" onclick="navigateToFavDemand('${d.target_type}','${d.id}')">
         <div class="plaza-card-header">
           <span class="plaza-tag ${isInf ? 'plaza-tag-influencer' : 'plaza-tag-merchant'}">${isInf ? '达人需求' : '商家需求'}</span>
           <span class="plaza-card-time">收藏于 ${formatTimeAgo(d.favorited_at)}</span>
         </div>
         <div class="plaza-card-title">${escapeHtml(title)}</div>
         <div class="plaza-card-desc">${escapeHtml(d.description || d.book_introduction || '—').slice(0, 100)}</div>
-        <div class="plaza-card-footer">
+        <div class="plaza-card-footer" style="display:flex;align-items:center;gap:8px;margin-top:10px">
           ${renderFavStar(d.target_type, d.id)}
+          <button class="btn btn-sm btn-primary" style="flex:1" onclick="event.stopPropagation();navigateToFavDemand('${d.target_type}','${d.id}')">查看详情</button>
         </div>
       </div>`;
   }).join('')}</div>`;
+}
+
+// V5: 收藏需求点击 → 跳转到需求广场并定位/弹出详情
+function navigateToFavDemand(targetType, id) {
+  // 两类需求都在需求广场，进去后用 keyword 精确锁定（按 id 前缀搜，能筛出来）
+  navigateTo('demand-plaza');
+  showToast('已为你打开需求广场，请查找该需求');
 }
 
 function renderFavEntitiesList(entities) {
@@ -7137,8 +7192,10 @@ function renderFavEntitiesList(entities) {
       `${e.level || '-'} · 粉丝 ${formatBigNumber(e.fans_count || 0)} · ${e.region || '-'}` :
       `${e.industry || '-'} · ${e.phone || '-'}`;
     const desc = isInf ? (e.introduction || e.audience_profile || '—') : (e.description || '—');
+    // V5: 达人卡片可点击跳转
+    const onClick = isInf ? `onclick="showInfDetailModal('${e.id}')"` : '';
     return `
-      <div class="plaza-card">
+      <div class="plaza-card ${isInf ? 'fav-card-clickable' : ''}" ${onClick}>
         <div class="plaza-card-header">
           <span class="plaza-tag ${isInf ? 'plaza-tag-influencer' : 'plaza-tag-merchant'}">${isInf ? '达人' : '商家'}</span>
           <span class="plaza-card-time">收藏于 ${formatTimeAgo(e.favorited_at)}</span>

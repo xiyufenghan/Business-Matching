@@ -830,6 +830,10 @@ router.get('/plaza', (req, res) => {
           d.publisher_role, d.merchant_id, d.ref_demand_id,
           COALESCE(bd.pinned_at, cd.pinned_at) as pinned_at,
           COALESCE(bd.images, cd.images) as images,
+          bd.book_name, bd.book_category, bd.selling_price, bd.pure_commission, bd.ad_commission,
+          bd.specification, bd.book_introduction, bd.selling_points, bd.target_audience, bd.stock,
+          cd.course_name, cd.unit_price, cd.grade_level, cd.subject, cd.course_introduction,
+          cd.pure_commission as course_pure_commission, cd.ad_commission as course_ad_commission,
           m.company as merchant_company, m.industry as merchant_industry,
           'merchant_or_admin' as source_kind
         FROM demands d
@@ -860,6 +864,10 @@ router.get('/plaza', (req, res) => {
           d.publisher_role, d.merchant_id, d.ref_demand_id,
           COALESCE(bd.pinned_at, cd.pinned_at) as pinned_at,
           COALESCE(bd.images, cd.images) as images,
+          bd.book_name, bd.book_category, bd.selling_price, bd.pure_commission, bd.ad_commission,
+          bd.specification, bd.book_introduction, bd.selling_points, bd.target_audience, bd.stock,
+          cd.course_name, cd.unit_price, cd.grade_level, cd.subject, cd.course_introduction,
+          cd.pure_commission as course_pure_commission, cd.ad_commission as course_ad_commission,
           m.company as merchant_company, m.industry as merchant_industry,
           'merchant_or_admin' as source_kind
         FROM demands d
@@ -920,6 +928,25 @@ router.get('/plaza', (req, res) => {
         demand_type: r.demand_type,
         pinned_at: r.pinned_at,
         images: r.images,
+        // V5: 透出图书/课程子表字段，前端广场卡片直接展示价格/佣金/具体名等
+        book_name: r.book_name,
+        book_category: r.book_category,
+        selling_price: r.selling_price,
+        pure_commission: r.pure_commission,
+        ad_commission: r.ad_commission,
+        specification: r.specification,
+        book_introduction: r.book_introduction,
+        selling_points: r.selling_points,
+        target_audience: r.target_audience,
+        stock: r.stock,
+        course_name: r.course_name,
+        unit_price: r.unit_price,
+        grade_level: r.grade_level,
+        subject: r.subject,
+        course_introduction: r.course_introduction,
+        course_pure_commission: r.course_pure_commission,
+        course_ad_commission: r.course_ad_commission,
+        merchant_company: r.merchant_company,
         created_at: r.created_at,
       })),
       ...influencerRows.map(r => ({
