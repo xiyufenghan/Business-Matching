@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const { parseChineseNumber, normalizeText, normalizeYesNo, normalizeLevel } = require('../utils/chineseParser');
+const { buildTemplateSheet, stripTemplateHintRow, buildHelperNoteSheet, buildTemplateBuffer } = require('../utils/excelTemplate');
 
 // 配置文件上传
 const uploadDir = path.join(__dirname, '..', 'uploads');
@@ -88,43 +89,32 @@ const INFLUENCER_FIELDS_ORDER = [
 // ========== Excel模板下载 (必须放在 /:id 之前) ==========
 router.get('/excel/template', (req, res) => {
   try {
-    const wb = XLSX.utils.book_new();
-    const headers = INFLUENCER_FIELDS_ORDER;
-    const sampleData = [
-      headers,
+    const fields = [
+      { name: '达人等级',         desc: 'S/A/B/C/D 等级',                         required: false },
+      { name: '账号名称',         desc: '视频号昵称（唯一标识）',                  required: true  },
+      { name: '手机号',           desc: '11位手机号，可作为登录账号',              required: false },
+      { name: '内容赛道',         desc: '多值，逗号分隔，如：图书,课程',           required: false },
+      { name: '短视频月销（万）', desc: '数值，单位万元',                          required: false },
+      { name: '直播月销（万）',   desc: '数值，单位万元',                          required: false },
+      { name: '粉丝数',           desc: '数值',                                    required: false },
+      { name: '合作类型',         desc: '多值，如：纯佣,投流,坑位费',              required: false },
+      { name: '图书带货意愿',     desc: '高/中/低',                                required: false },
+      { name: '课程带货意愿',     desc: '高/中/低',                                required: false },
+      { name: '短视频频率',       desc: '如：每周3-5条',                           required: false },
+      { name: '直播频率',         desc: '如：每周1-2场',                           required: false },
+      { name: '是否签约MCN',      desc: '是/否',                                   required: false },
+      { name: 'MCN机构名称',      desc: 'MCN机构全称',                             required: false },
+      { name: '所在地区',         desc: '如：北京 / 广州 / 上海',                  required: false },
+      { name: '是否入驻互选',     desc: '是/否',                                   required: false },
+      { name: '归属销售',         desc: '负责销售人员（系统自动关联）',            required: false },
+      { name: '公众号名称',       desc: '关联公众号名称',                          required: false }
+    ];
+    const sampleRows = [
       ['S', '读书小达人', '13800138888', '图书,教育', 15.5, 8.2, 500000, '纯佣,投流', '高', '中', '每周3-5条', '每周1-2场', '否', '', '北京', '是', '销售A', '读书小达人公众号'],
       ['A', '知识课堂', '13800139999', '课程,教育', 8.0, 25.0, 1200000, '纯佣,坑位费', '中', '高', '每周1-2条', '每周3-5场', '是', '星辰MCN', '上海', '是', '销售B', '知识课堂Official']
     ];
-    const ws = XLSX.utils.aoa_to_sheet(sampleData);
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 14) }));
-    XLSX.utils.book_append_sheet(wb, ws, '达人数据');
-    
-    const noteData = [
-      ['字段', '说明', '是否必填'],
-      ['达人等级', 'S/A/B/C/D等级', '否'],
-      ['账号名称', '视频号昵称（唯一标识）', '是'],
-      ['手机号', '11位手机号，可作为登录账号', '否'],
-      ['内容赛道', '多值，逗号分隔，如：图书,课程', '否'],
-      ['短视频月销（万）', '数值，单位万元', '否'],
-      ['直播月销（万）', '数值，单位万元', '否'],
-      ['粉丝数', '数值', '否'],
-      ['合作类型', '多值，如：纯佣,投流,坑位费', '否'],
-      ['图书带货意愿', '高/中/低', '否'],
-      ['课程带货意愿', '高/中/低', '否'],
-      ['短视频频率', '如：每周3-5条', '否'],
-      ['直播频率', '如：每周1-2场', '否'],
-      ['是否签约MCN', '是/否', '否'],
-      ['MCN机构名称', 'MCN机构全称', '否'],
-      ['所在地区', '如：北京 / 广州 / 上海', '否'],
-      ['是否入驻互选', '是/否', '否'],
-      ['归属销售', '负责销售人员（系统自动关联）', '否'],
-      ['公众号名称', '关联公众号名称', '否']
-    ];
-    const noteWs = XLSX.utils.aoa_to_sheet(noteData);
-    noteWs['!cols'] = [{ wch: 35 }, { wch: 40 }, { wch: 10 }];
-    XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
-    
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const buf = buildTemplateBuffer('达人数据', fields, sampleRows);
+
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent('达人批量导入模板.xlsx')}`,
@@ -144,7 +134,8 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
     
     const wb = XLSX.readFile(req.file.path);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const rawData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
     
     if (jsonData.length === 0) {
       fs.unlinkSync(req.file.path);

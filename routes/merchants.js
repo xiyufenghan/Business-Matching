@@ -4,6 +4,7 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
+const { buildTemplateSheet, stripTemplateHintRow, buildHelperNoteSheet, buildTemplateBuffer } = require('../utils/excelTemplate');
 const { v4: uuidv4 } = require('uuid');
 
 // 行业枚举（与前端发布需求枚举保持一致）
@@ -226,32 +227,21 @@ router.get('/export', (req, res) => {
 // ========== Excel 模板下载（必须在 /:id 之前）==========
 router.get('/excel/template', (req, res) => {
   try {
-    const headers = ['公司名称', '联系人姓名', '手机号', '邮箱', '行业', '描述', '归属销售'];
-    const sampleData = [
-      headers,
+    const fields = [
+      { name: '公司名称',     desc: '商家公司全称（不能与已有商家重复）', required: true  },
+      { name: '联系人姓名',   desc: '主联系人姓名',                      required: true  },
+      { name: '手机号',       desc: '11位手机号，登录账号将使用此手机号',  required: true  },
+      { name: '邮箱',         desc: '联系邮箱',                          required: false },
+      { name: '行业',         desc: `可选：${INDUSTRIES.join(' / ')}`,    required: false },
+      { name: '描述',         desc: '商家简介',                          required: false },
+      { name: '归属销售',     desc: '销售人员姓名（系统会自动关联）',     required: false }
+    ];
+    const sampleRows = [
       ['知行图书出版社', '张经理', '13800138001', 'zhang@zxbook.com', '图书出版', '主营儿童绘本与教辅图书', ''],
       ['书海文化传媒', '李总监', '13800138002', 'li@shuhai.com', '数字内容', '专注K12教育内容', '']
     ];
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(sampleData);
-    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 16) }));
-    XLSX.utils.book_append_sheet(wb, ws, '商家数据');
+    const buf = buildTemplateBuffer('商家数据', fields, sampleRows);
 
-    const noteData = [
-      ['字段', '说明', '是否必填'],
-      ['公司名称', '商家公司全称', '是'],
-      ['联系人姓名', '主联系人姓名', '是'],
-      ['手机号', '登录账号将使用此手机号', '是'],
-      ['邮箱', '联系邮箱', '否'],
-      ['行业', `可选：${INDUSTRIES.join(' / ')}`, '否'],
-      ['描述', '商家简介', '否'],
-      ['归属销售', '销售人员姓名（系统会自动关联）', '否']
-    ];
-    const noteWs = XLSX.utils.aoa_to_sheet(noteData);
-    noteWs['!cols'] = [{ wch: 16 }, { wch: 40 }, { wch: 10 }];
-    XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
-
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent('商家批量导入模板.xlsx')}`,
@@ -272,7 +262,8 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
 
     const wb = XLSX.readFile(req.file.path);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const rawRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const rows = stripTemplateHintRow(rawRows); // V5: 跳过模板说明行
 
     if (rows.length === 0) {
       fs.unlinkSync(req.file.path);

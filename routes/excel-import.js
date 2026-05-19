@@ -3,6 +3,9 @@ const router = express.Router();
 const multer = require('multer');
 const XLSX = require('xlsx');
 const path = require('path');
+const { stripTemplateHintRow, buildTemplateBuffer } = require('../utils/excelTemplate');
+
+
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
@@ -113,102 +116,77 @@ function findSalesOwnerId(db, salesName) {
 router.get('/template/:type', (req, res) => {
   try {
     const type = req.params.type;
-    const wb = XLSX.utils.book_new();
-    
+    let buf, filename, sheetName, fields, sampleRows, extraNotes = [];
+
     if (type === 'book') {
-      const headers = BOOK_FIELDS_ORDER;
-      const sampleData = [
-        headers,
+      sheetName = '图书需求';
+      filename = '图书需求批量导入模板.xlsx';
+      fields = [
+        { name: '图书商家',     desc: '商家/出版社名称（不存在将自动创建商家）',  required: true  },
+        { name: '图书名称',     desc: '图书名称',                                required: true  },
+        { name: '目标人群',     desc: '多值输入，逗号分隔，如：小学生,家长',       required: false },
+        { name: '图书分类',     desc: '多值输入，逗号分隔，如：教育图书,儿童绘本', required: true  },
+        { name: '图书介绍',     desc: '简要介绍',                                required: false },
+        { name: '微信小店商品链接', desc: '商品URL',                              required: false },
+        { name: '图书规格',     desc: '可选：单本 或 套组',                       required: false },
+        { name: '售价',         desc: '数值，单位元',                            required: true  },
+        { name: '纯佣金',       desc: '数值，百分比',                            required: true  },
+        { name: '投流佣金',     desc: '数值，百分比',                            required: false },
+        { name: '物流快递',     desc: '快递公司',                                required: false },
+        { name: '库存',         desc: '数值',                                    required: false },
+        { name: '归属销售',     desc: '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', required: false },
+      ];
+      sampleRows = [
         ['知行图书出版社', '趣味数学思维训练', '小学生,家长', '教育图书', '适合6-12岁儿童的数学思维训练', 'https://shop.weixin.qq.com/xxx', '单本', 39.9, 25, 35, '中通快递', 5000, '销售小王'],
         ['启明文化传媒', '经典绘本套装', '幼儿,宝妈,教师', '儿童绘本', '获奖绘本合集，3-6岁适读', 'https://shop.weixin.qq.com/yyy', '套组', 128, 30, 40, '顺丰快递', 3000, '销售小李']
       ];
-      const ws = XLSX.utils.aoa_to_sheet(sampleData);
-      ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 12) }));
-      XLSX.utils.book_append_sheet(wb, ws, '图书需求');
-      
-      const noteData = [
-        ['字段', '说明', '是否必填'],
-        ['图书商家', '商家/出版社名称（不存在将自动创建商家）', '是'],
-        ['图书名称', '图书名称', '是'],
-        ['目标人群', '多值输入，逗号分隔，如：小学生,家长', '否'],
-        ['图书分类', '多值输入，逗号分隔，如：教育图书,儿童绘本', '是'],
-        ['图书介绍', '简要介绍', '否'],
-        ['微信小店商品链接', '商品URL', '否'],
-        ['图书规格', '可选：单本 或 套组', '否'],
-        ['售价', '数值，单位元', '是'],
-        ['纯佣金', '数值，百分比', '是'],
-        ['投流佣金', '数值，百分比', '否'],
-        ['物流快递', '快递公司', '否'],
-        ['库存', '数值', '否'],
-        ['归属销售', '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', '否'],
+      extraNotes = [
         ['', '', ''],
-        ['⚠️ 图片说明', '本模板已剥离图片字段。请先上传文字数据，导入完成后到「商家管理 → 商家需求」逐条点"上传图片"按钮添加（每条最多 3 张，单张 ≤500KB，仅 PNG/JPG）', '']
+        ['⚠️ 图片说明', '本模板已剥离图片字段。请先上传文字数据，导入完成后到「商家管理 → 商家需求」逐条点"上传图片"按钮添加（每条最多 3 张，单张 ≤500KB，仅 PNG/JPG）', ''],
       ];
-      const noteWs = XLSX.utils.aoa_to_sheet(noteData);
-      noteWs['!cols'] = [{ wch: 18 }, { wch: 60 }, { wch: 10 }];
-      XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
     } else if (type === 'course') {
-      const headers = COURSE_FIELDS_ORDER;
-      const sampleData = [
-        headers,
+      sheetName = '课程需求';
+      filename = '课程需求批量导入模板.xlsx';
+      fields = [
+        { name: '课程商家',  desc: '商家/机构名称（不存在将自动创建商家）',     required: true  },
+        { name: '课程名称',  desc: '课程名称',                                required: true  },
+        { name: '课程价格',  desc: '数值，单位元',                            required: true  },
+        { name: '学段',      desc: '多值，逗号分隔，如：小学,初中',            required: false },
+        { name: '学科',      desc: '多值，逗号分隔，如：数学,英语',            required: false },
+        { name: '课程介绍',  desc: '简要介绍',                                required: false },
+        { name: '课程链接',  desc: '课程URL',                                 required: false },
+        { name: '归属销售',  desc: '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', required: false },
+      ];
+      sampleRows = [
         ['少儿编程学院', '少儿编程入门班', 1999, '小学,初中', '编程,信息技术', 'Scratch+Python双轨课程', 'https://edu.example.com/course1', '销售小王'],
         ['外语教育集团', '英语自然拼读', 899, '幼儿园,小学', '英语', '外教自然拼读课程', 'https://edu.example.com/course2', '销售小李']
       ];
-      const ws = XLSX.utils.aoa_to_sheet(sampleData);
-      ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 12) }));
-      XLSX.utils.book_append_sheet(wb, ws, '课程需求');
-      
-      const noteData = [
-        ['字段', '说明', '是否必填'],
-        ['课程商家', '商家/机构名称（不存在将自动创建商家）', '是'],
-        ['课程名称', '课程名称', '是'],
-        ['课程价格', '数值，单位元', '是'],
-        ['学段', '多值，逗号分隔，如：小学,初中', '否'],
-        ['学科', '多值，逗号分隔，如：数学,英语', '否'],
-        ['课程介绍', '简要介绍', '否'],
-        ['课程链接', '课程URL', '否'],
-        ['归属销售', '销售管理员的姓名或账号，需与系统中"销售"角色管理员匹配', '否'],
+      extraNotes = [
         ['', '', ''],
-        ['⚠️ 图片说明', '本模板已剥离图片字段。请先上传文字数据，导入完成后到「商家管理 → 商家需求」逐条点"上传图片"按钮添加（每条最多 3 张，单张 ≤500KB，仅 PNG/JPG）', '']
+        ['⚠️ 图片说明', '本模板已剥离图片字段。请先上传文字数据，导入完成后到「商家管理 → 商家需求」逐条点"上传图片"按钮添加（每条最多 3 张，单张 ≤500KB，仅 PNG/JPG）', ''],
       ];
-      const noteWs = XLSX.utils.aoa_to_sheet(noteData);
-      noteWs['!cols'] = [{ wch: 18 }, { wch: 60 }, { wch: 10 }];
-      XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
     } else if (type === 'influencer-demand' || type === 'influencer_demand') {
-      // 达人需求批量导入模板（V4.1 新增）
-      const headers = ['视频号账号名称', '需求类型', '图书品类', '图书价格区间', '课程价格区间', '粉丝数', '需求描述'];
-      const sampleData = [
-        headers,
-        ['读书小达人', '图书需求', '科普百科', '20-60', '', 500000, '想找适合6-10岁的科普类图书带货'],
+      sheetName = '达人需求';
+      filename = '达人需求批量导入模板.xlsx';
+      fields = [
+        { name: '视频号账号名称', desc: '需对应平台已存在的达人，不存在将跳过',     required: true },
+        { name: '需求类型',       desc: '可填：图书需求 / 课程需求 / 图书需求,课程需求', required: true },
+        { name: '图书品类',       desc: '如：科普百科 / 儿童绘本 / 文学经典',        required: true },
+        { name: '图书价格区间',   desc: '格式：最低-最高，如 20-60',                required: true },
+        { name: '课程价格区间',   desc: '格式：最低-最高，如 500-2000',             required: true },
+        { name: '粉丝数',         desc: '数值',                                    required: true },
+        { name: '需求描述',       desc: '一句话描述需求',                          required: true },
+      ];
+      sampleRows = [
+        ['读书小达人', '图书需求', '科普百科', '20-60', '0', 500000, '想找适合6-10岁的科普类图书带货'],
         ['亲子阅读馆', '图书需求,课程需求', '儿童绘本', '30-80', '500-2000', 800000, '寻找高质量的亲子互动绘本和早教课程']
       ];
-      const ws = XLSX.utils.aoa_to_sheet(sampleData);
-      ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2, 14) }));
-      XLSX.utils.book_append_sheet(wb, ws, '达人需求');
-
-      const noteData = [
-        ['字段', '说明', '是否必填'],
-        ['视频号账号名称', '需对应平台已存在的达人，不存在将跳过', '是'],
-        ['需求类型', '可填：图书需求 / 课程需求 / 图书需求,课程需求', '是'],
-        ['图书品类', '如：科普百科 / 儿童绘本 / 文学经典', '否'],
-        ['图书价格区间', '格式：最低-最高，如 20-60', '否'],
-        ['课程价格区间', '格式：最低-最高，如 500-2000', '否'],
-        ['粉丝数', '数值', '否'],
-        ['需求描述', '一句话描述需求', '否']
-      ];
-      const noteWs = XLSX.utils.aoa_to_sheet(noteData);
-      noteWs['!cols'] = [{ wch: 18 }, { wch: 50 }, { wch: 10 }];
-      XLSX.utils.book_append_sheet(wb, noteWs, '填写说明');
     } else {
       return res.status(400).json({ success: false, error: '类型仅支持 book / course / influencer-demand' });
     }
-    
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-    let filename = '需求批量导入模板.xlsx';
-    if (type === 'book') filename = '图书需求批量导入模板.xlsx';
-    else if (type === 'course') filename = '课程需求批量导入模板.xlsx';
-    else if (type === 'influencer-demand' || type === 'influencer_demand') filename = '达人需求批量导入模板.xlsx';
-    
+
+    buf = buildTemplateBuffer(sheetName, fields, sampleRows, extraNotes);
+
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
@@ -245,7 +223,8 @@ router.post('/import/book', upload.single('file'), (req, res) => {
     
     const wb = XLSX.readFile(req.file.path);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const rawData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
     
     if (jsonData.length === 0) {
       fs.unlinkSync(req.file.path);
@@ -363,7 +342,8 @@ router.post('/import/course', upload.single('file'), (req, res) => {
     
     const wb = XLSX.readFile(req.file.path);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const rawData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
     
     if (jsonData.length === 0) {
       fs.unlinkSync(req.file.path);
@@ -482,7 +462,8 @@ router.post('/import/influencer-demand', upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, error: '请上传 Excel 文件' });
     const wb = XLSX.readFile(req.file.path);
     const ws = wb.Sheets[wb.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    const rawData = XLSX.utils.sheet_to_json(ws, { defval: '' });
+const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
     if (jsonData.length === 0) {
       fs.unlinkSync(req.file.path);
       return res.status(400).json({ success: false, error: 'Excel 文件为空或格式不正确' });
