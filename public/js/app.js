@@ -983,35 +983,41 @@ function initDistributionChart(dist) {
   const chart = echarts.init(dom);
   echartInstances['dist'] = chart;
   
-  const typeData = (dist.typeStats || []).map(t => ({
-    name: t.type === 'book' ? '图书' : (t.type === 'course' ? '课程' : t.type),
-    value: t.count
-  }));
-  const catData = (dist.categoryStats || []).slice(0, 8).map(c => ({
-    name: c.category, value: c.count
-  }));
+  const catData = (dist.categoryStats || []).slice(0, 12);
+  const categories = catData.map(c => c.category);
+  // 按图书/课程分组（category包含"课程"或"课"的归入课程，其余归入图书）
+  const bookValues = catData.map(c => (c.book_count || (c.type === 'book' ? c.count : 0)));
+  const courseValues = catData.map(c => (c.course_count || (c.type === 'course' ? c.count : 0)));
+  // 如果后端没有按类型分组，用总量柱状图
+  const totalValues = catData.map(c => c.count);
+  const hasSplit = bookValues.some(v => v > 0) || courseValues.some(v => v > 0);
   
-  chart.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} ({d}%)' },
-    legend: { bottom: 0, type: 'scroll' },
-    series: [
-      {
-        name: '类型', type: 'pie',
-        radius: ['0%', '30%'], center: ['50%', '45%'],
-        label: { position: 'inner', formatter: '{b}\n{d}%', fontSize: 11, color: '#fff' },
-        data: typeData,
-        color: ['#3b82f6', '#8b5cf6']
-      },
-      {
-        name: '类目', type: 'pie',
-        radius: ['45%', '70%'], center: ['50%', '45%'],
-        labelLine: { length: 8, length2: 8 },
-        label: { fontSize: 11, formatter: '{b} {d}%' },
-        data: catData,
-        color: ['#60a5fa','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#8b5cf6','#64748b']
-      }
-    ]
-  });
+  if (hasSplit) {
+    chart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { data: ['图书', '课程'], top: 0 },
+      grid: { left: 60, right: 20, top: 40, bottom: 60 },
+      xAxis: { type: 'category', data: categories, axisLabel: { rotate: 30, fontSize: 11 } },
+      yAxis: { type: 'value', name: '需求量' },
+      series: [
+        { name: '图书', type: 'bar', stack: 'total', data: bookValues, itemStyle: { color: '#3b82f6' }, barWidth: '40%' },
+        { name: '课程', type: 'bar', stack: 'total', data: courseValues, itemStyle: { color: '#8b5cf6' }, barWidth: '40%' }
+      ]
+    });
+  } else {
+    chart.setOption({
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      grid: { left: 60, right: 20, top: 20, bottom: 60 },
+      xAxis: { type: 'category', data: categories, axisLabel: { rotate: 30, fontSize: 11 } },
+      yAxis: { type: 'value', name: '需求量' },
+      series: [{
+        type: 'bar', data: totalValues,
+        itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#3b82f6' }, { offset: 1, color: '#8b5cf6' }]) },
+        barWidth: '40%',
+        label: { show: true, position: 'top', fontSize: 11 }
+      }]
+    });
+  }
 }
 
 function initTrendChart(trend) {
@@ -4299,7 +4305,7 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
       <h2>撮合管理</h2>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="font-size:13px;color:var(--gray-500)">共 ${totalCount} 条</span>
-        <button class="btn btn-primary" onclick="showCreateMatchmaking()">+ 新建撮合</button>
+        <button class="btn btn-primary" onclick="showCreateMatchmaking()">+ 结果补录</button>
       </div>
     </div>
     <div class="mm-summary">
@@ -4506,6 +4512,7 @@ function renderVerticalMatchmakingCard(mm, stageColor) {
           ${mm.cooperation_details ? `<div class="vcard-detail-item"><span class="detail-label">合作详情</span><span class="detail-value">${mm.cooperation_details}</span></div>` : ''}
         </div>
         <div class="vcard-actions">
+          ${mm.demand_id ? `<button class="btn btn-sm btn-outline" onclick="viewDemandDetail('${mm.demand_id}')">📎 需求单</button>` : ''}
           <button class="btn btn-sm btn-outline" onclick="viewMatchmakingDetail('${mm.id}')"> 详情</button>
           <button class="btn btn-sm btn-primary" onclick="editMatchmakingDetail('${mm.id}')">编辑</button>
           <button class="btn btn-sm btn-warning" onclick="editMatchmakingStage('${mm.id}','${mm.stage}')">⏭ 流转</button>
@@ -4636,6 +4643,11 @@ async function editMatchmakingDetail(id) {
     <div class="form-group">
       <label>~ 合作详情（合作方式、佣金比例、合作周期等）</label>
       <textarea id="edit-mm-cooperation" rows="3" placeholder="如：纯佣合作，佣金25%，合作周期1个月">${mm.cooperation_details || ''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>📎 数据凭证（上传后台截图或Excel原文件）</label>
+      <input type="file" id="edit-mm-evidence" accept=".png,.jpg,.jpeg,.xlsx,.xls" style="font-size:13px">
+      <span style="font-size:11px;color:var(--gray-400)">支持截图(png/jpg)或Excel(.xlsx/.xls)，作为数据真实性凭证</span>
     </div>
   `, `
     <button class="btn btn-outline" onclick="closeModal()">取消</button>
@@ -4864,7 +4876,7 @@ async function showCreateMatchmaking() {
     return;
   }
 
-  openModal('新建撮合', `
+  openModal('结果补录', `
     <div class="form-group">
       <label>选择商家 *</label>
       <select id="mm-merchant">
