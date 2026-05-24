@@ -1,4 +1,4 @@
-// 商达撮合系统 - 前端逻辑
+// 腾讯营销·教育行业商达撮合平台 - 前端逻辑
 const API_BASE = '/api';
 let currentUser = null;
 let navigationHistory = [];

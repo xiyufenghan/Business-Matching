@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>商达撮合系统</title>
-  <link rel="stylesheet" href="/css/style.css?v=20260505zh">
+  <title>腾讯营销·商达撮合平台</title>
+  <link rel="stylesheet" href="/css/style.css?v=20260524brand">
+  <link rel="icon" type="image/png" href="/images/logo-icon-black.png">
 </head>
 <body>
   <div class="app-container" id="app-container" style="display:none">
@@ -13,7 +14,7 @@
       <button class="hamburger" id="hamburger-btn" onclick="toggleSidebar()">
         <span></span><span></span><span></span>
       </button>
-      <h1 class="mobile-title">商达撮合</h1>
+      <h1 class="mobile-title">腾讯营销·商达撮合</h1>
       <div class="notify-bell-wrap" id="notify-bell-wrap" style="display:none">
         <div class="notify-bell" onclick="toggleNotifyPanel(event)">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -41,8 +42,11 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <h1>商达撮合</h1>
-        <p>视频号商家与达人匹配平台</p>
+        <div class="sidebar-brand">
+          <img src="/images/logo-icon-white.png" alt="腾讯营销">
+          <span class="sidebar-brand-text">腾讯营销</span>
+        </div>
+        <p>教育行业商达撮合平台</p>
         <button class="sidebar-close" onclick="closeSidebar()">&times;</button>
       </div>
       <nav class="nav-menu" id="nav-menu"></nav>
@@ -63,10 +67,10 @@
     <div class="login-card">
       <div class="login-header">
         <div class="login-logo">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+          <img src="/images/logo-icon-white.png" alt="腾讯营销">
+          <span class="login-logo-text">腾讯营销</span>
         </div>
-        <h1>商达撮合系统</h1>
-        <p>视频号商家与达人匹配平台</p>
+        <h1>教育行业商达撮合平台</h1>
       </div>
       <form id="login-form" onsubmit="handleLogin(event)">
         <div class="form-group">
@@ -80,6 +84,10 @@
         <div id="login-error" class="login-error" style="display:none"></div>
         <button type="submit" class="btn btn-primary" style="width:100%;margin-top:12px" id="login-btn">登 录</button>
       </form>
+      <div class="login-footer-brand">
+        <img src="/images/logo-icon-black.png" alt="">
+        <span>腾讯营销出品</span>
+      </div>
     </div>
   </div>
 
@@ -87,8 +95,9 @@
   <div class="login-page" id="activate-page" style="display:none">
     <div class="login-card">
       <div class="login-header">
-        <div class="login-logo" style="background:#fef3c7">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.5"><path d="M20 6L9 17l-5-5"/></svg>
+        <div class="login-logo">
+          <img src="/images/logo-icon-white.png" alt="腾讯营销">
+          <span class="login-logo-text">腾讯营销</span>
         </div>
         <h1>激活账号</h1>
         <p id="activate-subtitle">正在验证邀请链接...</p>
@@ -125,7 +134,7 @@
   <div class="consent-overlay" id="consent-overlay">
     <div class="consent-modal">
       <h2>欢迎使用「商达撮合平台」</h2>
-      <p>本平台由腾讯广告商业管理部运营，用于促成商家与视频号达人的合作撮合。</p>
+      <p>本平台由腾讯营销运营，用于促成教育行业商家与视频号达人的合作撮合。</p>
       <p>为了提供更好的服务，我们需要收集和展示你的基础资料（包括公司/账号名、行业、粉丝量、合作意向等）。这些信息将在平台内对其他合作方可见，用于撮合匹配。</p>
       <p>点击「同意并继续」代表你已阅读并同意平台的数据使用规则。你可以随时在「个人中心」中查看或修改你的资料。</p>
       <button class="consent-btn" onclick="acceptConsent()">同意并继续</button>
@@ -145,6 +154,6 @@
   </div>
 
 <script src="/lib/echarts.min.js"></script>
-<script src="/js/app.js?v=20260505zh"></script>
+<script src="/js/app.js?v=20260524brand"></script>
 </body>
 </html>

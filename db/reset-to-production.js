@@ -51,7 +51,7 @@ async function main() {
   }
 
   console.log('\n======================================');
-  console.log('  商达撮合系统 · 生产数据重置');
+  console.log('  腾讯营销·商达撮合平台 · 生产数据重置');
   console.log('======================================\n');
   console.log('本脚本将清空所有业务数据，仅保留 admin 超管账号：');
   console.log('  - 所有商家、达人、管理员（除 admin 超管）');

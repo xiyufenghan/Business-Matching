@@ -54,7 +54,7 @@ router.post('/test-wework', async (req, res) => {
     }
 
     const content = `**🔔 企微推送测试**\n` +
-                    `> 来源：商达撮合系统\n` +
+                    `> 来源：腾讯营销·商达撮合平台\n` +
                     `> 时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n` +
                     `如果你看到这条消息，说明 Webhook 配置成功！`;
     // 测试推送直接同步等待 postWebhook 结果

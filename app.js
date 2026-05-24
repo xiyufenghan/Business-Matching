@@ -402,7 +402,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`商达撮合系统已启动: http://0.0.0.0:${PORT}`);
+  console.log(`腾讯营销·商达撮合平台已启动: http://0.0.0.0:${PORT}`);
 });
 
 module.exports = app;

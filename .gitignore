@@ -20,5 +20,10 @@ decode.py
 # 业务数据源（不入仓库）
 *.xlsx
 *.docx
+*.csv
+*.pdf
 *.db.bak.*
 .codebuddy/
+
+# 需求文档（不入仓库）
+需求*
