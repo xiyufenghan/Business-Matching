@@ -408,16 +408,22 @@ router.post('/', (req, res) => {
     const isInviteMode = invite_mode === 1 || invite_mode === '1' || invite_mode === true;
     const inviteCode = isInviteMode ? uuidv4() : null;
     const inviteStatus = isInviteMode ? 'pending' : 'active';
-    const finalPassword = isInviteMode ? '' : (password || '123456');
+    const plainPwd = isInviteMode ? '' : (password || '123456');
 
     try {
       req.db.prepare(`
         INSERT INTO merchants (id, name, company, phone, email, industry, description, sales_owner_id, password, status,
           invite_code, invite_status, invited_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 'active', ?, ?, ?)
       `).run(id, name, company, phone, email || null, industry || null, description || null,
-        sales_owner_id || null, finalPassword,
+        sales_owner_id || null,
         inviteCode, inviteStatus, invited_by || null);
+
+      // P2 fix: 非邀请模式用 bcrypt 哈希密码
+      if (!isInviteMode && plainPwd) {
+        const setPasswordHash = req.app.locals.setPasswordHash;
+        setPasswordHash('merchants', id, plainPwd);
+      }
     } catch (e) {
       // V5 A2: 捕获 UNIQUE 约束冲突（并发时两个请求都通过了 SELECT）
       if (e && e.code === 'SQLITE_CONSTRAINT_UNIQUE') {

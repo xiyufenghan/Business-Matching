@@ -370,8 +370,8 @@ app.post('/api/auth/consent', (req, res) => {
     ).run(u.id);
     res.json({ success: true });
   } catch (e) {
-    console.eor('[' + "app.js" + ']', e);
-    res.status(500).json({ success: false, eor: '操作失败，请稍后重试' });
+    console.error('[app.js consent]', e);
+    res.status(500).json({ success: false, error: '操作失败，请稍后重试' });
   }
 });
 

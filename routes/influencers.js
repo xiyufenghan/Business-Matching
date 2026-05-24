@@ -224,8 +224,11 @@ router.post('/excel/import', upload.single('file'), (req, res) => {
               fields.short_video_frequency, fields.live_frequency,
               fields.has_mcn, fields.mcn_name, fields.region,
               fields.has_joined_mutual_select, fields.sales_owner, fields.sales_owner_id,
-              fields.official_account_name, '123456'
+              fields.official_account_name, ''
             );
+            // P1 fix: Excel 导入的新达人用 bcrypt 哈希默认密码
+            const setPasswordHash = req.app.locals.setPasswordHash;
+            setPasswordHash('influencers', id, '123456');
             results.inserted++;
           }
           results.success++;
@@ -861,12 +864,12 @@ router.post('/add', (req, res) => {
     const isInviteMode = invite_mode === 1 || invite_mode === '1' || invite_mode === true;
     const inviteCode = isInviteMode ? uuidv4() : null;
     const inviteStatus = isInviteMode ? 'pending' : 'active';
-    const finalPassword = isInviteMode ? '' : '123456';
+    const defaultPwd = isInviteMode ? '' : '123456';
 
     req.db.prepare(`
       INSERT INTO influencers (id, level, video_account_name, phone, video_category_track, monthly_short_video_sales, monthly_live_sales, fans_count, cooperation_type, book_willingness, course_willingness, short_video_frequency, live_frequency, has_mcn, mcn_name, region, has_joined_mutual_select, sales_owner, official_account_name, password, operator_id, sales_owner_id,
         invite_code, invite_status, invited_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)
     `).run(
       id, normalizeLevel(level), video_account_name, phone || '',
       video_category_track || '',
@@ -878,10 +881,16 @@ router.post('/add', (req, res) => {
       live_frequency || '', has_mcn || '否',
       mcn_name || '', region || '',
       has_joined_mutual_select || '否',
-      sales_owner || '', official_account_name || '', finalPassword,
+      sales_owner || '', official_account_name || '',
       operator_id || null, sales_owner_id || null,
       inviteCode, inviteStatus, invited_by || null
     );
+
+    // P1 fix: 非邀请模式用 bcrypt 哈希密码
+    if (!isInviteMode) {
+      const setPasswordHash = req.app.locals.setPasswordHash;
+      setPasswordHash('influencers', id, defaultPwd);
+    }
 
     const newInf = req.db.prepare('SELECT * FROM influencers WHERE id = ?').get(id);
     res.status(201).json({ success: true, data: newInf, invite_code: inviteCode });

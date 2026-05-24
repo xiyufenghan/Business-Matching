@@ -995,8 +995,8 @@ router.get('/plaza', (req, res) => {
 
 // 兼容旧版：/merchant-plaza 重定向到 /plaza
 router.get('/merchant-plaza', (req, res) => {
-  req.url = '/plaza' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '');
-  router.handle(req, res);
+  const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+  res.redirect(301, '/api/demands/plaza' + qs);
 });
 
 // ========== V4 置顶 / 下架 / 复制 ==========

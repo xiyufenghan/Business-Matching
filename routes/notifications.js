@@ -4,10 +4,11 @@ const { v4: uuidv4 } = require('uuid');
 
 // GET /api/notifications/unread-count — 轮询未读数（仅 COUNT，极低负载）
 router.get('/unread-count', (req, res) => {
-  const { user_type, id } = req.user;
+  const role = req.user.role;
+  const { id } = req.user;
   const row = req.db.prepare(
     "SELECT COUNT(*) as count FROM notifications WHERE user_type = ? AND user_id = ? AND is_read = 0"
-  ).get(user_type || req.user.role, id);
+  ).get(role, id);
   res.json({ success: true, data: { count: row.count } });
 });
 

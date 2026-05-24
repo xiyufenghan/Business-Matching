@@ -97,10 +97,15 @@ router.post('/', (req, res) => {
     }
 
     const id = uuidv4();
+    const plainPwd = password || '123456';
     req.db.prepare(`
       INSERT INTO admins (id, username, password, name, is_super, admin_role, phone, email, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, username, password || '123456', name, is_super ? 1 : 0, is_super ? '管理员' : role, phone || '', email || '', description || '');
+      VALUES (?, ?, '', ?, ?, ?, ?, ?, ?)
+    `).run(id, username, name, is_super ? 1 : 0, is_super ? '管理员' : role, phone || '', email || '', description || '');
+
+    // P1 fix: 用 bcrypt 哈希密码，不存明文
+    const setPasswordHash = req.app.locals.setPasswordHash;
+    setPasswordHash('admins', id, plainPwd);
 
     res.json({ success: true, data: { id, username, name }, message: '员工创建成功' });
   } catch (err) {
@@ -130,27 +135,36 @@ router.put('/:id', (req, res) => {
     if (is_super || (is_super !== undefined && is_super)) finalRole = '管理员';
     else if (is_super === 0) finalRole = admin_role || admin.admin_role;
 
-    req.db.prepare(`
-      UPDATE admins SET
-        username = COALESCE(?, username),
-        password = COALESCE(?, password),
-        name = COALESCE(?, name),
-        is_super = CASE WHEN ? IS NOT NULL THEN ? ELSE is_super END,
-        admin_role = CASE WHEN ? IS NOT NULL THEN ? ELSE admin_role END,
-        phone = CASE WHEN ? IS NOT NULL THEN ? ELSE phone END,
-        email = CASE WHEN ? IS NOT NULL THEN ? ELSE email END,
-        description = CASE WHEN ? IS NOT NULL THEN ? ELSE description END,
-        status = CASE WHEN ? IS NOT NULL THEN ? ELSE status END,
-        updated_at = datetime('now')
-      WHERE id = ?
-    `).run(
-      username || null, password || null, name || null,
-      is_super, (is_super ? 1 : 0),
-      finalRole, finalRole,
-      phone, phone ?? null, email, email ?? null, description, description ?? null,
-      status, status ?? null,
-      id
-    );
+    // P1 fix: 密码单独处理，不通过 COALESCE 明文写入
+    const newPassword = password || null;
+    const updateFields = [];
+    const updateParams = [];
+
+    if (username) { updateFields.push('username = ?'); updateParams.push(username); }
+    if (newPassword) { /* 密码在 UPDATE 后单独哈希 */ }
+    if (name) { updateFields.push('name = ?'); updateParams.push(name); }
+    updateFields.push('is_super = CASE WHEN ? IS NOT NULL THEN ? ELSE is_super END');
+    updateParams.push(is_super, (is_super ? 1 : 0));
+    updateFields.push('admin_role = CASE WHEN ? IS NOT NULL THEN ? ELSE admin_role END');
+    updateParams.push(finalRole, finalRole);
+    updateFields.push('phone = CASE WHEN ? IS NOT NULL THEN ? ELSE phone END');
+    updateParams.push(phone, phone ?? null);
+    updateFields.push('email = CASE WHEN ? IS NOT NULL THEN ? ELSE email END');
+    updateParams.push(email, email ?? null);
+    updateFields.push('description = CASE WHEN ? IS NOT NULL THEN ? ELSE description END');
+    updateParams.push(description, description ?? null);
+    updateFields.push('status = CASE WHEN ? IS NOT NULL THEN ? ELSE status END');
+    updateParams.push(status, status ?? null);
+    updateFields.push("updated_at = datetime('now')");
+
+    updateParams.push(id);
+    req.db.prepare(`UPDATE admins SET ${updateFields.join(', ')} WHERE id = ?`).run(...updateParams);
+
+    // P1 fix: 有新密码时用 bcrypt 哈希
+    if (newPassword) {
+      const setPasswordHash = req.app.locals.setPasswordHash;
+      setPasswordHash('admins', id, newPassword);
+    }
 
     res.json({ success: true, message: '员工信息已更新' });
   } catch (err) {

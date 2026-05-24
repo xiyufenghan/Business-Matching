@@ -541,7 +541,11 @@ router.get('/matchmaking-overview', (req, res) => {
 router.get('/matchmaking-detail', (req, res) => {
   try {
     const { dimension = 'merchant', days = 30 } = req.query;
-    const dateLimit = `datetime('now','-${parseInt(days) || 30} days')`;
+    // P3 fix: 在 JS 端计算日期，避免 SQL 字符串拼接
+    const daysNum = parseInt(days) || 30;
+    const d = new Date();
+    d.setDate(d.getDate() - daysNum);
+    const dateLimit = d.toISOString().slice(0, 19).replace('T', ' ');
 
     let sql;
     if (dimension === 'influencer') {
@@ -555,7 +559,7 @@ router.get('/matchmaking-detail', (req, res) => {
           COUNT(*) as total
         FROM matchmaking mm
         LEFT JOIN influencers inf ON mm.influencer_id = inf.id
-        WHERE datetime(mm.created_at) >= ${dateLimit}
+        WHERE datetime(mm.created_at) >= ?
         GROUP BY inf.id
         ORDER BY total DESC
         LIMIT 50
@@ -571,14 +575,14 @@ router.get('/matchmaking-detail', (req, res) => {
           COUNT(*) as total
         FROM matchmaking mm
         LEFT JOIN merchants m ON mm.merchant_id = m.id
-        WHERE datetime(mm.created_at) >= ${dateLimit}
+        WHERE datetime(mm.created_at) >= ?
         GROUP BY m.id
         ORDER BY total DESC
         LIMIT 50
       `;
     }
 
-    const data = req.db.prepare(sql).all();
+    const data = req.db.prepare(sql).all(dateLimit);
     res.json({ success: true, data });
   } catch (err) {
     console.error('[' + "routes/stats.js" + ']', err);
