@@ -4238,6 +4238,18 @@ async function handleExcelUpload(e) {
       if (data.data?.errors && data.data.errors.length> 0) {
         html += `<div class="result-errors" style="margin-top:8px;font-size:12px;color:#991b1b">${data.data.errors.slice(0, 5).map(escapeHtml).join('<br>')}</div>`;
       }
+      // 按商家聚合展示
+      const groups = data.data?.merchantGroups;
+      if (groups && Object.keys(groups).length > 0) {
+        const entries = Object.entries(groups);
+        html += '<div style="margin-top:10px;text-align:left">';
+        html += `<div style="font-size:13px;color:#475569;margin-bottom:6px;font-weight:600">📊 按商家聚合（${entries.length} 家）</div>`;
+        entries.forEach(([merchant, info]) => {
+          const itemsStr = info.items.length <= 5 ? info.items.map(i => escapeHtml(i)).join('、') : info.items.slice(0, 5).map(i => escapeHtml(i)).join('、') + ` 等 ${info.items.length} 条`;
+          html += `<div style="padding:4px 0;font-size:12px;color:#334155;border-bottom:1px solid #f1f5f9"><strong style="color:#1e293b">${escapeHtml(merchant)}</strong>（${info.count} 条）：${itemsStr}</div>`;
+        });
+        html += '</div>';
+      }
       resultDiv.innerHTML = html;
       showToast(`导入成功！成功${count}条${failed> 0 ? '，失败' + failed + '条' : ''}`);
     } else {
@@ -7695,7 +7707,20 @@ async function onBatchImportFile(tab, uploadUrl) {
       const r = data.data || {};
       const msg = data.message || '已写入数据库';
       const errs = (r.errors && r.errors.length) ? '<br><span style="color:#f59e0b;font-size:12px">部分行失败：<br>' + r.errors.slice(0, 5).map(e => '• ' + escapeHtml(e)).join('<br>') + (r.errors.length > 5 ? `<br>... 共 ${r.errors.length} 条错误` : '') + '</span>' : '';
-      result.innerHTML = `<span style="color:#10b981">✓ ${msg}</span>${errs}`;
+      // 按商家聚合展示
+      let groupHtml = '';
+      const groups = r.merchantGroups;
+      if (groups && Object.keys(groups).length > 0) {
+        const entries = Object.entries(groups);
+        groupHtml = '<div style="margin-top:12px;text-align:left">';
+        groupHtml += `<div style="font-size:13px;color:#475569;margin-bottom:6px;font-weight:600">📊 按商家聚合（${entries.length} 家）</div>`;
+        entries.forEach(([merchant, info]) => {
+          const itemsStr = info.items.length <= 5 ? info.items.map(i => escapeHtml(i)).join('、') : info.items.slice(0, 5).map(i => escapeHtml(i)).join('、') + ` 等 ${info.items.length} 条`;
+          groupHtml += `<div style="padding:4px 0;font-size:12px;color:#334155;border-bottom:1px solid #f1f5f9"><strong style="color:#1e293b">${escapeHtml(merchant)}</strong>（${info.count} 条）：${itemsStr}</div>`;
+        });
+        groupHtml += '</div>';
+      }
+      result.innerHTML = `<span style="color:#10b981">✓ ${msg}</span>${errs}${groupHtml}`;
       showToast('导入完成');
     } else {
       result.innerHTML = `<span style="color:#ef4444">× 导入失败</span><br><span style="color:#64748b;font-size:12px">${escapeHtml(data.error || '未知错误')}</span>`;

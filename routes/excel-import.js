@@ -231,7 +231,7 @@ const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
       return res.status(400).json({ success: false, error: 'Excel文件为空或格式不正确' });
     }
     
-    const results = { success: 0, failed: 0, errors: [] };
+    const results = { success: 0, failed: 0, errors: [], merchantGroups: {} };
     
     if (isAdmin) req.db.pragma('foreign_keys = OFF');
     
@@ -294,6 +294,12 @@ const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
             'published', bookId
           );
           
+          // 按商家聚合统计
+          const mKey = String(mapped.book_merchant).trim();
+          if (!results.merchantGroups[mKey]) results.merchantGroups[mKey] = { count: 0, items: [] };
+          results.merchantGroups[mKey].count++;
+          results.merchantGroups[mKey].items.push(mapped.book_name);
+          
           results.success++;
         } catch (e) {
           results.errors.push(`第${idx + 2}行：${e.message}`);
@@ -350,7 +356,7 @@ const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
       return res.status(400).json({ success: false, error: 'Excel文件为空或格式不正确' });
     }
     
-    const results = { success: 0, failed: 0, errors: [] };
+    const results = { success: 0, failed: 0, errors: [], merchantGroups: {} };
     
     if (isAdmin) req.db.pragma('foreign_keys = OFF');
     
@@ -411,6 +417,12 @@ const jsonData = stripTemplateHintRow(rawData); // V5: 跳过模板说明行
             mapped.course_introduction || mapped.course_name,
             'published', courseId
           );
+          
+          // 按商家聚合统计
+          const mKey = String(mapped.course_merchant || '').trim() || '未指定商家';
+          if (!results.merchantGroups[mKey]) results.merchantGroups[mKey] = { count: 0, items: [] };
+          results.merchantGroups[mKey].count++;
+          results.merchantGroups[mKey].items.push(mapped.course_name);
           
           results.success++;
         } catch (e) {
