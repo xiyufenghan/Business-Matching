@@ -4,27 +4,26 @@ let currentUser = null;
 let navigationHistory = [];
 let notificationCount = 0;
 
-// ============ V4 撮合 5 段流程定义（前端单一来源） ============
-const MM_STAGES = ['published', 'responded', 'connected', 'sample_sent', 'cooperating'];
+// ============ V6 撮合 4 段流程定义（前端单一来源） ============
+const MM_STAGES = ['published', 'responded', 'connected', 'cooperating'];
 const MM_STAGE_LABELS = {
-  published: '发布需求',
+  published: '需求发布',
   responded: '需求回应',
-  connected: '需求建联',
-  sample_sent: '样品寄送',
+  connected: '确认合作',
   cooperating: '开始合作',
 };
 const MM_STAGE_COLORS = {
   published: '#94a3b8',
   responded: '#3b82f6',
   connected: '#8b5cf6',
-  sample_sent: '#f59e0b',
   cooperating: '#10b981',
 };
-const MM_OPTIONAL_STAGES = ['sample_sent'];
+const MM_OPTIONAL_STAGES = [];
 // 旧值兼容：把任何旧中文 stage 标准化成新英文枚举
 const STAGE_LEGACY_MAP = {
   '需求发布': 'published', '合作匹配': 'connected', '达成意向': 'connected',
-  '样品寄送': 'sample_sent', '开始合作': 'cooperating',
+  '样品寄送': 'connected', 'sample_sent': 'connected',
+  '开始合作': 'cooperating',
 };
 function normStage(s) { return STAGE_LEGACY_MAP[s] || (MM_STAGES.includes(s) ? s : 'published'); }
 function stageLabel(s) { return MM_STAGE_LABELS[normStage(s)] || s; }
@@ -3328,11 +3327,12 @@ async function submitAddInfluencer(e) {
 
 // ============ 发布需求 ============
 // 发布表单下拉枚举（与列表筛选保持一致）
-const PUB_BOOK_CATEGORIES = ['少儿科普', '绘本', '教辅', '文学', '家庭教育', '童书', '人文社科', '其他'];
-const PUB_GRADE_LEVELS = ['学龄前', '小学', '初中', '高中', '成人', '通用'];
-const PUB_SUBJECTS = ['语文', '数学', '英语', '科学', '艺术', '编程', '通用', '其他'];
+const PUB_BOOK_CATEGORIES = ['文学', '社科', '健康', '励志', '传记', '童书', '教辅', '经管', '科技', '企管', '其他'];
+const PUB_GRADE_LEVELS = ['学龄前', '小学', '初中'];
+const PUB_SUBJECTS = ['家庭教育', '家庭关系', '英语', '编程', '数学', '早教', '科学', '语文', '物理', '其他'];
 const PUB_AUDIENCES = ['学龄前儿童', '小学生', '初中生', '高中生', '大学生', '家长', '老师', '成人', '银发族'];
 const PUB_INF_CATEGORIES = ['图书需求', '课程需求', '其他'];
+const PUB_COOPERATION_TYPES = ['素材内容授权', '短视频带货分佣', '商家投流+分佣'];
 
 let pubActiveTab = 'book';
 let pubInfluencerOptions = []; // 管理员代发达人需求时缓存的达人列表
@@ -3404,16 +3404,34 @@ function renderPublisherInfoBar(scope) {
 
 function renderBookForm() {
   const merchantId = currentUser.role === 'merchant' ? currentUser.id : '';
+  const isAdmin = currentUser.role === 'admin';
   return `
     <div class="card"><div class="card-header"><h3>发布图书需求</h3></div><div class="card-body">
       ${renderPublisherInfoBar('book')}
       <form onsubmit="submitBookDemand(event)">
+        ${isAdmin ? `
         <div class="form-row">
+          <div class="form-group" style="grid-column:1/-1"><label>代发商家 * <span style="color:#94a3b8;font-weight:400;font-size:12px">（管理员代发，必选）</span></label>
+            <input id="pub-book-merchant-search" placeholder="输入商家名称搜索..." oninput="onBookMerchantSearch(this.value)" autocomplete="off">
+            <input type="hidden" id="pub-book-merchant-id">
+            <div id="pub-book-merchant-dropdown" style="display:none;position:absolute;z-index:99;background:#fff;border:1px solid #e2e8f0;border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:100%"></div>
+          </div>
+        </div>` : `<input type="hidden" id="pub-book-merchant-id" value="${merchantId}">`}
+        <div class="form-row">
+          <div class="form-group"><label>需求标题 *</label><input id="pub-book-title" required placeholder="如：寻找亲子赛道达人推广少儿科普"></div>
           <div class="form-group"><label>图书名称 *</label><input id="pub-book-name" required placeholder="图书名称"></div>
+        </div>
+        <div class="form-row">
           <div class="form-group"><label>图书分类 *</label>
             <select id="pub-book-category" required>
               <option value="">请选择</option>
               ${PUB_BOOK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>合作类型 *</label>
+            <select id="pub-book-cooperation-type" required>
+              <option value="">请选择</option>
+              ${PUB_COOPERATION_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -3427,23 +3445,22 @@ function renderBookForm() {
           </div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>规格</label><select id="pub-book-spec"><option value="单本">单本</option><option value="套组">套组</option></select></div>
-          <div class="form-group"><label>售价（元）</label><input type="number" id="pub-book-price" min="0" step="0.01" placeholder="39.9"></div>
+          <div class="form-group"><label>售价（元） *</label><input type="number" id="pub-book-price" min="0" step="0.01" required placeholder="39.9"></div>
+          <div class="form-group"><label>纯佣金 (%) *</label><input type="number" id="pub-book-commission" min="0" max="100" step="0.01" required placeholder="25"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>纯佣金 (%)</label><input type="number" id="pub-book-commission" min="0" max="100" step="0.01" placeholder="25"></div>
           <div class="form-group"><label>投流佣金 (%)</label><input type="number" id="pub-book-ad-commission" min="0" max="100" step="0.01" placeholder="35"></div>
+          <div class="form-group"><label>规格</label><select id="pub-book-spec"><option value="单本">单本</option><option value="套组">套组</option></select></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>物流</label><input id="pub-book-logistics" placeholder="如：中通快递"></div>
           <div class="form-group"><label>库存</label><input type="number" id="pub-book-stock" min="0" step="1" placeholder="5000"></div>
         </div>
         <div class="form-group"><label>图书介绍</label><textarea id="pub-book-intro" rows="3" placeholder="简单介绍图书内容"></textarea></div>
-        <div class="form-group"><label>商品卖点 <span style="color:#94a3b8;font-size:12px">(V4新增 · 突出卖点便于达人筛选)</span></label><textarea id="pub-book-selling-points" rows="2" placeholder="如：①教育部白名单 ②思维启蒙类畅销书 ③配套答案+解析视频"></textarea></div>
-        <div class="form-group"><label>备注 <span style="color:#94a3b8;font-size:12px">(V4新增 · 自由说明)</span></label><textarea id="pub-book-remark" rows="2" placeholder="如：可提供达人专属优惠码 / 节假日发货顺延"></textarea></div>
+        <div class="form-group"><label>商品卖点</label><textarea id="pub-book-selling-points" rows="2" placeholder="如：①教育部白名单 ②思维启蒙类畅销书 ③配套答案+解析视频"></textarea></div>
+        <div class="form-group"><label>备注</label><textarea id="pub-book-remark" rows="2" placeholder="如：可提供达人专属优惠码 / 节假日发货顺延"></textarea></div>
         <div class="form-group"><label>微信小店商品链接</label><input id="pub-book-link" placeholder="https://"></div>
         <div class="form-group"><label>图书图片URL</label><input id="pub-book-image" placeholder="图片链接（可选）"></div>
-        <input type="hidden" id="pub-book-merchant-id" value="${merchantId}">
         <button type="submit" class="btn btn-primary btn-block">发布图书需求</button>
       </form>
     </div></div>`;
@@ -3451,36 +3468,71 @@ function renderBookForm() {
 
 function renderCourseForm() {
   const merchantId = currentUser.role === 'merchant' ? currentUser.id : '';
+  const isAdmin = currentUser.role === 'admin';
   return `
     <div class="card"><div class="card-header"><h3>发布课程需求</h3></div><div class="card-body">
       ${renderPublisherInfoBar('course')}
       <form onsubmit="submitCourseDemand(event)">
+        ${isAdmin ? `
         <div class="form-row">
+          <div class="form-group" style="grid-column:1/-1"><label>代发商家 * <span style="color:#94a3b8;font-weight:400;font-size:12px">（管理员代发，必选）</span></label>
+            <input id="pub-course-merchant-search" placeholder="输入商家名称搜索..." oninput="onCourseMerchantSearch(this.value)" autocomplete="off">
+            <input type="hidden" id="pub-course-merchant-id">
+            <div id="pub-course-merchant-dropdown" style="display:none;position:absolute;z-index:99;background:#fff;border:1px solid #e2e8f0;border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);width:100%"></div>
+          </div>
+        </div>` : `<input type="hidden" id="pub-course-merchant-id" value="${merchantId}">`}
+        <div class="form-row">
+          <div class="form-group"><label>需求标题 *</label><input id="pub-course-title" required placeholder="如：寻找教育达人推广编程课"></div>
           <div class="form-group"><label>课程名称 *</label><input id="pub-course-name" required placeholder="课程名称"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>合作类型 *</label>
+            <select id="pub-course-cooperation-type" required>
+              <option value="">请选择</option>
+              ${PUB_COOPERATION_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+            </select>
+          </div>
           <div class="form-group"><label>课程价格（元）</label><input type="number" id="pub-course-price" min="0" step="0.01" placeholder="1999"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>学段</label>
-            <select id="pub-course-grade">
+          <div class="form-group"><label>课程分类 *</label>
+            <select id="pub-course-category" required onchange="onCourseCategoryChange()">
               <option value="">请选择</option>
-              ${PUB_GRADE_LEVELS.map(g => `<option value="${g}">${g}</option>`).join('')}
+              <option value="图书">图书</option>
+              <option value="课程">课程</option>
             </select>
           </div>
-          <div class="form-group"><label>学科</label>
+          <div class="form-group" id="pub-course-book-cat-group" style="display:none"><label>图书分类 *</label>
+            <select id="pub-course-book-cat">
+              <option value="">请选择</option>
+              ${PUB_BOOK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" id="pub-course-subject-group" style="display:none"><label>课程学科 *</label>
             <select id="pub-course-subject">
               <option value="">请选择</option>
               ${PUB_SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join('')}
             </select>
           </div>
         </div>
+        <div class="form-row" id="pub-course-grade-group" style="display:none">
+          <div class="form-group"><label>年龄段</label>
+            <select id="pub-course-grade">
+              <option value="">请选择</option>
+              ${PUB_GRADE_LEVELS.map(g => `<option value="${g}">${g}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"></div>
+        </div>
         <div class="form-row">
           <div class="form-group"><label>纯佣金 (%)</label><input type="number" id="pub-course-commission" min="0" max="100" step="0.01" placeholder="如 30"></div>
           <div class="form-group"><label>投流佣金 (%)</label><input type="number" id="pub-course-ad-commission" min="0" max="100" step="0.01" placeholder="如 40"></div>
         </div>
         <div class="form-group"><label>课程介绍</label><textarea id="pub-course-intro" rows="3" placeholder="课程内容介绍"></textarea></div>
+        <div class="form-group"><label>商品卖点</label><textarea id="pub-course-selling-points" rows="2" placeholder="如：①名师授课 ②体系化课程 ③配套练习"></textarea></div>
+        <div class="form-group"><label>备注</label><textarea id="pub-course-remark" rows="2" placeholder="其他说明"></textarea></div>
         <div class="form-group"><label>课程链接</label><input id="pub-course-link" placeholder="https://"></div>
         <div class="form-group"><label>课程图片URL</label><input id="pub-course-image" placeholder="图片链接（可选）"></div>
-        <input type="hidden" id="pub-course-merchant-id" value="${merchantId}">
         <button type="submit" class="btn btn-primary btn-block">发布课程需求</button>
       </form>
     </div></div>`;
@@ -3839,43 +3891,67 @@ function renderInfluencerDemandForm() {
         </div>
         <div class="form-row">
           <div class="form-group"><label>需求类型 *</label>
-            <select id="pub-inf-category" required>
+            <select id="pub-inf-category" required onchange="onInfCategoryChange()">
               ${PUB_INF_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
             </select>
           </div>
-          <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" min="0" step="1" readonly placeholder="选择达人后自动填充" style="background:#f8fafc"></div>
-        </div>` : `
+          <div class="form-group"><label>合作类型 *</label>
+            <select id="pub-inf-cooperation-type" required>
+              <option value="">请选择</option>
+              ${PUB_COOPERATION_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" min="0" step="1" readonly placeholder="选择达人后自动填充" style="background:#f8fafc"></div>` : `
         <div class="form-row">
           <div class="form-group"><label>视频号账号名称</label><input id="pub-inf-account" value="${isInfluencer ? escapeHtml(currentUser.name || '') : ''}" placeholder="达人视频号名称" ${isInfluencer ? 'readonly style="background:#f8fafc"' : ''}></div>
           <div class="form-group"><label>需求类型 *</label>
-            <select id="pub-inf-category" required>
+            <select id="pub-inf-category" required onchange="onInfCategoryChange()">
               ${PUB_INF_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
             </select>
           </div>
         </div>
-        <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" min="0" step="1" placeholder="500000" value="${currentUser.fans_count || ''}"></div>`}
         <div class="form-row">
-          <div class="form-group"><label>图书分类</label>
-            <select id="pub-inf-book-cat">
-              <option value="">请选择（图书需求时）</option>
-              ${PUB_BOOK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
-            </select>
-          </div>
-          <div class="form-group"><label>学科分类</label>
-            <select id="pub-inf-subject">
+          <div class="form-group"><label>合作类型 *</label>
+            <select id="pub-inf-cooperation-type" required>
               <option value="">请选择</option>
-              ${PUB_SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join('')}
+              ${PUB_COOPERATION_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
             </select>
           </div>
+          <div class="form-group"><label>粉丝数量</label><input type="number" id="pub-inf-fans" min="0" step="1" placeholder="500000" value="${currentUser.fans_count || ''}"></div>
+        </div>`}
+        <div id="pub-inf-book-fields" style="display:block">
+          <div class="form-row">
+            <div class="form-group"><label>图书分类</label>
+              <select id="pub-inf-book-cat">
+                <option value="">请选择</option>
+                ${PUB_BOOK_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>年龄段</label>
+              <select id="pub-inf-grade">
+                <option value="">请选择</option>
+                ${PUB_GRADE_LEVELS.map(g => `<option value="${g}">${g}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="form-group"><label>期望图书</label><input id="pub-inf-book-name" placeholder="如：少儿科普百科 / DK系列"></div>
         </div>
-        <div class="form-group"><label>期望图书</label><input id="pub-inf-book-name" placeholder="如：少儿科普百科 / DK系列（图书需求时填写）"></div>
-        <div class="form-row">
-          <div class="form-group"><label>图书可接受售价（最低，元）</label><input type="number" id="pub-inf-book-min" min="0" step="0.01" placeholder="0"></div>
-          <div class="form-group"><label>图书可接受售价（最高，元）</label><input type="number" id="pub-inf-book-max" min="0" step="0.01" placeholder="100"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>课程可接受价（最低，元）</label><input type="number" id="pub-inf-course-min" min="0" step="0.01" placeholder="0"></div>
-          <div class="form-group"><label>课程可接受价（最高，元）</label><input type="number" id="pub-inf-course-max" min="0" step="0.01" placeholder="3000"></div>
+        <div id="pub-inf-course-fields" style="display:none">
+          <div class="form-row">
+            <div class="form-group"><label>课程学科</label>
+              <select id="pub-inf-subject">
+                <option value="">请选择</option>
+                ${PUB_SUBJECTS.map(s => `<option value="${s}">${s}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>年龄段</label>
+              <select id="pub-inf-course-grade">
+                <option value="">请选择</option>
+                ${PUB_GRADE_LEVELS.map(g => `<option value="${g}">${g}</option>`).join('')}
+              </select>
+            </div>
+          </div>
         </div>
         <div class="form-group"><label>需求描述</label><textarea id="pub-inf-desc" rows="3" placeholder="描述您的需求（如：选品偏好、佣金期望、合作方式等）"></textarea></div>
         <button type="submit" class="btn btn-primary btn-block">发布达人需求</button>
@@ -3915,6 +3991,75 @@ function onPubInfluencerChange() {
   if (fans) fans.value = opt?.getAttribute('data-fans') || '';
 }
 
+// 达人需求：类型联动（图书/课程字段切换）
+function onInfCategoryChange() {
+  const cat = document.getElementById('pub-inf-category')?.value;
+  const bookFields = document.getElementById('pub-inf-book-fields');
+  const courseFields = document.getElementById('pub-inf-course-fields');
+  if (bookFields) bookFields.style.display = (cat === '课程需求') ? 'none' : 'block';
+  if (courseFields) courseFields.style.display = (cat === '课程需求') ? 'block' : 'none';
+}
+
+// 课程需求：分类联动（图书→图书分类 / 课程→学科+年龄段）
+function onCourseCategoryChange() {
+  const cat = document.getElementById('pub-course-category')?.value;
+  const bookCatGroup = document.getElementById('pub-course-book-cat-group');
+  const subjectGroup = document.getElementById('pub-course-subject-group');
+  const gradeGroup = document.getElementById('pub-course-grade-group');
+  if (bookCatGroup) bookCatGroup.style.display = (cat === '图书') ? '' : 'none';
+  if (subjectGroup) subjectGroup.style.display = (cat === '课程') ? '' : 'none';
+  if (gradeGroup) gradeGroup.style.display = (cat === '课程') ? '' : 'none';
+}
+
+// 管理员代发：商家模糊搜索（图书需求）
+async function onBookMerchantSearch(keyword) {
+  const dropdown = document.getElementById('pub-book-merchant-dropdown');
+  if (!dropdown) return;
+  if (!keyword || keyword.length < 1) { dropdown.style.display = 'none'; return; }
+  const merchants = await searchMerchants(keyword);
+  renderMerchantDropdown(dropdown, merchants, (m) => {
+    document.getElementById('pub-book-merchant-id').value = m.id;
+    document.getElementById('pub-book-merchant-search').value = m.company || m.name;
+    document.getElementById('pub-book-merchant').value = m.company || m.name;
+    dropdown.style.display = 'none';
+  });
+}
+
+// 管理员代发：商家模糊搜索（课程需求）
+async function onCourseMerchantSearch(keyword) {
+  const dropdown = document.getElementById('pub-course-merchant-dropdown');
+  if (!dropdown) return;
+  if (!keyword || keyword.length < 1) { dropdown.style.display = 'none'; return; }
+  const merchants = await searchMerchants(keyword);
+  renderMerchantDropdown(dropdown, merchants, (m) => {
+    document.getElementById('pub-course-merchant-id').value = m.id;
+    document.getElementById('pub-course-merchant-search').value = m.company || m.name;
+    dropdown.style.display = 'none';
+  });
+}
+
+// 通用商家搜索
+async function searchMerchants(keyword) {
+  try {
+    const res = await fetchAPI(`/merchants?keyword=${encodeURIComponent(keyword)}&pageSize=20`);
+    return res.success ? (res.data || []) : [];
+  } catch (e) { return []; }
+}
+
+// 渲染商家下拉选项
+function renderMerchantDropdown(dropdown, merchants, onSelect) {
+  if (merchants.length === 0) {
+    dropdown.innerHTML = '<div style="padding:10px;color:#94a3b8;font-size:13px">无匹配商家</div>';
+  } else {
+    dropdown.innerHTML = merchants.map(m =>
+      `<div style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f1f5f9" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='#fff'" onclick="this._onSelect()">${escapeHtml(m.company || m.name)}${m.phone ? ` <span style="color:#94a3b8">${escapeHtml(m.phone)}</span>` : ''}</div>`
+    ).join('');
+    const items = dropdown.querySelectorAll('div[onclick]');
+    merchants.forEach((m, i) => { if (items[i]) items[i]._onSelect = () => onSelect(m); });
+  }
+  dropdown.style.display = 'block';
+}
+
 function renderExcelImport() {
   return `
     <div class="card"><div class="card-header"><h3> Excel批量导入需求</h3></div><div class="card-body">
@@ -3947,10 +4092,12 @@ async function submitBookDemand(e) {
   if (!merchantId) { showToast('未识别商家身份，请重新登录', 'error'); return; }
   const data = {
     merchant_id: merchantId,
+    title: document.getElementById('pub-book-title')?.value || '',
     book_merchant: document.getElementById('pub-book-merchant').value,
     book_name: document.getElementById('pub-book-name').value,
     target_audience: document.getElementById('pub-book-audience').value,
     book_category: document.getElementById('pub-book-category').value,
+    cooperation_type: document.getElementById('pub-book-cooperation-type')?.value || '',
     specification: document.getElementById('pub-book-spec').value,
     selling_price: document.getElementById('pub-book-price').value,
     pure_commission: document.getElementById('pub-book-commission').value,
@@ -3979,15 +4126,22 @@ async function submitCourseDemand(e) {
   e.preventDefault();
   const merchantId = document.getElementById('pub-course-merchant-id').value || currentUser.id;
   if (!merchantId) { showToast('未识别商家身份，请重新登录', 'error'); return; }
+  const courseCat = document.getElementById('pub-course-category')?.value || '';
   const data = {
     merchant_id: merchantId,
+    title: document.getElementById('pub-course-title')?.value || '',
     course_name: document.getElementById('pub-course-name').value,
+    cooperation_type: document.getElementById('pub-course-cooperation-type')?.value || '',
+    course_category: courseCat,
     unit_price: document.getElementById('pub-course-price').value,
-    grade_level: document.getElementById('pub-course-grade').value,
-    subject: document.getElementById('pub-course-subject').value,
+    grade_level: document.getElementById('pub-course-grade')?.value || '',
+    subject: document.getElementById('pub-course-subject')?.value || '',
+    book_category: document.getElementById('pub-course-book-cat')?.value || '',
     pure_commission: document.getElementById('pub-course-commission').value,
     ad_commission: document.getElementById('pub-course-ad-commission').value,
     course_introduction: document.getElementById('pub-course-intro').value,
+    selling_points: (document.getElementById('pub-course-selling-points') || {}).value || '',
+    remark: (document.getElementById('pub-course-remark') || {}).value || '',
     course_link: document.getElementById('pub-course-link').value,
     course_image: document.getElementById('pub-course-image').value,
   };
@@ -4021,14 +4175,12 @@ async function submitInfluencerDemand(e) {
     influencer_id: influencerId,
     video_account_name: accountName,
     demand_category: document.getElementById('pub-inf-category').value,
+    cooperation_type: document.getElementById('pub-inf-cooperation-type')?.value || '',
     book_name: document.getElementById('pub-inf-book-name')?.value || '',
     book_category: document.getElementById('pub-inf-book-cat').value,
+    book_grade: document.getElementById('pub-inf-grade')?.value || '',
     subject_category: document.getElementById('pub-inf-subject').value,
-    book_price_min: document.getElementById('pub-inf-book-min').value || 0,
-    book_price_max: document.getElementById('pub-inf-book-max').value || 0,
-    course_price_min: document.getElementById('pub-inf-course-min').value || 0,
-    course_price_max: document.getElementById('pub-inf-course-max').value || 0,
-    fans_count: document.getElementById('pub-inf-fans').value || 0,
+    course_grade: document.getElementById('pub-inf-course-grade')?.value || '',
     description: document.getElementById('pub-inf-desc').value,
   };
   if (currentUser.role === 'admin') data.operator_id = currentUser.id;
@@ -4157,14 +4309,14 @@ async function renderMatchmaking(page = 1, pageSize = 20, stage = '', keyword = 
         <div class="mm-summary-sub">来自 ${dealCount} 单「开始合作」</div>
       </div>
       <div class="mm-summary-item">
-        <div class="mm-summary-label">需求建联（待跟进）</div>
-        <div class="mm-summary-value" style="color:#8b5cf6">${getStageCount('connected')}</div>
-        <div class="mm-summary-sub">需运营尽快推进</div>
+        <div class="mm-summary-label">需求回应（待处理）</div>
+        <div class="mm-summary-value" style="color:#3b82f6">${getStageCount('responded')}</div>
+        <div class="mm-summary-sub">需运营尽快处理</div>
       </div>
       <div class="mm-summary-item">
-        <div class="mm-summary-label">样品寄送中</div>
-        <div class="mm-summary-value" style="color:#f59e0b">${getStageCount('sample_sent')}</div>
-        <div class="mm-summary-sub">寄出待确认（可选环节）</div>
+        <div class="mm-summary-label">确认合作（待推进）</div>
+        <div class="mm-summary-value" style="color:#8b5cf6">${getStageCount('connected')}</div>
+        <div class="mm-summary-sub">需推进到开始合作</div>
       </div>
       <div class="mm-summary-item">
         <div class="mm-summary-label">开始合作</div>

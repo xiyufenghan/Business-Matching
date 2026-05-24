@@ -440,21 +440,22 @@ router.post('/recommend', (req, res) => {
 // 单条图书需求发布
 router.post('/book', (req, res) => {
   try {
-    const { merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id, selling_points, remark } = req.body;
+    const { merchant_id, title, book_image, book_merchant, book_name, target_audience, book_category, cooperation_type, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id, selling_points, remark } = req.body;
     if (!merchant_id || !book_name || !book_category || !book_merchant) {
       return res.status(400).json({ success: false, error: '商家ID、图书名称、图书分类、图书商家为必填项' });
     }
     const bookId = uuidv4();
     req.db.prepare(`
-      INSERT INTO book_demands (id, merchant_id, book_image, book_merchant, book_name, target_audience, book_category, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id, selling_points, remark)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(bookId, merchant_id, book_image || '', book_merchant, book_name, target_audience || '', book_category, product_image || '', book_introduction || '', wechat_shop_link || '', specification || '', parseFloat(selling_price) || 0, parseFloat(pure_commission) || 0, parseFloat(ad_commission) || 0, logistics || '', parseInt(stock) || 0, operator_id || null, selling_points || '', remark || '');
+      INSERT INTO book_demands (id, merchant_id, book_image, book_merchant, book_name, target_audience, book_category, cooperation_type, product_image, book_introduction, wechat_shop_link, specification, selling_price, pure_commission, ad_commission, logistics, stock, operator_id, selling_points, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(bookId, merchant_id, book_image || '', book_merchant, book_name, target_audience || '', book_category, cooperation_type || '', product_image || '', book_introduction || '', wechat_shop_link || '', specification || '', parseFloat(selling_price) || 0, parseFloat(pure_commission) || 0, parseFloat(ad_commission) || 0, logistics || '', parseInt(stock) || 0, operator_id || null, selling_points || '', remark || '');
     
     const demandId = uuidv4();
+    const demandTitle = title || (book_name + ' 推广');
     req.db.prepare(`
-      INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, description, status, ref_demand_id, operator_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(demandId, merchant_id, book_name + ' 推广', 'book', book_category.split(',')[0], '视频号', book_introduction || book_name, 'published', bookId, operator_id || null);
+      INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, description, status, ref_demand_id, operator_id, cooperation_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(demandId, merchant_id, demandTitle, 'book', book_category.split(',')[0], '视频号', book_introduction || book_name, 'published', bookId, operator_id || null, cooperation_type || '');
     
     // 企微推送：场景#2 商家发布需求
     try {
@@ -485,22 +486,23 @@ router.post('/book', (req, res) => {
 // 单条课程需求发布
 router.post('/course', (req, res) => {
   try {
-    const { merchant_id, course_image, course_name, unit_price, grade_level, subject, pure_commission, ad_commission, course_introduction, course_link, operator_id } = req.body;
+    const { merchant_id, title, course_image, course_name, cooperation_type, course_category, unit_price, grade_level, subject, book_category, pure_commission, ad_commission, course_introduction, course_link, operator_id, selling_points, remark } = req.body;
     if (!merchant_id || !course_name) {
       return res.status(400).json({ success: false, error: '商家ID、课程名称为必填项' });
     }
     const courseId = uuidv4();
     req.db.prepare(`
-      INSERT INTO course_demands (id, merchant_id, course_image, course_name, unit_price, grade_level, subject, pure_commission, ad_commission, course_introduction, course_link, operator_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(courseId, merchant_id, course_image || '', course_name, parseFloat(unit_price) || 0, grade_level || '', subject || '', parseFloat(pure_commission) || 0, parseFloat(ad_commission) || 0, course_introduction || '', course_link || '', operator_id || null);
+      INSERT INTO course_demands (id, merchant_id, course_image, course_name, cooperation_type, course_category, unit_price, grade_level, subject, book_category, pure_commission, ad_commission, course_introduction, course_link, operator_id, selling_points, remark)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(courseId, merchant_id, course_image || '', course_name, cooperation_type || '', course_category || '', parseFloat(unit_price) || 0, grade_level || '', subject || '', book_category || '', parseFloat(pure_commission) || 0, parseFloat(ad_commission) || 0, course_introduction || '', course_link || '', operator_id || null, selling_points || '', remark || '');
     
     const demandId = uuidv4();
-    const category = subject ? subject.split(',')[0] + '课程' : '课程';
+    const category = course_category === '图书' ? (book_category || '图书') : (subject ? subject.split(',')[0] + '课程' : '课程');
+    const demandTitle = title || (course_name + ' 推广');
     req.db.prepare(`
-      INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, description, status, ref_demand_id, operator_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(demandId, merchant_id, course_name + ' 推广', 'course', category, '视频号', course_introduction || course_name, 'published', courseId, operator_id || null);
+      INSERT INTO demands (id, merchant_id, title, demand_type, category, platform, description, status, ref_demand_id, operator_id, cooperation_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(demandId, merchant_id, demandTitle, 'course', category, '视频号', course_introduction || course_name, 'published', courseId, operator_id || null, cooperation_type || '');
     
     // 企微推送：场景#2 商家发布课程需求
     try {

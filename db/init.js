@@ -595,6 +595,30 @@ function initDatabase() {
     if (!idCols2.includes('cooperation_types')) db.exec('ALTER TABLE influencer_demands ADD COLUMN cooperation_types TEXT');
     // V4 新增：达人需求置顶字段
     if (!idCols2.includes('pinned_at')) db.exec('ALTER TABLE influencer_demands ADD COLUMN pinned_at DATETIME');
+    // V6 新增：合作类型 + 年龄段
+    if (!idCols2.includes('cooperation_type')) db.exec('ALTER TABLE influencer_demands ADD COLUMN cooperation_type TEXT');
+    if (!idCols2.includes('book_grade')) db.exec('ALTER TABLE influencer_demands ADD COLUMN book_grade TEXT');
+    if (!idCols2.includes('course_grade')) db.exec('ALTER TABLE influencer_demands ADD COLUMN course_grade TEXT');
+  } catch (e) { /* ignore */ }
+
+  // book_demands: V6 新增合作类型
+  try {
+    const bdCols2 = db.prepare('PRAGMA table_info(book_demands)').all().map(c => c.name);
+    if (!bdCols2.includes('cooperation_type')) db.exec('ALTER TABLE book_demands ADD COLUMN cooperation_type TEXT');
+  } catch (e) { /* ignore */ }
+
+  // course_demands: V6 新增合作类型+课程分类+图书分类+卖点+备注
+  try {
+    const cdCols2 = db.prepare('PRAGMA table_info(course_demands)').all().map(c => c.name);
+    if (!cdCols2.includes('cooperation_type')) db.exec('ALTER TABLE course_demands ADD COLUMN cooperation_type TEXT');
+    if (!cdCols2.includes('course_category')) db.exec('ALTER TABLE course_demands ADD COLUMN course_category TEXT');
+    if (!cdCols2.includes('book_category')) db.exec('ALTER TABLE course_demands ADD COLUMN book_category TEXT');
+  } catch (e) { /* ignore */ }
+
+  // demands: V6 新增合作类型
+  try {
+    const demCols2 = db.prepare('PRAGMA table_info(demands)').all().map(c => c.name);
+    if (!demCols2.includes('cooperation_type')) db.exec('ALTER TABLE demands ADD COLUMN cooperation_type TEXT');
   } catch (e) { /* ignore */ }
 
   // cooperation: 补 influencer_demand_id 字段（模式C/D 关联达人需求）
