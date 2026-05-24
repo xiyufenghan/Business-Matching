@@ -118,8 +118,6 @@ body {
 .login-decor {
   position: absolute;
   z-index: 0;
-  opacity: 0.15;
-  filter: brightness(2) saturate(0.3);
   pointer-events: none;
 }
 .login-decor-handshake {

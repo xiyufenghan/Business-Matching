@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 打开的书 -->
+  <path d="M60 90 Q80 80, 100 85 Q120 80, 140 90"/>
+  <path d="M60 90 L60 120 Q80 110, 100 115 Q120 110, 140 120 L140 90"/>
+  <line x1="100" y1="85" x2="100" y2="115" stroke-width="1"/>
+  <!-- 书页横线 -->
+  <line x1="70" y1="98" x2="92" y2="95" stroke-width="0.8" opacity="0.4"/>
+  <line x1="70" y1="105" x2="92" y2="102" stroke-width="0.8" opacity="0.4"/>
+  <line x1="70" y1="112" x2="92" y2="109" stroke-width="0.8" opacity="0.4"/>
+  <line x1="108" y1="95" x2="130" y2="98" stroke-width="0.8" opacity="0.4"/>
+  <line x1="108" y1="102" x2="130" y2="105" stroke-width="0.8" opacity="0.4"/>
+  <line x1="108" y1="109" x2="130" y2="112" stroke-width="0.8" opacity="0.4"/>
+  <!-- 叠放的书本 -->
+  <rect x="30" y="130" width="45" height="8" rx="2" stroke-width="1" opacity="0.35" transform="rotate(-3,52,134)"/>
+  <rect x="33" y="140" width="40" height="7" rx="2" stroke-width="1" opacity="0.3" transform="rotate(2,53,143)"/>
+  <rect x="125" y="128" width="42" height="8" rx="2" stroke-width="1" opacity="0.35" transform="rotate(4,146,132)"/>
+  <rect x="128" y="138" width="38" height="7" rx="2" stroke-width="1" opacity="0.3" transform="rotate(-2,147,141)"/>
+  <!-- 灯泡（创意/知识） -->
+  <circle cx="100" cy="50" r="16" stroke-width="1.2" opacity="0.35"/>
+  <path d="M92 66 L92 72 Q92 76, 96 78 L104 78 Q108 76, 108 72 L108 66" stroke-width="1" opacity="0.35"/>
+  <line x1="95"  y1="74" x2="105" y2="74" stroke-width="0.8" opacity="0.25"/>
+  <line x1="96"  y1="77" x2="104" y2="77" stroke-width="0.8" opacity="0.25"/>
+  <!-- 灯泡光线 -->
+  <line x1="100" y1="28" x2="100" y2="22" stroke-width="1" opacity="0.2"/>
+  <line x1="116" y1="35" x2="121" y2="30" stroke-width="1" opacity="0.2"/>
+  <line x1="84" y1="35" x2="79" y2="30" stroke-width="1" opacity="0.2"/>
+  <line x1="122" y1="50" x2="128" y2="50" stroke-width="1" opacity="0.15"/>
+  <line x1="78" y1="50" x2="72" y2="50" stroke-width="1" opacity="0.15"/>
+  <!-- 齿轮（运营/机制） -->
+  <circle cx="160" cy="75" r="12" stroke-width="1" opacity="0.2"/>
+  <circle cx="160" cy="75" r="5" stroke-width="1" opacity="0.2"/>
+  <line x1="160" y1="61" x2="160" y2="57" stroke-width="2" opacity="0.2"/>
+  <line x1="160" y1="89" x2="160" y2="93" stroke-width="2" opacity="0.2"/>
+  <line x1="146" y1="75" x2="142" y2="75" stroke-width="2" opacity="0.2"/>
+  <line x1="174" y1="75" x2="178" y2="75" stroke-width="2" opacity="0.2"/>
+  <line x1="150" y1="65" x2="147" y2="62" stroke-width="2" opacity="0.2"/>
+  <line x1="170" y1="85" x2="173" y2="88" stroke-width="2" opacity="0.2"/>
+  <line x1="150" y1="85" x2="147" y2="88" stroke-width="2" opacity="0.2"/>
+  <line x1="170" y1="65" x2="173" y2="62" stroke-width="2" opacity="0.2"/>
+  <!-- 连接箭头（撮合） -->
+  <path d="M40 60 Q30 50, 35 38" stroke-width="1" opacity="0.2"/>
+  <path d="M35 38 L30 42 M35 38 L39 42" stroke-width="1" opacity="0.2"/>
+  <circle cx="40" cy="60" r="3" stroke-width="0.8" opacity="0.15"/>
+</svg>

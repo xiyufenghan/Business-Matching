@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 握手 -->
+  <path d="M40 110 L60 95 L80 100 L95 85"/>
+  <path d="M160 110 L140 95 L120 100 L105 85"/>
+  <path d="M95 85 L100 80 L105 85"/>
+  <path d="M80 100 L85 105 L95 100 L105 110 L115 105 L120 100"/>
+  <path d="M40 110 L40 130 L60 140"/>
+  <path d="M160 110 L160 130 L140 140"/>
+  <!-- 袖口线条 -->
+  <path d="M35 108 C30 105, 28 100, 30 95"/>
+  <path d="M165 108 C170 105, 172 100, 170 95"/>
+  <!-- 放射光线 -->
+  <line x1="100" y1="45" x2="100" y2="25" stroke-width="1" opacity="0.5"/>
+  <line x1="75" y1="52" x2="65" y2="35" stroke-width="1" opacity="0.5"/>
+  <line x1="125" y1="52" x2="135" y2="35" stroke-width="1" opacity="0.5"/>
+  <line x1="60" y1="68" x2="45" y2="55" stroke-width="1" opacity="0.4"/>
+  <line x1="140" y1="68" x2="155" y2="55" stroke-width="1" opacity="0.4"/>
+  <!-- 合作圆环 -->
+  <circle cx="100" cy="80" r="35" stroke-width="1" opacity="0.15"/>
+  <!-- 小星星 -->
+  <path d="M55 50 L57 46 L59 50 L63 52 L59 54 L57 58 L55 54 L51 52 Z" stroke-width="0.8" opacity="0.3"/>
+  <path d="M145 55 L146.5 52 L148 55 L151 56.5 L148 58 L146.5 61 L145 58 L142 56.5 Z" stroke-width="0.8" opacity="0.25"/>
+</svg>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- 大学分馆建筑 -->
+  <rect x="50" y="70" width="100" height="70" rx="2"/>
+  <!-- 圆顶 -->
+  <path d="M70 70 C70 50, 130 50, 130 70"/>
+  <!-- 旗杆 -->
+  <line x1="100" y1="50" x2="100" y2="30"/>
+  <path d="M100 30 L115 35 L100 40" fill="rgba(255,255,255,0.1)" stroke-width="1"/>
+  <!-- 柱子 -->
+  <line x1="65" y1="70" x2="65" y2="140" stroke-width="2.5" opacity="0.6"/>
+  <line x1="85" y1="70" x2="85" y2="140" stroke-width="2.5" opacity="0.6"/>
+  <line x1="115" y1="70" x2="115" y2="140" stroke-width="2.5" opacity="0.6"/>
+  <line x1="135" y1="70" x2="135" y2="140" stroke-width="2.5" opacity="0.6"/>
+  <!-- 门 -->
+  <path d="M92 140 L92 110 Q100 100, 108 110 L108 140"/>
+  <!-- 台阶 -->
+  <line x1="45" y1="140" x2="155" y2="140"/>
+  <line x1="48" y1="145" x2="152" y2="145"/>
+  <line x1="51" y1="150" x2="149" y2="150"/>
+  <!-- 窗户 -->
+  <rect x="70" y="85" width="12" height="12" rx="1" stroke-width="1" opacity="0.4"/>
+  <rect x="118" y="85" width="12" height="12" rx="1" stroke-width="1" opacity="0.4"/>
+  <!-- 底部书本 -->
+  <rect x="60" y="160" width="25" height="6" rx="1" stroke-width="1" opacity="0.5" transform="rotate(-5,72,163)"/>
+  <rect x="88" y="158" width="22" height="5" rx="1" stroke-width="1" opacity="0.4" transform="rotate(3,99,160)"/>
+  <rect x="113" y="161" width="20" height="5" rx="1" stroke-width="1" opacity="0.45" transform="rotate(-2,123,163)"/>
+  <!-- 学士帽 -->
+  <path d="M155 60 L170 52 L185 60 L170 68 Z" stroke-width="1" opacity="0.3"/>
+  <line x1="170" y1="68" x2="170" y2="78" stroke-width="1" opacity="0.3"/>
+  <path d="M185 60 L185 70 Q170 78, 155 70 L155 60" stroke-width="1" opacity="0.2"/>
+  <line x1="170" y1="52" x2="170" y2="44" stroke-width="0.8" opacity="0.25"/>
+  <circle cx="170" cy="42" r="2" stroke-width="0.8" opacity="0.25"/>
+</svg>
