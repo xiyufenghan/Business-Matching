@@ -114,6 +114,45 @@ body {
   66% { transform: translate(-15px, 15px) rotate(-1deg); }
 }
 
+/* 背景装饰图 */
+.login-decor {
+  position: absolute;
+  z-index: 0;
+  opacity: 0.15;
+  filter: brightness(2) saturate(0.3);
+  pointer-events: none;
+}
+.login-decor-handshake {
+  bottom: 5%;
+  left: 5%;
+  width: 280px;
+  animation: decorFloat 20s infinite ease-in-out;
+}
+.login-decor-campus {
+  top: 3%;
+  right: 3%;
+  width: 260px;
+  animation: decorFloat 24s infinite reverse ease-in-out;
+}
+.login-decor-books {
+  bottom: 15%;
+  right: 8%;
+  width: 200px;
+  animation: decorFloat 18s infinite ease-in-out;
+}
+@keyframes decorFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-15px) scale(1.02); }
+}
+@media (max-width: 1200px) {
+  .login-decor-handshake { width: 200px; opacity: 0.10; }
+  .login-decor-campus { width: 180px; opacity: 0.10; }
+  .login-decor-books { width: 140px; opacity: 0.10; }
+}
+@media (max-width: 768px) {
+  .login-decor { display: none; }
+}
+
 .login-card {
   background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(20px);
