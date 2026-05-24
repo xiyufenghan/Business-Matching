@@ -69,3 +69,35 @@ node db/reset-to-production.js --yes      # 非交互直接执行
 - **主仓库（默认 push & pull）**：Gitee — `gitee.com/xiyufenghan/Business-Matching`
 - **备份仓库**：GitHub — `github.com/xiyufenghan/Business-Matching`
 - **生产服务器** `/opt/bizmatch`：从 Gitee 拉取
+
+## 生产部署
+
+**服务器**：腾讯云轻量应用服务器 `lhins-1kh87y02`（ap-beijing, 82.156.82.50）
+
+**进程管理**：PM2，进程名 `bizmatch`
+
+```bash
+# 启动（必须指定 PORT=8001，默认 3000 被占用）
+PORT=8001 pm2 start app.js --name bizmatch
+
+# 更新代码并重启
+cd /opt/bizmatch && git pull origin main && pm2 restart bizmatch
+
+# 查看状态
+pm2 show bizmatch
+```
+
+**Nginx 反代**：`bizmatch.dacongming.chat` → `127.0.0.1:8001`（SSL 证书 `/etc/letsencrypt/live/bizmatch.dacongming.chat/`）
+
+### 北京服务器端口分配（3000-3005 均已占用）
+
+| 端口 | 服务 | 方式 |
+|------|------|------|
+| 3000 | market-advisor | Docker |
+| 3001 | flashcamp-class | PM2 |
+| 3002 | skillstore | Docker |
+| 3003 | huiben | Docker |
+| 3005 | xiaodian-server | Docker |
+| **8001** | **bizmatch（本系统）** | **PM2** |
+
+> ⚠️ **重要**：`bizmatch` 必须使用 `PORT=8001`，绝不能使用默认 3000。2026-05-25 曾因 PM2 注册的 bizmatch 使用默认端口 3000 与 Docker 冲突，导致进程反复重启 106 次进入 errored 状态。今后重建 PM2 进程时务必带 `PORT=8001` 环境变量。
